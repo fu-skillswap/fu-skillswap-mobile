@@ -6,3 +6,9 @@
 
 process.env.EXPO_PUBLIC_API_URL ??= 'https://api.skillswap.asia';
 process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??= 'test-web-client-id.apps.googleusercontent.com';
+
+import axios from 'axios';
+
+// MSW chặn ở tầng http của Node; trong Jest phải ép axios dùng adapter 'http'
+// thay vì XMLHttpRequest thì handler mới bắt được request.
+axios.defaults.adapter = 'http';
