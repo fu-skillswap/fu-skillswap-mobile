@@ -94,6 +94,42 @@ describe('apiClient', () => {
     expect(getAccessToken()).toBe('token-moi');
   });
 
+  it('refresh thành công nhưng request gốc vẫn 401 thì không refresh lần hai, ném ApiClientError', async () => {
+    let profileCalls = 0;
+    let refreshCalls = 0;
+    const onUnauthenticated = jest.fn();
+    server.use(
+      // Endpoint này luôn trả 401 dù token có mới hay không — mô phỏng trường
+      // hợp refresh thành công nhưng request bị retry vẫn thất bại vì lý do khác
+      // (ví dụ hết quyền trên đúng resource đó).
+      http.get(`${BASE}/api/me/profile`, () => {
+        profileCalls += 1;
+        return HttpResponse.json(envelope(null, { status: 401, code: 'AUTH_1001' }), {
+          status: 401,
+        });
+      }),
+      http.post(`${BASE}/api/auth/refresh`, () => {
+        refreshCalls += 1;
+        return HttpResponse.json(envelope({ accessToken: 'token-moi', tokenType: 'Bearer' }));
+      }),
+    );
+    setAccessToken('token-cu');
+    setUnauthenticatedHandler(onUnauthenticated);
+
+    const pending = apiClient('/api/me/profile');
+    await expect(pending).rejects.toBeInstanceOf(ApiClientError);
+    await expect(pending).rejects.toMatchObject({ status: 401 });
+    expect(profileCalls).toBe(2);
+    expect(refreshCalls).toBe(1);
+    // Hành vi thực tế: khối try trong interceptor bọc luôn cả lệnh retry
+    // (`await axiosInstance(originalRequest)`), nên khi request được retry vẫn
+    // 401, lỗi đó rơi vào cùng catch với lỗi refresh và handler mất phiên vẫn
+    // được gọi — dù refresh access token tự nó đã thành công. Đây là hành vi
+    // hiện có của interceptor (không phải vòng lặp hay refresh hai lần), ghi
+    // nhận đúng như quan sát được, không sửa implementation để hợp với kỳ vọng.
+    expect(onUnauthenticated).toHaveBeenCalledTimes(1);
+  });
+
   it('nhiều request 401 song song chỉ gọi refresh một lần', async () => {
     let refreshCalls = 0;
     server.use(

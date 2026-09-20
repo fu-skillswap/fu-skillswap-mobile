@@ -85,7 +85,10 @@ axiosInstance.interceptors.response.use(
     const envelope = response.data as ApiResponse<unknown> | null;
     if (envelope && typeof envelope === 'object' && 'data' in envelope) {
       // `data` có thể là null hợp lệ với HTTP 2xx — không được coi là lỗi.
-      return envelope.data;
+      // Bắt buộc ép kiểu `any`: chữ ký interceptor của axios yêu cầu trả về
+      // `AxiosResponse | Promise<AxiosResponse>`, nhưng interceptor này cố ý
+      // trả thẳng payload đã bóc khỏi envelope (đổi hẳn kiểu trả về).
+      return envelope.data as any;
     }
     return response.data;
   },
