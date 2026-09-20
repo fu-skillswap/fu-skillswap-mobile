@@ -113,6 +113,22 @@ function normalize(value: unknown, seen: WeakSet<object>): unknown {
     );
   }
 
+  if (typeof value === 'symbol' || typeof value === 'bigint') {
+    // symbol và bigint không khớp nhánh object ở trên (typeof của chúng không
+    // phải 'object') nên nếu không chặn riêng, chúng sẽ rơi thẳng xuống
+    // `return value` cuối cùng. Với symbol, JSON.stringify(symbol) trả về
+    // runtime undefined (fingerprint() sẽ trả undefined dù khai báo kiểu là
+    // string — type nói dối), còn symbol lồng trong object thì bị
+    // JSON.stringify âm thầm bỏ qua (gộp trùng dấu vân tay với object không
+    // có trường đó — cùng kiểu collision đã chặn cho Map/Set ở trên). Với
+    // bigint, JSON.stringify ném TypeError runtime mù mờ. Cả hai đều ném lỗi
+    // rõ ràng ngay tại đây thay vì để rơi vào các hành vi ngầm đó.
+    const typeName = typeof value;
+    throw new Error(
+      `Không thể tính dấu vân tay ổn định cho payload chứa giá trị kiểu "${typeName}" (không tuần tự hoá được bằng JSON.stringify). Hãy chuyển giá trị này sang dạng thuần (string/number/boolean/null) trước khi dùng làm payload cho keyFor.`
+    );
+  }
+
   // Giá trị nguyên thuỷ (string, number, boolean) hoặc null: JSON.stringify
   // tự xử lý ổn định, không cần chuẩn hoá thêm.
   return value;

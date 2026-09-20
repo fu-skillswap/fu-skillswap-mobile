@@ -113,6 +113,17 @@ describe('idempotency', () => {
     ).toBe('uuid-1');
   });
 
+  it('hai giá trị Date khác giờ nhưng cùng ngày thì vẫn sinh key khác nhau', () => {
+    const store = createIdempotencyStore();
+
+    expect(
+      store.keyFor('booking:create:b1', { at: new Date('2026-03-10T08:00:00.000Z') })
+    ).toBe('uuid-1');
+    expect(
+      store.keyFor('booking:create:b1', { at: new Date('2026-03-10T18:00:00.000Z') })
+    ).toBe('uuid-2');
+  });
+
   it('payload chứa Map thì báo lỗi rõ ràng thay vì âm thầm gán key', () => {
     const store = createIdempotencyStore();
 
@@ -149,5 +160,40 @@ describe('idempotency', () => {
 
     expect(store.keyFor('checkin:c2')).toBe('uuid-1');
     expect(store.keyFor('checkin:c2', undefined)).toBe('uuid-1');
+  });
+
+  it('payload có tham chiếu vòng (circular) trong một mảng thì báo lỗi rõ ràng, không làm sập stack', () => {
+    const store = createIdempotencyStore();
+
+    const circular: unknown[] = [1];
+    circular.push(circular);
+
+    expect(() => store.keyFor('booking:create:b1', circular)).toThrow(
+      /tham chiếu vòng/i
+    );
+  });
+
+  it('payload là Symbol ở cấp cao nhất thì báo lỗi rõ ràng thay vì trả về undefined', () => {
+    const store = createIdempotencyStore();
+
+    expect(() => store.keyFor('booking:create:b1', Symbol('x'))).toThrow(
+      /không thể tính dấu vân tay/i
+    );
+  });
+
+  it('payload chứa Symbol ở một trường lồng bên trong thì báo lỗi rõ ràng thay vì âm thầm bỏ trường', () => {
+    const store = createIdempotencyStore();
+
+    expect(() =>
+      store.keyFor('booking:create:b1', { a: 1, b: Symbol('x') })
+    ).toThrow(/không thể tính dấu vân tay/i);
+  });
+
+  it('payload là BigInt thì báo lỗi rõ ràng thay vì để JSON.stringify ném TypeError khó hiểu', () => {
+    const store = createIdempotencyStore();
+
+    expect(() => store.keyFor('booking:create:b1', 10n)).toThrow(
+      /không thể tính dấu vân tay/i
+    );
   });
 });
