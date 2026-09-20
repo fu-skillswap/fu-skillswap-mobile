@@ -90,4 +90,64 @@ describe('idempotency', () => {
     expect(storeA.keyFor('booking:create:b1', { goal: 'X' })).toBe('uuid-1');
     expect(storeB.keyFor('booking:create:b1', { goal: 'X' })).toBe('uuid-2');
   });
+
+  it('hai giá trị Date khác nhau trong cùng một trường thì sinh key khác nhau', () => {
+    const store = createIdempotencyStore();
+
+    expect(
+      store.keyFor('booking:create:b1', { at: new Date('2026-01-01T00:00:00.000Z') })
+    ).toBe('uuid-1');
+    expect(
+      store.keyFor('booking:create:b1', { at: new Date('2026-01-02T00:00:00.000Z') })
+    ).toBe('uuid-2');
+  });
+
+  it('cùng một giá trị Date (kể cả tạo lại bằng instance khác) thì giữ nguyên key', () => {
+    const store = createIdempotencyStore();
+
+    expect(
+      store.keyFor('booking:create:b1', { at: new Date('2026-01-01T00:00:00.000Z') })
+    ).toBe('uuid-1');
+    expect(
+      store.keyFor('booking:create:b1', { at: new Date('2026-01-01T00:00:00.000Z') })
+    ).toBe('uuid-1');
+  });
+
+  it('payload chứa Map thì báo lỗi rõ ràng thay vì âm thầm gán key', () => {
+    const store = createIdempotencyStore();
+
+    expect(() =>
+      store.keyFor('booking:create:b1', { data: new Map([[1, 2]]) })
+    ).toThrow(/không thể tính dấu vân tay/i);
+  });
+
+  it('payload là class instance (không phải object thuần) thì báo lỗi rõ ràng', () => {
+    const store = createIdempotencyStore();
+
+    class Slot {
+      id = 'a';
+    }
+
+    expect(() => store.keyFor('booking:create:b1', new Slot())).toThrow(
+      /không thể tính dấu vân tay/i
+    );
+  });
+
+  it('payload có tham chiếu vòng (circular) thì báo lỗi rõ ràng, không làm sập stack', () => {
+    const store = createIdempotencyStore();
+
+    const circular: Record<string, unknown> = { a: 1 };
+    circular.self = circular;
+
+    expect(() => store.keyFor('booking:create:b1', circular)).toThrow(
+      /tham chiếu vòng/i
+    );
+  });
+
+  it('keyFor không truyền payload và keyFor với payload undefined dùng chung một dấu vân tay', () => {
+    const store = createIdempotencyStore();
+
+    expect(store.keyFor('checkin:c2')).toBe('uuid-1');
+    expect(store.keyFor('checkin:c2', undefined)).toBe('uuid-1');
+  });
 });
