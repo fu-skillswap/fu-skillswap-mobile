@@ -1,3 +1,4 @@
+import CookieManager from '@preeternal/react-native-cookie-manager';
 import { Platform } from 'react-native';
 
 import {
@@ -7,16 +8,27 @@ import {
   persistSessionCookies,
 } from '@/core/auth/session';
 
-const mockCookieManager = {
-  flush: jest.fn().mockResolvedValue(undefined),
-  clearAll: jest.fn().mockResolvedValue(true),
-  get: jest.fn().mockResolvedValue({}),
-};
-
-jest.mock('@react-native-cookies/cookies', () => ({
+/**
+ * Mock được tạo hoàn toàn bên trong factory của `jest.mock` (không tham chiếu
+ * biến ngoài) vì factory bị Jest hoist lên trên mọi khai báo `const`/`import`
+ * trong file — nếu để đối tượng mock ở ngoài rồi tham chiếu vào trong factory,
+ * factory sẽ chạy trước khi biến đó được gán và chỉ nhận `undefined`.
+ *
+ * Hình dạng trả về `{ __esModule: true, default: {...} }` khớp với cách
+ * `@preeternal/react-native-cookie-manager` export thật: package export
+ * `export default CookieManager` (ESM), nên khi Metro/Babel biên dịch sang
+ * CommonJS ở runtime, module sẽ có đúng hai khoá này.
+ */
+jest.mock('@preeternal/react-native-cookie-manager', () => ({
   __esModule: true,
-  default: mockCookieManager,
+  default: {
+    flush: jest.fn().mockResolvedValue(undefined),
+    clearAll: jest.fn().mockResolvedValue(true),
+    get: jest.fn().mockResolvedValue({}),
+  },
 }));
+
+const mockCookieManager = jest.mocked(CookieManager);
 
 /** Platform.OS là thuộc tính chỉ đọc theo typings của RN, phải ghi đè qua defineProperty */
 function setPlatform(os: 'android' | 'ios'): void {
