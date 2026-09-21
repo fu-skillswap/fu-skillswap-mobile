@@ -229,4 +229,10 @@ export function __resetApiClientForTests(): void {
   sessionEpoch = 0;
   unauthenticatedHandler = undefined;
   tokenRefreshedHandler = undefined;
+  // Instance axios cũng phải bị xoá: nó nhớ `baseURL` chốt tại lúc tạo (đọc từ
+  // getEnv() ở đúng một lần gọi getAxiosInstance() đầu tiên). Nếu test đổi
+  // EXPO_PUBLIC_API_URL rồi resetEnvCache() mà không xoá instance này, request
+  // tiếp theo vẫn âm thầm dùng baseURL cũ — resetEnvCache() trông như không
+  // làm gì cả.
+  axiosInstance = null;
 }

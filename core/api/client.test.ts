@@ -313,4 +313,38 @@ describe('cấu hình môi trường', () => {
       resetEnvCache();
     }
   });
+
+  it('__resetApiClientForTests xoá luôn axios instance đã memo hoá, không chỉ token/epoch/handler', async () => {
+    // Fix 3 (đợt review cuối): axios instance được tạo lười và nhớ lại (memo
+    // hoá) ở lần request đầu tiên — chốt baseURL đọc từ getEnv() ngay lúc đó.
+    // Nếu __resetApiClientForTests() không xoá luôn instance này, một test đổi
+    // EXPO_PUBLIC_API_URL rồi gọi resetEnvCache() sẽ thấy resetEnvCache() "như
+    // không làm gì": request tiếp theo vẫn âm thầm bay tới baseURL CŨ.
+    const originalApiUrl = process.env.EXPO_PUBLIC_API_URL;
+    const NEW_BASE = 'https://api-doi.skillswap.asia';
+    try {
+      // Chạm getAxiosInstance() một lần với baseURL CŨ để nó bị memo hoá.
+      server.use(http.get(`${BASE}/api/auth/me`, () => HttpResponse.json(envelope({ ok: true }))));
+      await apiClient('/api/auth/me');
+
+      process.env.EXPO_PUBLIC_API_URL = NEW_BASE;
+      resetEnvCache();
+      __resetApiClientForTests();
+
+      let calledNewBase = false;
+      server.use(
+        http.get(`${NEW_BASE}/api/auth/me`, () => {
+          calledNewBase = true;
+          return HttpResponse.json(envelope({ ok: true }));
+        }),
+      );
+
+      await apiClient('/api/auth/me');
+
+      expect(calledNewBase).toBe(true);
+    } finally {
+      process.env.EXPO_PUBLIC_API_URL = originalApiUrl;
+      resetEnvCache();
+    }
+  });
 });
