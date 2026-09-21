@@ -6,7 +6,7 @@ import type { AuthContextValue } from '@/core/auth/AuthProvider';
 import { useAuth } from '@/core/auth/AuthProvider';
 import type { UserMeResponse } from '@/core/auth/types';
 
-import UnsupportedAccountScreen from './unsupported-account';
+import UnsupportedAccountScreen from '@/app/(auth)/unsupported-account';
 
 // Đây là màn hình đóng vòng lặp redirect vô hạn (Critical, đợt review cuối):
 // PHẢI là trạng thái cuối khi route === 'unsupported' — không được render

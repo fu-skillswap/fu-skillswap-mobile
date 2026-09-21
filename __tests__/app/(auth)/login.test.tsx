@@ -6,7 +6,7 @@ import type { AuthContextValue } from '@/core/auth/AuthProvider';
 import { useAuth } from '@/core/auth/AuthProvider';
 import type { UserMeResponse } from '@/core/auth/types';
 
-import LoginScreen from './login';
+import LoginScreen from '@/app/(auth)/login';
 
 // Bug gốc (Critical): trước khi sửa, màn hình này không đọc `status` và không
 // tự điều hướng — sau khi đăng nhập thành công, status chuyển 'authenticated'

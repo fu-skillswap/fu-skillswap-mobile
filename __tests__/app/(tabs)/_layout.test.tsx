@@ -6,7 +6,7 @@ import type { AuthContextValue } from '@/core/auth/AuthProvider';
 import { useAuth } from '@/core/auth/AuthProvider';
 import type { UserMeResponse } from '@/core/auth/types';
 
-import TabsLayout from './_layout';
+import TabsLayout from '@/app/(tabs)/_layout';
 
 // Bug gốc (Critical, mặt còn lại): _layout coi 'loading' như chưa đăng nhập
 // nên deep link vào /(tabs) lúc khởi động bị bật thẳng về login rồi kẹt lại
