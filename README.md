@@ -1,56 +1,57 @@
-# Welcome to your Expo app 👋
+# SkillSwap Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App React Native (Expo) cho SkillSwap — dùng chung backend với [`fu-skillswap-fe-2`](../fu-skillswap-fe-2).
 
-## Get started
+Thiết kế: [`docs/superpowers/specs/2026-09-18-skillswap-mobile-design.md`](../docs/superpowers/specs/2026-09-18-skillswap-mobile-design.md).
+Kế hoạch giai đoạn nền tảng: [`docs/superpowers/plans/2026-09-20-skillswap-mobile-foundation.md`](../docs/superpowers/plans/2026-09-20-skillswap-mobile-foundation.md).
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Bắt đầu
 
 ```bash
-npm run reset-project
+npm install
+cp .env.example .env    # rồi điền EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+App dùng **development build**, không chạy trên Expo Go: nó cần các native module
+(`@preeternal/react-native-cookie-manager`, `@react-native-google-signin/google-signin`)
+mà Expo Go không có sẵn.
 
-### Other setup steps
+## Lệnh thường dùng
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+| Lệnh | Việc |
+|---|---|
+| `npm test` | Chạy toàn bộ test (Jest + React Native Testing Library + MSW) |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npx expo start` | Metro dev server |
+| `npx expo run:android` | Build và cài development build lên máy Android |
 
-## Learn more
+### Lần typecheck đầu tiên sau khi clone sẽ chậm hơn
 
-To learn more about developing your project with Expo, look at the following resources:
+`experiments.typedRoutes` đang bật, nên các route literal (`<Redirect href="/(tabs)" />`)
+được kiểm kiểu theo `.expo/types/router.d.ts` — một file **sinh tự động** và bị
+gitignore. Trên bản clone sạch, file đó chưa tồn tại và `tsc` sẽ báo `TS2322` ở
+mọi route literal dù code hoàn toàn đúng.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+`npm run typecheck` tự xử lý việc này: `scripts/ensure-router-types.js` phát hiện
+file thiếu, bật Metro vừa đủ lâu để Expo sinh file rồi tắt ngay (~10 giây, chỉ một
+lần). Các lần sau chạy tức thì. Expo SDK 57 không có lệnh typegen độc lập và
+`expo export` không sinh file này — chỉ dev server mới sinh.
 
-## Join the community
+## Trạng thái hiện tại
 
-Join our community of developers creating universal apps.
+Giai đoạn 1 (nền tảng) — xem plan để biết chi tiết từng task:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `core/api` — HTTP client bóc envelope `ApiResponse<T>`, tự refresh khi `401`
+  (promise singleton, retry đúng một lần), `ApiClientError` + `toUserMessage`,
+  `Idempotency-Key` gắn theo payload.
+- `core/auth` — phiên đăng nhập trên cookie store native, Google Sign-In, `authRepo`,
+  `AuthProvider`.
+- `core/config` — biến môi trường, bảng tab theo vai trò.
+- `core/ui` — design token port từ `styles/globals.css` của FE web.
+- `app/` — khung điều hướng expo-router: màn hình đăng nhập và 5 tab placeholder.
+
+### Chưa chạy được đầu–cuối
+
+Luồng đăng nhập cần backend bổ sung endpoint `/api/auth/google/mobile`. Lý do và
+nội dung đề nghị: [`docs/be-change-requests/2026-09-21-mobile-google-login-nonce.md`](../docs/be-change-requests/2026-09-21-mobile-google-login-nonce.md).

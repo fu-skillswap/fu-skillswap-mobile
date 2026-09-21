@@ -50,7 +50,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "test": "jest --watchAll=false",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "node scripts/ensure-router-types.js && tsc --noEmit"
   },
   "jest": {
     "preset": "jest-expo",
