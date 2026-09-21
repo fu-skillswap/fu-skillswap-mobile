@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
+import { ApiClientError } from '@/core/api/errors';
 import { AuthProvider, useAuth } from '@/core/auth/AuthProvider';
 
 const BASE = 'https://api.skillswap.asia';
@@ -128,6 +129,32 @@ describe('AuthProvider', () => {
     });
 
     await waitFor(() => expect(result.current.status).toBe('unauthenticated'));
+    expect(clearSessionCookies).toHaveBeenCalledTimes(1);
+  });
+
+  it('đăng xuất khi logout lỗi mạng vẫn kết thúc phiên cục bộ', async () => {
+    // Nếu phần dọn dẹp nằm trong nhánh thành công thay vì `finally`, người dùng
+    // bấm thoát lúc mất mạng sẽ vẫn ở trạng thái đã đăng nhập với token còn
+    // sống — tưởng đã thoát mà thực ra chưa. Test này khoá nhánh `finally` ở
+    // mức AuthProvider (authRepo.test.ts chỉ khoá được phần xoá access token).
+    const { clearSessionCookies } = jest.requireMock('@/core/auth/session');
+    server.use(
+      http.post(`${BASE}/api/auth/refresh`, () =>
+        HttpResponse.json(envelope({ accessToken: 'at-1', tokenType: 'Bearer' })),
+      ),
+      http.get(`${BASE}/api/auth/me`, () => HttpResponse.json(envelope(ME))),
+      http.post(`${BASE}/api/auth/logout`, () => HttpResponse.error()),
+    );
+
+    const { result } = await renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('authenticated'));
+
+    await act(async () => {
+      await expect(result.current.signOut()).rejects.toBeInstanceOf(ApiClientError);
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('unauthenticated'));
+    expect(result.current.user).toBeNull();
     expect(clearSessionCookies).toHaveBeenCalledTimes(1);
   });
 });
