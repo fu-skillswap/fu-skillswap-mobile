@@ -1,27 +1,27 @@
+import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
 import { useAuth } from '@/core/auth/AuthProvider';
-import { GoogleSignInCancelledError, getGoogleIdToken } from '@/core/auth/googleSignIn';
-import { decodeIdTokenClaims, describeIdTokenForSpike } from '@/core/auth/idTokenClaims';
-import { getEnv } from '@/core/config/env';
+import { GoogleSignInCancelledError } from '@/core/auth/googleSignIn';
 
 export default function LoginScreen() {
-  const { signInWithGoogle } = useAuth();
+  const { status, signInWithGoogle } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Đã có phiên hợp lệ (ví dụ vừa đăng nhập xong) thì rời màn hình này ngay,
+  // không tự vẽ lại nút đăng nhập — nếu không người dùng sẽ kẹt ở đây mãi vì
+  // không còn ai theo dõi việc status chuyển sang 'authenticated'.
+  if (status === 'authenticated') {
+    return <Redirect href="/(tabs)" />;
+  }
 
   const handlePress = async () => {
     setBusy(true);
     setError(null);
     try {
-      if (__DEV__) {
-        // Chỉ chạy trong bản dev, phục vụ spike R1: lấy token trước để đọc claim,
-        // rồi vẫn đi tiếp luồng đăng nhập bình thường bên dưới.
-        const idToken = await getGoogleIdToken();
-        console.log(describeIdTokenForSpike(decodeIdTokenClaims(idToken), getEnv().googleWebClientId));
-      }
       await signInWithGoogle();
     } catch (err) {
       if (!(err instanceof GoogleSignInCancelledError)) {
