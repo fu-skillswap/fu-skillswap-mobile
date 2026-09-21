@@ -23,8 +23,10 @@ import {
 } from '@/core/api/client';
 import { authRepo } from '@/core/auth/authRepo';
 import { configureGoogleSignIn, getGoogleIdToken, signOutGoogle } from '@/core/auth/googleSignIn';
+import { decodeIdTokenClaims, describeIdTokenForSpike } from '@/core/auth/idTokenClaims';
 import { clearSessionCookies, persistSessionCookies } from '@/core/auth/session';
 import type { UserMeResponse } from '@/core/auth/types';
+import { getEnv } from '@/core/config/env';
 
 /** Trạng thái phiên đăng nhập */
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -88,6 +90,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Thư viện Google Sign-In miễn phí không nhận nonce (không đưa được claim
     // `nonce` vào ID Token) — chỉ authRepo.loginWithGoogle mới gửi nonce lên backend.
     const credential = await getGoogleIdToken();
+    if (__DEV__) {
+      // Chỉ chạy trong bản dev, phục vụ spike R1: đọc claim đúng trên `credential` —
+      // token thực sự sẽ gửi lên backend ngay dưới đây — thay vì gọi getGoogleIdToken()
+      // lần hai (vừa hiện hộp thoại Google hai lần, vừa soi nhầm token đã bị bỏ đi).
+      console.log(describeIdTokenForSpike(decodeIdTokenClaims(credential), getEnv().googleWebClientId));
+    }
     await authRepo.loginWithGoogle({ credential, nonce });
     await persistSessionCookies();
     const me = await authRepo.getMe();
