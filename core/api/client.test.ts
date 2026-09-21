@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 
 import {
@@ -254,5 +254,37 @@ describe('apiClient', () => {
     server.use(http.get(`${BASE}/api/auth/me`, () => HttpResponse.error()));
 
     await expect(apiClient('/api/auth/me')).rejects.toMatchObject({ status: 0 });
+  });
+
+  it('đăng xuất trong lúc refresh đang chạy ngầm thì không hồi sinh token cũ', async () => {
+    // Kịch bản: request gặp 401, refresh bắt đầu chạy nhưng chậm (server delay).
+    // Trong lúc đó người dùng đăng xuất (setAccessToken(null)). Khi refresh cuối
+    // cùng cũng xong, KHÔNG được ghi token mới vào bộ nhớ — nếu không, một phiên
+    // đã bị đăng xuất sẽ sống lại ngay sau khi AuthProvider báo unauthenticated.
+    server.use(
+      http.get(`${BASE}/api/auth/me`, ({ request }) => {
+        if (request.headers.get('Authorization') !== 'Bearer token-moi') {
+          return HttpResponse.json(envelope(null, { status: 401, code: 'AUTH_1001' }), {
+            status: 401,
+          });
+        }
+        return HttpResponse.json(envelope({ email: 'a@b.com' }));
+      }),
+      http.post(`${BASE}/api/auth/refresh`, async () => {
+        await delay(50);
+        return HttpResponse.json(envelope({ accessToken: 'token-moi', tokenType: 'Bearer' }));
+      }),
+    );
+    setAccessToken('token-cu');
+
+    const pending = apiClient<{ email: string }>('/api/auth/me');
+    // Chờ đúng lúc request gốc đã 401 và refresh (còn đang delay 50ms) đã bắt
+    // đầu, rồi đăng xuất ngay giữa chừng.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    setAccessToken(null);
+
+    await pending.catch(() => undefined);
+
+    expect(getAccessToken()).toBeNull();
   });
 });

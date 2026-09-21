@@ -27,12 +27,23 @@ let memoryToken: string | null = null;
 /** Promise của lần refresh đang chạy, để nhiều request 401 song song chỉ refresh một lần */
 let refreshPromise: Promise<string> | null = null;
 
+/**
+ * Đếm số lần phiên bị xoá (đăng xuất). Một lần refresh đang chạy ngầm sẽ chụp lại
+ * giá trị này lúc bắt đầu; nếu giá trị đổi trước khi refresh xong (tức là đã đăng
+ * xuất trong lúc chờ) thì kết quả refresh bị coi là rác — không được ghi token mới
+ * vào bộ nhớ, tránh hồi sinh một phiên đã bị người dùng chủ động kết thúc.
+ */
+let sessionEpoch = 0;
+
 let unauthenticatedHandler: (() => void) | undefined;
 let tokenRefreshedHandler: ((token: string) => void | Promise<void>) | undefined;
 
 /** Cập nhật access token trong bộ nhớ; truyền null để xoá khi đăng xuất */
 export const setAccessToken = (token: string | null): void => {
   memoryToken = token;
+  if (token === null) {
+    sessionEpoch += 1;
+  }
 };
 
 /** Lấy access token hiện tại */
@@ -141,8 +152,16 @@ axiosInstance.interceptors.response.use(
 /** Gọi `/api/auth/refresh` một lần duy nhất dù có bao nhiêu request cùng gặp 401 */
 async function refreshAccessToken(): Promise<string> {
   if (!refreshPromise) {
+    const epochAtStart = sessionEpoch;
     refreshPromise = apiClient<RefreshTokenResponse>('/api/auth/refresh', { method: 'POST' })
       .then(async (tokenRes) => {
+        if (sessionEpoch !== epochAtStart) {
+          // Người dùng đã đăng xuất (setAccessToken(null)) trong lúc refresh này
+          // đang chạy ngầm. Token mới vừa nhận về giờ là rác — không được ghi vào
+          // bộ nhớ, không được coi là "đã refresh xong", nếu không sẽ hồi sinh một
+          // phiên đã chết ngay sau khi AuthProvider báo cáo unauthenticated.
+          throw new Error('Phiên đã đăng xuất trong lúc đang làm mới access token');
+        }
         setAccessToken(tokenRes.accessToken);
         await tokenRefreshedHandler?.(tokenRes.accessToken);
         return tokenRes.accessToken;
@@ -187,6 +206,7 @@ export const refreshSession = (): Promise<string> => refreshAccessToken();
 export function __resetApiClientForTests(): void {
   memoryToken = null;
   refreshPromise = null;
+  sessionEpoch = 0;
   unauthenticatedHandler = undefined;
   tokenRefreshedHandler = undefined;
 }
