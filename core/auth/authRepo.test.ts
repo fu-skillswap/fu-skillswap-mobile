@@ -1,7 +1,8 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 
-import { __resetApiClientForTests, getAccessToken } from '@/core/api/client';
+import { __resetApiClientForTests, getAccessToken, setAccessToken } from '@/core/api/client';
+import { ApiClientError } from '@/core/api/errors';
 import { authRepo } from '@/core/auth/authRepo';
 
 const BASE = 'https://api.skillswap.asia';
@@ -96,6 +97,19 @@ describe('authRepo', () => {
     await authRepo.logout();
 
     expect(called).toBe(1);
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it('đăng xuất thất bại vẫn phải xoá access token trong bộ nhớ', async () => {
+    // Nếu token chỉ được xoá ở nhánh thành công, một lần logout lỗi mạng sẽ để
+    // lại token còn sống trong RAM — người dùng tưởng đã thoát nhưng thực tế
+    // mọi request sau đó vẫn đi kèm Authorization. Test này khoá nhánh `finally`.
+    setAccessToken('at-con-song');
+    server.use(
+      http.post(`${BASE}/api/auth/logout`, () => HttpResponse.error()),
+    );
+
+    await expect(authRepo.logout()).rejects.toBeInstanceOf(ApiClientError);
     expect(getAccessToken()).toBeNull();
   });
 });
