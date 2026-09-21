@@ -121,13 +121,48 @@ describe('apiClient', () => {
     await expect(pending).rejects.toMatchObject({ status: 401 });
     expect(profileCalls).toBe(2);
     expect(refreshCalls).toBe(1);
-    // Hành vi thực tế: khối try trong interceptor bọc luôn cả lệnh retry
-    // (`await axiosInstance(originalRequest)`), nên khi request được retry vẫn
-    // 401, lỗi đó rơi vào cùng catch với lỗi refresh và handler mất phiên vẫn
-    // được gọi — dù refresh access token tự nó đã thành công. Đây là hành vi
-    // hiện có của interceptor (không phải vòng lặp hay refresh hai lần), ghi
-    // nhận đúng như quan sát được, không sửa implementation để hợp với kỳ vọng.
+    // Request bị retry vẫn 401 sau khi refresh đã thành công: interceptor coi
+    // đây là "phiên chết thật" (401 lần hai, không phải lỗi nhất thời) nên vẫn
+    // gọi handler mất phiên — khác với lỗi 500/403/429/mất mạng ở request bị
+    // retry, những lỗi đó không được coi là mất phiên (xem test 500 bên dưới).
     expect(onUnauthenticated).toHaveBeenCalledTimes(1);
+  });
+
+  it('refresh thành công nhưng request bị retry lỗi 500 (nhất thời) thì KHÔNG đăng xuất', async () => {
+    // Đây là bug đã sửa: trước kia khối try trong interceptor bọc luôn cả lệnh
+    // retry, nên bất kỳ lỗi nào ở request bị retry (kể cả 500 nhất thời) đều rơi
+    // vào cùng catch với lỗi refresh và làm người dùng bị đăng xuất oan.
+    let profileCalls = 0;
+    let refreshCalls = 0;
+    const onUnauthenticated = jest.fn();
+    server.use(
+      http.get(`${BASE}/api/me/profile`, ({ request }) => {
+        profileCalls += 1;
+        if (request.headers.get('Authorization') !== 'Bearer token-moi') {
+          // Lần gọi đầu tiên, token cũ đã hết hạn -> 401 để kích hoạt refresh.
+          return HttpResponse.json(envelope(null, { status: 401, code: 'AUTH_1001' }), {
+            status: 401,
+          });
+        }
+        // Request được retry với token mới, nhưng server đang gặp sự cố tạm thời.
+        return HttpResponse.json(envelope(null, { status: 500, code: 'INTERNAL_ERROR' }), {
+          status: 500,
+        });
+      }),
+      http.post(`${BASE}/api/auth/refresh`, () => {
+        refreshCalls += 1;
+        return HttpResponse.json(envelope({ accessToken: 'token-moi', tokenType: 'Bearer' }));
+      }),
+    );
+    setAccessToken('token-cu');
+    setUnauthenticatedHandler(onUnauthenticated);
+
+    const pending = apiClient('/api/me/profile');
+    await expect(pending).rejects.toBeInstanceOf(ApiClientError);
+    await expect(pending).rejects.toMatchObject({ status: 500 });
+    expect(profileCalls).toBe(2);
+    expect(refreshCalls).toBe(1);
+    expect(onUnauthenticated).not.toHaveBeenCalled();
   });
 
   it('nhiều request 401 song song chỉ gọi refresh một lần', async () => {

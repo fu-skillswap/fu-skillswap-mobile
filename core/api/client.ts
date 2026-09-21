@@ -101,13 +101,28 @@ axiosInstance.interceptors.response.use(
 
     if (status === 401 && originalRequest && !originalRequest._retry && canRefresh(path)) {
       originalRequest._retry = true;
+
+      let newToken: string;
       try {
-        const newToken = await refreshAccessToken();
-        originalRequest.headers?.set('Authorization', `Bearer ${newToken}`);
-        return await axiosInstance(originalRequest);
+        newToken = await refreshAccessToken();
       } catch (refreshError) {
+        // Không refresh được nữa (refresh token cũng hết hạn/bị thu hồi) — phiên
+        // đã chết thật sự, đây mới là lúc đăng xuất toàn app.
         unauthenticatedHandler?.();
         return Promise.reject(refreshError);
+      }
+
+      originalRequest.headers?.set('Authorization', `Bearer ${newToken}`);
+      try {
+        return await axiosInstance(originalRequest);
+      } catch (retryError) {
+        // Chỉ 401 lần hai mới nghĩa là phiên đã chết; 500/403/429/mất mạng ở
+        // đúng request bị retry là lỗi nhất thời, không được đăng xuất người
+        // dùng vì chúng.
+        if (retryError instanceof ApiClientError && retryError.status === 401) {
+          unauthenticatedHandler?.();
+        }
+        return Promise.reject(retryError);
       }
     }
 
