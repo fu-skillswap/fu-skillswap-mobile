@@ -3,7 +3,9 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
 import { useAuth } from '@/core/auth/AuthProvider';
-import { GoogleSignInCancelledError } from '@/core/auth/googleSignIn';
+import { GoogleSignInCancelledError, getGoogleIdToken } from '@/core/auth/googleSignIn';
+import { decodeIdTokenClaims, describeIdTokenForSpike } from '@/core/auth/idTokenClaims';
+import { getEnv } from '@/core/config/env';
 
 export default function LoginScreen() {
   const { signInWithGoogle } = useAuth();
@@ -14,6 +16,12 @@ export default function LoginScreen() {
     setBusy(true);
     setError(null);
     try {
+      if (__DEV__) {
+        // Chỉ chạy trong bản dev, phục vụ spike R1: lấy token trước để đọc claim,
+        // rồi vẫn đi tiếp luồng đăng nhập bình thường bên dưới.
+        const idToken = await getGoogleIdToken();
+        console.log(describeIdTokenForSpike(decodeIdTokenClaims(idToken), getEnv().googleWebClientId));
+      }
       await signInWithGoogle();
     } catch (err) {
       if (!(err instanceof GoogleSignInCancelledError)) {
