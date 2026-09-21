@@ -96,6 +96,12 @@ describe('AuthProvider', () => {
   });
 
   it('đăng nhập Google: lấy nonce, đổi lấy token rồi nạp hồ sơ', async () => {
+    // AuthProvider ghi log chẩn đoán spike R1 khi __DEV__ === true (đúng như
+    // trong Jest) — chặn console.log riêng cho test này, không tắt toàn cục,
+    // để output `npm test` giữ nguyên tinh khiết mà không che các console.log
+    // thật sự là lỗi ở các test khác.
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+
     let loginBody: unknown = null;
     server.use(
       http.post(`${BASE}/api/auth/refresh`, () =>
@@ -122,6 +128,8 @@ describe('AuthProvider', () => {
 
     await waitFor(() => expect(result.current.status).toBe('authenticated'));
     expect(loginBody).toEqual({ credential: 'id-token-abc', nonce: 'n-1' });
+
+    logSpy.mockRestore();
   });
 
   it('đăng xuất: gọi logout, xoá cookie và về trạng thái chưa đăng nhập', async () => {
@@ -169,6 +177,34 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(result.current.status).toBe('unauthenticated'));
     expect(result.current.user).toBeNull();
     expect(clearSessionCookies).toHaveBeenCalledTimes(1);
+  });
+
+  it('đăng xuất: dọn state cục bộ xong (unauthenticated) NGAY CẢ KHI clearSessionCookies() sau đó lỗi', async () => {
+    // Fix 4 (đợt review cuối): trước khi sửa, setUser(null)/setStatus('unauthenticated')
+    // nằm SAU `await clearSessionCookies()` trong cùng khối `finally` — nếu bước
+    // đó lỗi, hai lệnh setState không bao giờ chạy: phiên bị bỏ dở nửa chừng,
+    // status vẫn 'authenticated' dù accessToken đã bị xoá (mọi request tiếp
+    // theo sẽ 401 mà UI vẫn tưởng đang đăng nhập). Giờ state phải được dọn
+    // xong TRƯỚC khi chạm vào bước dọn dẹp chậm có thể lỗi.
+    const { clearSessionCookies } = jest.requireMock('@/core/auth/session');
+    clearSessionCookies.mockRejectedValueOnce(new Error('cookie store loi'));
+    server.use(
+      http.post(`${BASE}/api/auth/refresh`, () =>
+        HttpResponse.json(envelope({ accessToken: 'at-1', tokenType: 'Bearer' })),
+      ),
+      http.get(`${BASE}/api/auth/me`, () => HttpResponse.json(envelope(ME))),
+      http.post(`${BASE}/api/auth/logout`, () => HttpResponse.json(envelope(null))),
+    );
+
+    const { result } = await renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('authenticated'));
+
+    await act(async () => {
+      await expect(result.current.signOut()).rejects.toThrow('cookie store loi');
+    });
+
+    expect(result.current.status).toBe('unauthenticated');
+    expect(result.current.user).toBeNull();
   });
 
   it('đăng xuất: xoá sạch cache TanStack Query để tài khoản sau không thấy dữ liệu tài khoản trước', async () => {

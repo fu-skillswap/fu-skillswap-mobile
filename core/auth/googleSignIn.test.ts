@@ -2,8 +2,10 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 import {
   GoogleSignInCancelledError,
+  __resetGoogleSignInConfiguredForTests,
   configureGoogleSignIn,
   getGoogleIdToken,
+  signOutGoogle,
 } from '@/core/auth/googleSignIn';
 
 /**
@@ -39,6 +41,10 @@ const mockSignIn = mockGoogleSignin.signIn as unknown as jest.Mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Trạng thái "đã cấu hình" (Fix 2) được memo hoá ở module-scope, sống sót
+  // qua nhiều `it` trong cùng file test — phải đặt lại mỗi lần để mỗi test
+  // thấy đúng hành vi "lần gọi đầu tiên" của mình.
+  __resetGoogleSignInConfiguredForTests();
 });
 
 describe('googleSignIn', () => {
@@ -48,6 +54,32 @@ describe('googleSignIn', () => {
     expect(mockGoogleSignin.configure).toHaveBeenCalledWith(
       expect.objectContaining({ webClientId: 'test-web-client-id.apps.googleusercontent.com' }),
     );
+  });
+
+  it('getGoogleIdToken tự cấu hình trước nếu chưa cấu hình (Fix 2: không còn cấu hình nhiệt tình lúc khởi động)', async () => {
+    mockSignIn.mockResolvedValue({ type: 'success', data: { idToken: 'id-token-abc' } });
+
+    await getGoogleIdToken();
+
+    expect(mockGoogleSignin.configure).toHaveBeenCalledWith(
+      expect.objectContaining({ webClientId: 'test-web-client-id.apps.googleusercontent.com' }),
+    );
+  });
+
+  it('gọi getGoogleIdToken nhiều lần chỉ cấu hình đúng một lần (memo hoá)', async () => {
+    mockSignIn.mockResolvedValue({ type: 'success', data: { idToken: 'id-token-abc' } });
+
+    await getGoogleIdToken();
+    await getGoogleIdToken();
+
+    expect(mockGoogleSignin.configure).toHaveBeenCalledTimes(1);
+  });
+
+  it('signOutGoogle cũng tự cấu hình trước nếu chưa cấu hình', async () => {
+    await signOutGoogle();
+
+    expect(mockGoogleSignin.configure).toHaveBeenCalledTimes(1);
+    expect(mockGoogleSignin.signOut).toHaveBeenCalledTimes(1);
   });
 
   it('kiểm tra Play Services rồi trả về id token (dạng phản hồi mới)', async () => {
