@@ -1,0 +1,39 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Redirect, Tabs } from 'expo-router';
+
+import { useAuth } from '@/core/auth/AuthProvider';
+import { isMobileSupportedAccount, resolveTabs } from '@/core/config/tabs';
+import { colors } from '@/core/ui/theme';
+
+export default function TabsLayout() {
+  const { status, user } = useAuth();
+
+  if (status !== 'authenticated' || !user) {
+    return <Redirect href="/(auth)/login" />;
+  }
+  if (!isMobileSupportedAccount(user.roles)) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
+  return (
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
+      }}
+    >
+      {resolveTabs(user.roles).map((tab) => (
+        <Tabs.Screen
+          key={tab.name}
+          name={tab.name}
+          options={{
+            title: tab.title,
+            // Ionicons nhận tên icon dạng chuỗi; cấu hình tab giữ kiểu string để không phụ thuộc thư viện icon.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- tên icon đã kiểm soát trong core/config/tabs.ts
+            tabBarIcon: ({ color, size }) => <Ionicons name={tab.icon as any} color={color} size={size} />,
+          }}
+        />
+      ))}
+    </Tabs>
+  );
+}
