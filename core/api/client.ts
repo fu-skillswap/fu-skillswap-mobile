@@ -8,6 +8,7 @@
 
 import axios, {
   type AxiosError,
+  type AxiosInstance,
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig,
 } from 'axios';
@@ -73,81 +74,100 @@ function canRefresh(path: string): boolean {
   );
 }
 
-const axiosInstance = axios.create({
-  baseURL: getEnv().apiUrl,
-  // React Native tự quản lý cookie ở tầng native; cờ này giữ cho hành vi giống FE web.
-  withCredentials: true,
-  timeout: 20_000,
-  headers: { 'Content-Type': 'application/json' },
-});
+/**
+ * Instance axios thật sự, chỉ được tạo khi có request đầu tiên (xem `getAxiosInstance`).
+ * Không tạo ngay lúc module được nạp: `getEnv()` có thể ném lỗi nếu build thiếu biến
+ * môi trường bắt buộc, và lúc module này được evaluate (trước khi có cây React hay
+ * error boundary nào) là quá sớm để lỗi đó nổ ra — nó sẽ làm app trắng màn hình ngay
+ * lúc khởi động, không cách nào hiển thị thông báo cho người dùng.
+ */
+let axiosInstance: AxiosInstance | null = null;
 
-axiosInstance.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    if (memoryToken && !config.headers.has('Authorization')) {
-      config.headers.set('Authorization', `Bearer ${memoryToken}`);
-    }
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
+/** Tạo (một lần duy nhất) và trả về axios instance đã gắn interceptor */
+function getAxiosInstance(): AxiosInstance {
+  if (axiosInstance) {
+    return axiosInstance;
+  }
 
-axiosInstance.interceptors.response.use(
-  (response) => {
-    const envelope = response.data as ApiResponse<unknown> | null;
-    if (envelope && typeof envelope === 'object' && 'data' in envelope) {
-      // `data` có thể là null hợp lệ với HTTP 2xx — không được coi là lỗi.
-      // Bắt buộc ép kiểu `any`: chữ ký interceptor của axios yêu cầu trả về
-      // `AxiosResponse | Promise<AxiosResponse>`, nhưng interceptor này cố ý
-      // trả thẳng payload đã bóc khỏi envelope (đổi hẳn kiểu trả về).
-      return envelope.data as any;
-    }
-    return response.data;
-  },
-  async (error: AxiosError<ApiResponse<unknown>>) => {
-    const originalRequest = error.config as
-      | (InternalAxiosRequestConfig & { _retry?: boolean })
-      | undefined;
-    const status = error.response?.status ?? 0;
-    const path = originalRequest?.url ?? '';
+  const instance = axios.create({
+    baseURL: getEnv().apiUrl,
+    // React Native tự quản lý cookie ở tầng native; cờ này giữ cho hành vi giống FE web.
+    withCredentials: true,
+    timeout: 20_000,
+    headers: { 'Content-Type': 'application/json' },
+  });
 
-    if (status === 401 && originalRequest && !originalRequest._retry && canRefresh(path)) {
-      originalRequest._retry = true;
-
-      let newToken: string;
-      try {
-        newToken = await refreshAccessToken();
-      } catch (refreshError) {
-        // Không refresh được nữa (refresh token cũng hết hạn/bị thu hồi) — phiên
-        // đã chết thật sự, đây mới là lúc đăng xuất toàn app.
-        unauthenticatedHandler?.();
-        return Promise.reject(refreshError);
+  instance.interceptors.request.use(
+    (config: InternalAxiosRequestConfig) => {
+      if (memoryToken && !config.headers.has('Authorization')) {
+        config.headers.set('Authorization', `Bearer ${memoryToken}`);
       }
+      return config;
+    },
+    (error) => Promise.reject(error),
+  );
 
-      originalRequest.headers?.set('Authorization', `Bearer ${newToken}`);
-      try {
-        return await axiosInstance(originalRequest);
-      } catch (retryError) {
-        // Chỉ 401 lần hai mới nghĩa là phiên đã chết; 500/403/429/mất mạng ở
-        // đúng request bị retry là lỗi nhất thời, không được đăng xuất người
-        // dùng vì chúng.
-        if (retryError instanceof ApiClientError && retryError.status === 401) {
+  instance.interceptors.response.use(
+    (response) => {
+      const envelope = response.data as ApiResponse<unknown> | null;
+      if (envelope && typeof envelope === 'object' && 'data' in envelope) {
+        // `data` có thể là null hợp lệ với HTTP 2xx — không được coi là lỗi.
+        // Bắt buộc ép kiểu `any`: chữ ký interceptor của axios yêu cầu trả về
+        // `AxiosResponse | Promise<AxiosResponse>`, nhưng interceptor này cố ý
+        // trả thẳng payload đã bóc khỏi envelope (đổi hẳn kiểu trả về).
+        return envelope.data as any;
+      }
+      return response.data;
+    },
+    async (error: AxiosError<ApiResponse<unknown>>) => {
+      const originalRequest = error.config as
+        | (InternalAxiosRequestConfig & { _retry?: boolean })
+        | undefined;
+      const status = error.response?.status ?? 0;
+      const path = originalRequest?.url ?? '';
+
+      if (status === 401 && originalRequest && !originalRequest._retry && canRefresh(path)) {
+        originalRequest._retry = true;
+
+        let newToken: string;
+        try {
+          newToken = await refreshAccessToken();
+        } catch (refreshError) {
+          // Không refresh được nữa (refresh token cũng hết hạn/bị thu hồi) — phiên
+          // đã chết thật sự, đây mới là lúc đăng xuất toàn app.
           unauthenticatedHandler?.();
+          return Promise.reject(refreshError);
         }
-        return Promise.reject(retryError);
-      }
-    }
 
-    const envelope = error.response?.data;
-    const payload = envelope?.data;
-    throw new ApiClientError(
-      status,
-      envelope?.code ?? error.code ?? 'NETWORK_ERROR',
-      envelope?.message ?? error.message ?? `Gọi API thất bại (${status}).`,
-      Array.isArray(payload) ? (payload as ValidationError[]) : null,
-      envelope?.retryAfterSeconds,
-    );
-  },
-);
+        originalRequest.headers?.set('Authorization', `Bearer ${newToken}`);
+        try {
+          return await getAxiosInstance()(originalRequest);
+        } catch (retryError) {
+          // Chỉ 401 lần hai mới nghĩa là phiên đã chết; 500/403/429/mất mạng ở
+          // đúng request bị retry là lỗi nhất thời, không được đăng xuất người
+          // dùng vì chúng (xem Fix 1 trong đợt review cuối).
+          if (retryError instanceof ApiClientError && retryError.status === 401) {
+            unauthenticatedHandler?.();
+          }
+          return Promise.reject(retryError);
+        }
+      }
+
+      const envelope = error.response?.data;
+      const payload = envelope?.data;
+      throw new ApiClientError(
+        status,
+        envelope?.code ?? error.code ?? 'NETWORK_ERROR',
+        envelope?.message ?? error.message ?? `Gọi API thất bại (${status}).`,
+        Array.isArray(payload) ? (payload as ValidationError[]) : null,
+        envelope?.retryAfterSeconds,
+      );
+    },
+  );
+
+  axiosInstance = instance;
+  return instance;
+}
 
 /** Gọi `/api/auth/refresh` một lần duy nhất dù có bao nhiêu request cùng gặp 401 */
 async function refreshAccessToken(): Promise<string> {
@@ -189,7 +209,7 @@ export const apiClient = async <T>(
     data = typeof config.body === 'string' ? JSON.parse(config.body) : config.body;
   }
 
-  const result = await axiosInstance.request<ApiResponse<T>>({
+  const result = await getAxiosInstance().request<ApiResponse<T>>({
     ...config,
     url: path,
     method,

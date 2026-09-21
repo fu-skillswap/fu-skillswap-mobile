@@ -9,6 +9,7 @@ import {
   setUnauthenticatedHandler,
 } from '@/core/api/client';
 import { ApiClientError } from '@/core/api/errors';
+import { resetEnvCache } from '@/core/config/env';
 
 const BASE = 'https://api.skillswap.asia';
 
@@ -286,5 +287,30 @@ describe('apiClient', () => {
     await pending.catch(() => undefined);
 
     expect(getAccessToken()).toBeNull();
+  });
+});
+
+describe('cấu hình môi trường', () => {
+  it('import module không ném lỗi ngay cả khi thiếu biến môi trường bắt buộc', async () => {
+    const originalApiUrl = process.env.EXPO_PUBLIC_API_URL;
+    const originalGoogleId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+    delete process.env.EXPO_PUBLIC_API_URL;
+    delete process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+
+    try {
+      await jest.isolateModulesAsync(async () => {
+        const { resetEnvCache: resetIsolatedEnvCache } = require('@/core/config/env');
+        resetIsolatedEnvCache();
+        // Đây là điểm mấu chốt: import module KHÔNG được gọi getEnv() ngay lúc
+        // evaluate (baseURL của axios phải được tạo lười, ở lần gọi API đầu
+        // tiên) — nếu không, một build thiếu biến môi trường sẽ chết ngay lúc
+        // khởi động app, trước khi có cây React hay error boundary nào bắt được.
+        expect(() => require('@/core/api/client')).not.toThrow();
+      });
+    } finally {
+      process.env.EXPO_PUBLIC_API_URL = originalApiUrl;
+      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = originalGoogleId;
+      resetEnvCache();
+    }
   });
 });
