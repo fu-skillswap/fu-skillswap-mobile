@@ -5,6 +5,7 @@
  * đăng nhập. Cũng là nơi nối HTTP client với tầng cookie native.
  */
 
+import { useQueryClient } from '@tanstack/react-query';
 import React, {
   createContext,
   useCallback,
@@ -46,6 +47,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<UserMeResponse | null>(null);
   const mounted = useRef(true);
+  // AuthProvider được render bên trong QueryClientProvider (xem app/_layout.tsx),
+  // nên hook này luôn có client thật để dùng.
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     mounted.current = true;
@@ -53,6 +57,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setUnauthenticatedHandler(() => {
       setAccessToken(null);
+      // Xoá sạch cache TanStack Query khi phiên kết thúc (dù là do người dùng
+      // đăng xuất hay do 401 không refresh được nữa): gcTime mặc định là 5 phút,
+      // nếu không xoá thì tài khoản B dùng chung máy sẽ thấy thoáng qua dữ liệu
+      // cache của tài khoản A trước khi các query refetch xong.
+      queryClient.clear();
       if (mounted.current) {
         setUser(null);
         setStatus('unauthenticated');
@@ -83,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUnauthenticatedHandler(undefined);
       setTokenRefreshedHandler(undefined);
     };
-  }, []);
+  }, [queryClient]);
 
   const signInWithGoogle = useCallback(async () => {
     const { nonce } = await authRepo.getGoogleNonce();
@@ -110,6 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await authRepo.logout();
     } finally {
       setAccessToken(null);
+      // Xoá cache TanStack Query của tài khoản vừa đăng xuất — xem giải thích ở
+      // setUnauthenticatedHandler phía trên.
+      queryClient.clear();
       await clearSessionCookies();
       await signOutGoogle().catch(() => undefined);
       if (mounted.current) {
@@ -117,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setStatus('unauthenticated');
       }
     }
-  }, []);
+  }, [queryClient]);
 
   const value = useMemo<AuthContextValue>(
     () => ({ status, user, signInWithGoogle, signOut }),

@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -50,9 +51,21 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <AuthProvider>{children}</AuthProvider>
-);
+// AuthProvider giờ dùng useQueryClient() (Fix 4: xoá cache TanStack Query khi
+// đăng xuất) nên bắt buộc phải có QueryClientProvider bao ngoài, đúng như thứ tự
+// thật ở app/_layout.tsx. Mỗi lần gọi tạo một QueryClient mới để test không dây
+// cache vào nhau; truyền `queryClient` riêng khi cần kiểm tra chính cái cache đó.
+function createWrapper(queryClient: QueryClient = new QueryClient()) {
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>{children}</AuthProvider>
+      </QueryClientProvider>
+    );
+  };
+}
+
+const wrapper = createWrapper();
 
 describe('AuthProvider', () => {
   it('khởi động app: refresh thành công thì vào trạng thái đã đăng nhập', async () => {
@@ -156,5 +169,32 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(result.current.status).toBe('unauthenticated'));
     expect(result.current.user).toBeNull();
     expect(clearSessionCookies).toHaveBeenCalledTimes(1);
+  });
+
+  it('đăng xuất: xoá sạch cache TanStack Query để tài khoản sau không thấy dữ liệu tài khoản trước', async () => {
+    // Trên thiết bị dùng chung, nếu cache (gcTime 5 phút) không bị xoá khi đăng
+    // xuất, tài khoản B đăng nhập sau vẫn có thể render thoáng qua dữ liệu đã
+    // cache của tài khoản A trước khi các query refetch xong.
+    server.use(
+      http.post(`${BASE}/api/auth/refresh`, () =>
+        HttpResponse.json(envelope({ accessToken: 'at-1', tokenType: 'Bearer' })),
+      ),
+      http.get(`${BASE}/api/auth/me`, () => HttpResponse.json(envelope(ME))),
+      http.post(`${BASE}/api/auth/logout`, () => HttpResponse.json(envelope(null))),
+    );
+
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(['newsfeed'], { posts: ['bai-cua-tai-khoan-a'] });
+
+    const { result } = await renderHook(() => useAuth(), { wrapper: createWrapper(queryClient) });
+    await waitFor(() => expect(result.current.status).toBe('authenticated'));
+
+    await act(async () => {
+      await result.current.signOut();
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('unauthenticated'));
+    expect(queryClient.getQueryData(['newsfeed'])).toBeUndefined();
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
   });
 });
