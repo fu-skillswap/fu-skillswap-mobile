@@ -1,0 +1,19 @@
+{
+  // Project TypeScript riêng chỉ để typecheck các file `*.test.ts(x)`.
+  // Lý do tồn tại: xem ghi chú trong tsconfig.json cạnh `"types": ["jest"]`.
+  // Chỉ ở ĐÂY mới bật lại "node" trong `types` (Buffer, NodeJS.* hợp lệ), và chỉ
+  // cho các file khớp `include` bên dưới — code app thật (tsconfig.json) không
+  // bao giờ thấy Buffer như một global.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["jest", "node"]
+  },
+  "include": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
+  ],
+  "exclude": []
+}

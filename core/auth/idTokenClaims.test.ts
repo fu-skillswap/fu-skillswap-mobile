@@ -1,3 +1,8 @@
+// `Buffer` ở file này là global thật của Node/Jest — hợp lệ vì đây là code test
+// (không bao giờ chạy trên Hermes). tsconfig.json đã bỏ "node" khỏi mảng `types`
+// dùng cho code app (xem ghi chú ở đó); các file `*.test.ts(x)` được typecheck
+// riêng bằng tsconfig.test.json — nơi vẫn khai báo `"types": ["jest", "node"]` —
+// nên `Buffer` vẫn hợp lệ ở ĐÚNG MỘT MÌNH các file test, không rò rỉ sang app.
 import { decodeIdTokenClaims, describeIdTokenForSpike } from '@/core/auth/idTokenClaims';
 
 /** Dựng một JWT giả với payload cho trước (chữ ký không quan trọng: hàm này không xác minh chữ ký) */

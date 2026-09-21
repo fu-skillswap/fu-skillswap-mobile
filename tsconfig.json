@@ -2,10 +2,22 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "types": ["jest", "node"],
+    // KHÔNG thêm "node" vào đây: nó biến Buffer/atob/crypto (và các global Node
+    // khác) thành global có sẵn cho TOÀN BỘ app, kể cả code chạy trên Hermes
+    // (React Native) — nơi các global đó không tồn tại (xem core/auth/idTokenClaims.ts).
+    // Đã thử "opt-in" @types/node chỉ cho một file test bằng
+    // `/// <reference types="node" />` — KHÔNG hoạt động như mong đợi: ambient
+    // global (Buffer, v.v.) không có phạm vi theo file, một khi @types/node được
+    // đưa vào compilation (bằng bất cứ cách nào) là nó global cho TOÀN BỘ
+    // chương trình. Vì vậy các file `*.test.ts(x)` (nơi hợp lệ để dùng Buffer,
+    // theo core/auth/idTokenClaims.test.ts) được typecheck bằng một project
+    // TypeScript RIÊNG — xem tsconfig.test.json và lệnh `typecheck` trong
+    // package.json — nơi đó mới bật lại "node" trong `types`.
+    "types": ["jest"],
     "paths": {
       "@/*": ["./*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],
+  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
 }
