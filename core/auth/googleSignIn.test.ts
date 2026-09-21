@@ -23,20 +23,19 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
 }));
 
 /**
- * Không dùng `jest.mocked(GoogleSignin)` ở đây: nó ràng type của `signIn` vào
- * `SignInResponse` thật của thư viện, trong khi bài test cố ý còn kiểm cả dạng
- * phản hồi CŨ (`{ idToken }` không có `type`/`data`) — dạng thư viện từng trả
- * trước khi có `SignInResponse`. Ép kiểu về một type mock lỏng để giữ nguyên
- * khả năng gọi `mockResolvedValue` với cả hai dạng phản hồi mới lẫn cũ.
+ * `jest.mocked` giữ nguyên chữ ký thật của thư viện, nên mọi lỗi gõ sai tên
+ * trường hay sai kiểu tham số trong test vẫn bị `tsc` bắt.
  */
-interface MockedGoogleSignin {
-  configure: jest.Mock;
-  hasPlayServices: jest.Mock;
-  signIn: jest.Mock;
-  signOut: jest.Mock;
-}
+const mockGoogleSignin = jest.mocked(GoogleSignin);
 
-const mockGoogleSignin = GoogleSignin as unknown as MockedGoogleSignin;
+/**
+ * Riêng `signIn` phải nới lỏng kiểu trả về: `SignInResponse` của thư viện là một
+ * union đóng (`{ type: 'success' | 'cancelled' }`), trong khi bài test cố ý còn
+ * kiểm cả dạng phản hồi CŨ (`{ idToken }` không có `type`/`data`). Chỉ ép kiểu
+ * đúng một method này, không ép cả đối tượng — `configure`, `hasPlayServices`
+ * và `signOut` giữ nguyên kiểm tra kiểu.
+ */
+const mockSignIn = mockGoogleSignin.signIn as unknown as jest.Mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -52,7 +51,7 @@ describe('googleSignIn', () => {
   });
 
   it('kiểm tra Play Services rồi trả về id token (dạng phản hồi mới)', async () => {
-    mockGoogleSignin.signIn.mockResolvedValue({
+    mockSignIn.mockResolvedValue({
       type: 'success',
       data: { idToken: 'id-token-abc' },
     });
@@ -62,25 +61,28 @@ describe('googleSignIn', () => {
   });
 
   it('đọc được cả dạng phản hồi cũ trả thẳng idToken', async () => {
-    mockGoogleSignin.signIn.mockResolvedValue({ idToken: 'id-token-cu' });
+    // Typings của v16.1.5 không còn sinh ra dạng này (`SignInResponse` là union
+    // đóng gồm 'success' và 'cancelled'), nên đây là lớp phòng thủ cho runtime
+    // cũ chứ không phải nhánh có thật ở bản đang cài.
+    mockSignIn.mockResolvedValue({ idToken: 'id-token-cu' });
 
     await expect(getGoogleIdToken()).resolves.toBe('id-token-cu');
   });
 
   it('người dùng bấm huỷ → ném GoogleSignInCancelledError', async () => {
-    mockGoogleSignin.signIn.mockResolvedValue({ type: 'cancelled', data: null });
+    mockSignIn.mockResolvedValue({ type: 'cancelled', data: null });
 
     await expect(getGoogleIdToken()).rejects.toBeInstanceOf(GoogleSignInCancelledError);
   });
 
   it('thư viện ném lỗi huỷ theo mã cũ → cũng quy về GoogleSignInCancelledError', async () => {
-    mockGoogleSignin.signIn.mockRejectedValue({ code: '12501' });
+    mockSignIn.mockRejectedValue({ code: '12501' });
 
     await expect(getGoogleIdToken()).rejects.toBeInstanceOf(GoogleSignInCancelledError);
   });
 
   it('không có id token → báo lỗi rõ ràng', async () => {
-    mockGoogleSignin.signIn.mockResolvedValue({ type: 'success', data: {} });
+    mockSignIn.mockResolvedValue({ type: 'success', data: {} });
 
     await expect(getGoogleIdToken()).rejects.toThrow('Không lấy được Google ID token');
   });
