@@ -13,3 +13,10 @@ import axios from 'axios';
 // MSW chặn ở tầng http của Node; trong Jest phải ép axios dùng adapter 'http'
 // thay vì XMLHttpRequest thì handler mới bắt được request.
 axios.defaults.adapter = 'http';
+
+// `@expo/vector-icons` nạp font bất đồng bộ rồi setState khi xong. Trong test,
+// việc đó xảy ra sau khi assertion đã chạy nên React cảnh báo "An update to Icon
+// inside a test was not wrapped in act(...)". Không test nào assert vào icon, nên
+// thay bằng một host component rỗng: cây vẫn render được, không còn tác dụng phụ.
+jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicons');
+
