@@ -17,6 +17,15 @@ export interface PostCardProps {
 }
 
 export function PostCard({ post, onPress, onToggleLike }: PostCardProps) {
+  const icon = (
+    <Ionicons
+      name={post.reactedByCurrentUser ? 'heart' : 'heart-outline'}
+      size={18}
+      color={post.reactedByCurrentUser ? colors.danger : colors.textMuted}
+    />
+  );
+  const soLuotThich = <Text className="text-sm text-text-muted">{post.reactionCount}</Text>;
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -42,22 +51,30 @@ export function PostCard({ post, onPress, onToggleLike }: PostCardProps) {
       ) : null}
 
       <View className="flex-row items-center gap-4 pt-1">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={post.reactedByCurrentUser ? 'Bỏ thích' : 'Thích'}
-          disabled={!onToggleLike}
-          onPress={() => onToggleLike?.(post)}
-          className="flex-row items-center gap-1"
-        >
-          <Ionicons
-            name={post.reactedByCurrentUser ? 'heart' : 'heart-outline'}
-            size={18}
-            color={post.reactedByCurrentUser ? colors.danger : colors.textMuted}
-          />
-          <Text className="text-sm text-text-muted">{post.reactionCount}</Text>
-        </Pressable>
+        {/*
+          Không có `onToggleLike` thì đây KHÔNG phải nút: một Pressable `disabled`
+          vẫn giữ role "button", nên trình đọc màn hình đọc "nút Thích" trong khi
+          cú chạm rơi xuống Pressable cha và mở bài viết. Render View thường.
+        */}
+        {onToggleLike ? (
+          <Pressable
+            testID="so-luot-thich"
+            accessibilityRole="button"
+            accessibilityLabel={post.reactedByCurrentUser ? 'Bỏ thích' : 'Thích'}
+            onPress={() => onToggleLike(post)}
+            className="flex-row items-center gap-1"
+          >
+            {icon}
+            {soLuotThich}
+          </Pressable>
+        ) : (
+          <View testID="so-luot-thich" className="flex-row items-center gap-1">
+            {icon}
+            {soLuotThich}
+          </View>
+        )}
 
-        <View className="flex-row items-center gap-1">
+        <View testID="so-binh-luan" className="flex-row items-center gap-1">
           <Ionicons name="chatbubble-outline" size={18} color={colors.textMuted} />
           <Text className="text-sm text-text-muted">{post.commentCount}</Text>
         </View>

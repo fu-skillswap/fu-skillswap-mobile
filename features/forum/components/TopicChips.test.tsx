@@ -20,7 +20,7 @@ describe('TopicChips', () => {
     const onSelect = jest.fn();
     await render(<TopicChips topics={TOPICS} selectedTopicId={null} onSelect={onSelect} />);
 
-    fireEvent.press(screen.getByText('Chia sẻ'));
+    await fireEvent.press(screen.getByText('Chia sẻ'));
 
     expect(onSelect).toHaveBeenCalledWith('t2');
   });
@@ -29,8 +29,25 @@ describe('TopicChips', () => {
     const onSelect = jest.fn();
     await render(<TopicChips topics={TOPICS} selectedTopicId="t2" onSelect={onSelect} />);
 
-    fireEvent.press(screen.getByText('Tất cả'));
+    await fireEvent.press(screen.getByText('Tất cả'));
 
     expect(onSelect).toHaveBeenCalledWith(null);
+  });
+
+  it('chip đang chọn được đánh dấu selected, các chip khác thì không', async () => {
+    // Nếu `active` bị nối cứng (hoặc `selectedTopicId` bị bỏ quên), người dùng
+    // không còn biết mình đang lọc theo chủ đề nào — nhưng mọi test dựa trên
+    // nhãn và onSelect vẫn xanh, vì phần hiển thị chưa ai khoá.
+    await render(<TopicChips topics={TOPICS} selectedTopicId="t2" onSelect={jest.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Chia sẻ', selected: true })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Tất cả', selected: false })).toBeTruthy();
+  });
+
+  it('không chọn chủ đề nào thì chip "Tất cả" là chip được đánh dấu', async () => {
+    await render(<TopicChips topics={TOPICS} selectedTopicId={null} onSelect={jest.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Tất cả', selected: true })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Chia sẻ', selected: false })).toBeTruthy();
   });
 });

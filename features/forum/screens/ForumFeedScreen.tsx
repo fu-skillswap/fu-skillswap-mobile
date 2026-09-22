@@ -2,14 +2,16 @@
  * @file ForumFeedScreen.tsx
  * @description Màn hình diễn đàn: newsfeed theo ngành, lọc theo chủ đề, tìm kiếm.
  *
- * Ba trạng thái được phân biệt rõ và không gộp: đang tải, lỗi (ErrorView), và
- * rỗng (EmptyState — gọi API thành công nhưng không có bài nào).
+ * Bốn trạng thái được phân biệt rõ và không gộp: đang tải, lỗi khi chưa có gì
+ * (ErrorView chiếm màn hình), lỗi khi ĐÃ có dữ liệu (banner, giữ nguyên danh
+ * sách), và rỗng (EmptyState — gọi API thành công nhưng không có bài nào).
  */
 
 import { useRouter, type Href } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, FlatList, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 
+import { useDebouncedValue } from '@/core/hooks/useDebouncedValue';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
@@ -19,18 +21,53 @@ import { PostCard } from '@/features/forum/components/PostCard';
 import { TopicChips } from '@/features/forum/components/TopicChips';
 import { useForumList, useForumTopics } from '@/features/forum/hooks/useForumQueries';
 
+/**
+ * Từ khoá phải đứng yên bấy nhiêu mili giây mới được đưa vào query key.
+ * Thấp hơn thì gõ nhanh vẫn sinh request thừa; cao hơn thì người dùng thấy chậm.
+ */
+const DO_TRE_TIM_KIEM_MS = 350;
+
 export function ForumFeedScreen() {
   const router = useRouter();
   const [keyword, setKeyword] = useState('');
   const [topicId, setTopicId] = useState<string | null>(null);
 
+  // Ô nhập cập nhật tức thì để không giật chữ; chỉ giá trị đã lắng mới đi vào
+  // query key — xem JSDoc của useDebouncedValue.
+  const timKiem = useDebouncedValue(keyword.trim(), DO_TRE_TIM_KIEM_MS);
+
   const topics = useForumTopics();
   const list = useForumList({
-    keyword: keyword.trim() || undefined,
+    keyword: timKiem || undefined,
     forumTopicId: topicId ?? undefined,
   });
 
+  // Cast tạm: route `/forum/[postId]` chưa tồn tại nên expo-router chưa sinh kiểu
+  // cho nó. Task 8 tạo `app/forum/[postId].tsx` — khi đó BỎ cast này đi.
   const openPost = (postId: string) => router.push(`/forum/${postId}` as Href);
+
+  /**
+   * Chốt chặn ĐỒNG BỘ cho việc tải trang kế.
+   *
+   * FlatList bắn `onEndReached` nhiều lần liên tiếp trong cùng một frame. Nếu chỉ
+   * dựa vào `isFetchingNextPage`, cả hai lần gọi đều đọc cùng một giá trị `false`
+   * của lần render cũ — React chưa kịp render lại — và cùng một cursor được gửi
+   * đi hai lần: trang đó bị nối vào danh sách hai lượt và người dùng thấy bài
+   * trùng. Ref đổi ngay lập tức nên lần gọi thứ hai bị chặn.
+   */
+  const dangTaiTrangKe = useRef(false);
+  const taiTrangKe = () => {
+    if (dangTaiTrangKe.current || !list.hasNextPage || list.isFetchingNextPage) return;
+    dangTaiTrangKe.current = true;
+    void list.fetchNextPage().finally(() => {
+      dangTaiTrangKe.current = false;
+    });
+  };
+
+  // Chỉ chiếm cả màn hình khi thật sự không có gì để hiện. `isError` của TanStack
+  // v5 bật cả khi query đã có data và chỉ lần refetch nền hỏng; nếu dựa vào mình
+  // nó thì một lần kéo-để-tải-lại thất bại sẽ xoá sạch feed người dùng đang đọc.
+  const loiChiemManHinh = list.isError && list.posts.length === 0;
 
   return (
     <Screen testID="man-hinh-dien-dan">
@@ -57,21 +94,42 @@ export function ForumFeedScreen() {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator testID="dang-tai-dien-dan" color={colors.primary} />
         </View>
-      ) : list.isError ? (
+      ) : loiChiemManHinh ? (
         <ErrorView error={list.error} onAction={() => void list.refetch()} />
       ) : (
         <FlatList
+          testID="danh-sach-bai-viet"
           data={list.posts}
           keyExtractor={(post) => post.postId}
           renderItem={({ item }) => <PostCard post={item} onPress={openPost} />}
+          // `grow` để EmptyState (flex-1) căn giữa được theo chiều dọc: nếu thiếu,
+          // contentContainer co lại vừa nội dung và khối rỗng dính lên đầu.
+          contentContainerClassName="grow"
+          ListHeaderComponent={
+            list.isError ? (
+              <Pressable
+                testID="loi-tai-lai-nen"
+                accessibilityRole="button"
+                onPress={() => void list.refetch()}
+                className="mx-4 mt-2 rounded-md bg-danger-soft px-3 py-2"
+              >
+                <Text className="text-sm text-danger">
+                  Không tải được bài mới. Chạm để thử lại.
+                </Text>
+              </Pressable>
+            ) : null
+          }
           onEndReachedThreshold={0.5}
-          onEndReached={() => {
-            if (list.hasNextPage && !list.isFetchingNextPage) {
-              void list.fetchNextPage();
-            }
-          }}
+          onEndReached={taiTrangKe}
           refreshing={list.isRefetching}
           onRefresh={() => void list.refetch()}
+          ListFooterComponent={
+            list.isFetchingNextPage ? (
+              <View className="py-4">
+                <ActivityIndicator testID="dang-tai-trang-ke" color={colors.primary} />
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <EmptyState
               title="Chưa có bài viết nào"

@@ -1,7 +1,8 @@
 /**
  * @file TopicChips.tsx
- * @description Hàng chip chọn chủ đề. `null` nghĩa là không lọc — khi đó màn
- * hình quay về newsfeed cá nhân hoá thay vì gọi endpoint tra cứu.
+ * @description Hàng chip chọn chủ đề. `null` nghĩa là không lọc theo chủ đề —
+ * màn hình chỉ quay về newsfeed cá nhân hoá khi KHÔNG còn bộ lọc nào khác; nếu
+ * ô tìm kiếm vẫn có chữ thì danh sách vẫn đi qua endpoint tra cứu.
  */
 
 import { Pressable, ScrollView, Text } from 'react-native';
@@ -26,6 +27,9 @@ function Chip({
   return (
     <Pressable
       accessibilityRole="button"
+      // Trạng thái chọn phải nằm trong cây trợ năng, không chỉ trong màu nền:
+      // trình đọc màn hình không thấy được `className`.
+      accessibilityState={{ selected: active }}
       onPress={onPress}
       className={`h-control-md items-center justify-center rounded-full px-4 ${
         active ? 'bg-primary' : 'bg-surface border border-border-color'

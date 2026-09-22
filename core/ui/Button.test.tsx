@@ -7,7 +7,7 @@ describe('Button', () => {
     const onPress = jest.fn();
     await render(<Button label="Đăng bài" onPress={onPress} />);
 
-    fireEvent.press(screen.getByText('Đăng bài'));
+    await fireEvent.press(screen.getByText('Đăng bài'));
 
     expect(onPress).toHaveBeenCalledTimes(1);
   });
@@ -17,7 +17,7 @@ describe('Button', () => {
     await render(<Button label="Đăng bài" onPress={onPress} busy testID="nut" />);
 
     expect(screen.queryByText('Đăng bài')).toBeNull();
-    fireEvent.press(screen.getByTestId('nut'));
+    await fireEvent.press(screen.getByTestId('nut'));
 
     expect(onPress).not.toHaveBeenCalled();
   });
@@ -26,7 +26,7 @@ describe('Button', () => {
     const onPress = jest.fn();
     await render(<Button label="Đăng bài" onPress={onPress} disabled testID="nut" />);
 
-    fireEvent.press(screen.getByTestId('nut'));
+    await fireEvent.press(screen.getByTestId('nut'));
 
     expect(onPress).not.toHaveBeenCalled();
   });

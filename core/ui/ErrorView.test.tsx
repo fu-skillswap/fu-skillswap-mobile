@@ -9,7 +9,7 @@ describe('ErrorView', () => {
     await render(<ErrorView error={new ApiClientError(500, 'SYS_0010', 'Lỗi')} onAction={onAction} />);
 
     expect(screen.getByText('Hệ thống đang bận')).toBeTruthy();
-    fireEvent.press(screen.getByText('Thử lại'));
+    await fireEvent.press(screen.getByText('Thử lại'));
 
     expect(onAction).toHaveBeenCalledTimes(1);
   });
