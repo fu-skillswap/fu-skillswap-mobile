@@ -1,9 +1,17 @@
 # SkillSwap Mobile
 
-App React Native (Expo) cho SkillSwap — dùng chung backend với [`fu-skillswap-fe-2`](../fu-skillswap-fe-2).
+App React Native (Expo) cho SkillSwap — dùng chung backend với
+[`fu-skillswap-be`](https://github.com/fu-skillswap/fu-skillswap-be) và đối chiếu quy ước với
+web frontend [`fu-skillswap-fe-2`](https://github.com/fu-skillswap/fu-skillswap-fe-2).
 
-Thiết kế: [`docs/superpowers/specs/2026-09-18-skillswap-mobile-design.md`](../docs/superpowers/specs/2026-09-18-skillswap-mobile-design.md).
-Kế hoạch giai đoạn nền tảng: [`docs/superpowers/plans/2026-09-20-skillswap-mobile-foundation.md`](../docs/superpowers/plans/2026-09-20-skillswap-mobile-foundation.md).
+Spec thiết kế và các implementation plan **không nằm trong repo này** — chúng ở thư mục
+`docs/superpowers/` của workspace, cạnh các repo anh em:
+
+| Tài liệu | Đường dẫn trong workspace |
+|---|---|
+| Spec thiết kế mobile | `docs/superpowers/specs/2026-09-18-skillswap-mobile-design.md` |
+| Plan giai đoạn 1 (nền tảng) | `docs/superpowers/plans/2026-09-20-skillswap-mobile-foundation.md` |
+| Plan giai đoạn 2 (diễn đàn) | `docs/superpowers/plans/2026-09-22-skillswap-mobile-forum.md` |
 
 ## Bắt đầu
 
@@ -53,5 +61,11 @@ Giai đoạn 1 (nền tảng) — xem plan để biết chi tiết từng task:
 
 ### Chưa chạy được đầu–cuối
 
-Luồng đăng nhập cần backend bổ sung endpoint `/api/auth/google/mobile`. Lý do và
-nội dung đề nghị: [`docs/be-change-requests/2026-09-21-mobile-google-login-nonce.md`](../docs/be-change-requests/2026-09-21-mobile-google-login-nonce.md).
+Luồng đăng nhập cần backend bổ sung endpoint `/api/auth/google/mobile`: thư viện Google
+Sign-In miễn phí không đưa được claim `nonce` vào ID token, nên backend phải bỏ bước so
+khớp claim đó cho riêng đường mobile. Nội dung đề nghị chi tiết nằm ở
+`docs/be-change-requests/2026-09-21-mobile-google-login-nonce.md` trong workspace (không
+commit vào repo này).
+
+Cho tới khi endpoint đó lên, spike R1/R2 trong `docs/spike/` chưa kết luận được — xem mục
+"Bị chặn" trong chính runbook đó.
