@@ -1,4 +1,4 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { http, HttpResponse } from 'msw';
@@ -121,7 +121,7 @@ async function renderScreen() {
 }
 
 describe('PostDetailScreen', () => {
-  it('hiện bài viết, reply thụt vào và badge AI của bot', async () => {
+  it('hiện bài viết, dòng Trả lời ai của reply, và badge AI của bot', async () => {
     server.use(
       postOk(),
       commentsOk([
@@ -166,7 +166,10 @@ describe('PostDetailScreen', () => {
     expect(screen.queryByText('Chưa có bình luận')).toBeNull();
     // Bài viết vẫn đọc được: hai query độc lập nhau.
     expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy();
-  });
+    // 15s: `shouldRetryQuery` retry hai lần trước khi báo lỗi nên waitFor chờ
+    // 10s. Không nới timeout của `it` thì Jest cắt ở mốc mặc định 5s và báo
+    // "Exceeded timeout", che mất assertion thật sự hỏng.
+  }, 15_000);
 
   it('bài viết lỗi 500 ngay từ đầu thì hiện ErrorView kèm nút thử lại', async () => {
     server.use(
@@ -180,7 +183,7 @@ describe('PostDetailScreen', () => {
       timeout: 10_000,
     });
     expect(screen.getByText('Thử lại')).toBeTruthy();
-  });
+  }, 15_000);
 
   it('tải lại HỎNG khi đã có bài thì GIỮ NGUYÊN nội dung, chỉ báo nhẹ', async () => {
     // `isError` của TanStack v5 bật cả khi query đã có data và chỉ lần refetch
@@ -205,7 +208,7 @@ describe('PostDetailScreen', () => {
     });
     expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy();
     expect(screen.queryByText('Hệ thống đang bận')).toBeNull();
-  });
+  }, 15_000);
 
   it('cuộn tới cuối thì tải trang bình luận kế, và không gọi trùng khi đang tải', async () => {
     const cursorDaGui: (string | null)[] = [];
@@ -239,5 +242,67 @@ describe('PostDetailScreen', () => {
 
     await waitFor(() => expect(screen.getByText('noi dung c2')).toBeTruthy());
     expect(cursorDaGui).toEqual([null, 'c2']);
+  });
+
+  it('MẤT MẠNG lúc mở màn hình thì nói mất kết nối, KHÔNG nói chưa có bình luận', async () => {
+    // `isLoading` KHÔNG bật khi mất mạng: với networkMode 'online' (mặc định),
+    // query nằm ở status 'pending' + fetchStatus 'paused', mà
+    // `isLoading = isPending && isFetching` nên nó là false. Màn hình chỉ hỏi
+    // `isLoading` sẽ rơi thẳng xuống nhánh rỗng và báo "Chưa có bình luận" trong
+    // khi thực ra chưa hề gọi được API — nói dối người dùng, đúng kiểu mà test
+    // "bình luận lỗi 500" ở trên sinh ra để chặn, chỉ khác nguyên nhân.
+    onlineManager.setOnline(false);
+    try {
+      server.use(postOk(), commentsOk([]));
+
+      await renderScreen();
+
+      await waitFor(() => expect(screen.getByText('Không có kết nối')).toBeTruthy());
+      expect(screen.queryByText('Chưa có bình luận')).toBeNull();
+    } finally {
+      // Bật mạng lại làm các query đang hoãn chạy tiếp và setState trên màn hình
+      // vẫn còn gắn — phải nằm trong act đã await, nếu không React kêu
+      // "not wrapped in act(...)" và act scope hỏng sẽ lan sang test kế tiếp.
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
+  });
+
+  it('reply mồ côi vẫn giữ dòng Trả lời ai dù bị nâng lên làm bình luận gốc', async () => {
+    // Phân trang theo cursor: bình luận gốc có thể nằm ở trang trước, nên
+    // `buildCommentTree` nâng reply mồ côi lên làm gốc để nó không biến mất.
+    // Nhưng nó vẫn LÀ một reply. Nếu màn hình chỉ truyền `isReply` cho phần tử
+    // nằm trong `replies`, reply mồ côi mất sạch ngữ cảnh và người đọc thấy một
+    // câu cụt lủn không hiểu đang trả lời ai.
+    server.use(
+      postOk(),
+      commentsOk([
+        baseComment('r9', {
+          replyToCommentId: 'khong-co-trong-trang-nay',
+          replyToUserName: 'Tran Thi B',
+          content: 'Dung roi ban oi',
+        }),
+      ]),
+    );
+
+    await renderScreen();
+
+    await waitFor(() => expect(screen.getByText('Dung roi ban oi')).toBeTruthy());
+    expect(screen.getByText(/Trả lời Tran Thi B/)).toBeTruthy();
+  });
+
+  it('chưa có ô nhập thì màn hình KHÔNG được hiện nút Trả lời chết', async () => {
+    // Trước đây màn hình truyền `onReply={setReplyTo}` với state không ai đọc:
+    // người dùng bấm "Trả lời", cả màn hình render lại, và không có gì xảy ra.
+    // `CommentItem` đã tự bảo vệ bằng cách chỉ vẽ nút khi có handler — rồi màn
+    // hình đưa vào một handler rỗng và dựng lại đúng cái bẫy đó. Task 11 thêm ô
+    // nhập thì mới được truyền `onReply` trở lại.
+    server.use(postOk(), commentsOk([baseComment('c1')]));
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('noi dung c1')).toBeTruthy());
+
+    expect(screen.queryByRole('button', { name: 'Trả lời' })).toBeNull();
   });
 });

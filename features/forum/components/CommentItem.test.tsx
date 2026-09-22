@@ -65,4 +65,76 @@ describe('CommentItem', () => {
 
     expect(screen.queryByRole('button', { name: 'Trả lời' })).toBeNull();
   });
+
+  it('KHÔNG có onToggleLike thì ô lượt thích không được giả làm nút', async () => {
+    // Cùng lý do đã khoá cho PostCard: `Pressable` với `disabled` vẫn giữ
+    // accessibilityRole="button", nên trình đọc màn hình đọc ra "nút Thích bình
+    // luận" rồi bấm vào chẳng có gì xảy ra. Trước đây chỉ có comment nói về
+    // điều này chứ không có test — hoàn nguyên về `Pressable disabled` vẫn xanh.
+    await render(<CommentItem comment={comment()} />);
+
+    expect(screen.queryByLabelText('Thích bình luận')).toBeNull();
+    expect(screen.queryByLabelText('Bỏ thích bình luận')).toBeNull();
+  });
+
+  it('có onToggleLike thì ô lượt thích là nút thật, nhãn phân biệt với bài viết', async () => {
+    const onToggleLike = jest.fn();
+    await render(<CommentItem comment={comment({ commentId: 'c9' })} onToggleLike={onToggleLike} />);
+
+    // Nhãn phải là "Thích bình luận" chứ không phải "Thích": màn hình chi tiết
+    // có cả nút thích của BÀI VIẾT, trùng nhãn thì truy vấn nhập nhằng và trình
+    // đọc màn hình cũng đọc ra hai thứ giống hệt nhau.
+    await fireEvent.press(screen.getByLabelText('Thích bình luận'));
+
+    expect(onToggleLike).toHaveBeenCalledWith(expect.objectContaining({ commentId: 'c9' }));
+  });
+
+  it('mỗi bình luận có testID riêng, không trùng nhau', async () => {
+    // FlatList render nhiều bình luận cùng lúc; testID dùng chung sẽ làm
+    // `getByTestId` ném "found multiple elements" ngay khi Task 9 viết test cho
+    // nút thích — và lỗi đó hiện ra ở task khác chứ không phải ở đây.
+    await render(
+      <>
+        <CommentItem comment={comment({ commentId: 'c1' })} />
+        <CommentItem comment={comment({ commentId: 'c2' })} />
+      </>,
+    );
+
+    expect(screen.getByTestId('so-thich-binh-luan-c1')).toBeTruthy();
+    expect(screen.getByTestId('so-thich-binh-luan-c2')).toBeTruthy();
+  });
+
+  it('reply thụt lề vào, bình luận gốc thì không', async () => {
+    // Tên test cũ của màn hình chi tiết nói "reply thụt vào" nhưng không
+    // assertion nào chạm tới thụt lề: xoá `pl-12` đi mà toàn bộ suite vẫn xanh.
+    // Render cả hai biến thể trong CÙNG một cây thay vì render rồi `unmount()`:
+    // `unmount` của RNTL 14 cũng là hàm async, gọi mà không await thì act scope
+    // của nó rò ra và sinh "overlapping act() calls".
+    await render(
+      <>
+        <CommentItem comment={comment({ commentId: 'c1' })} testID="goc" />
+        <CommentItem comment={comment({ commentId: 'c2' })} isReply testID="reply" />
+      </>,
+    );
+
+    expect(String(screen.getByTestId('goc').props.className)).not.toContain('pl-12');
+    expect(String(screen.getByTestId('reply').props.className)).toContain('pl-12');
+  });
+
+  it('bình luận của bot có nền khác bình luận của người thật', async () => {
+    // JSDoc của component hứa "nền nhạt" cho bot. Chỉ badge "AI" được kiểm, nên
+    // lời hứa về nền là một câu mô tả hành vi không ai bảo vệ.
+    await render(
+      <>
+        <CommentItem comment={comment({ commentId: 'c1' })} testID="nguoi" />
+        <CommentItem
+          comment={comment({ commentId: 'c2', authorUserId: 'bot-user-id' })}
+          testID="bot"
+        />
+      </>,
+    );
+
+    expect(String(screen.getByTestId('nguoi').props.className)).toContain('bg-surface');
+    expect(String(screen.getByTestId('bot').props.className)).toContain('bg-primary-light');
+  });
 });

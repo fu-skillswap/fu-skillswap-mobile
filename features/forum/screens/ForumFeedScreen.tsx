@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 
+import { trangThaiTai } from '@/core/api/queryState';
 import { useDebouncedValue } from '@/core/hooks/useDebouncedValue';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
@@ -62,10 +63,14 @@ export function ForumFeedScreen() {
     });
   };
 
-  // Chỉ chiếm cả màn hình khi thật sự không có gì để hiện. `isError` của TanStack
-  // v5 bật cả khi query đã có data và chỉ lần refetch nền hỏng; nếu dựa vào mình
-  // nó thì một lần kéo-để-tải-lại thất bại sẽ xoá sạch feed người dùng đang đọc.
-  const loiChiemManHinh = list.isError && list.posts.length === 0;
+  // Quy cờ của TanStack thành MỘT trạng thái — luật và hai cái bẫy nằm ở JSDoc
+  // của `core/api/queryState.ts`, đừng tự suy diễn lại ở đây.
+  const trangThai = trangThaiTai({
+    isPaused: list.isPaused,
+    isPending: list.isPending,
+    isError: list.isError,
+    coDuLieu: list.posts.length > 0,
+  });
 
   return (
     <Screen testID="man-hinh-dien-dan">
@@ -88,11 +93,16 @@ export function ForumFeedScreen() {
         onSelect={setTopicId}
       />
 
-      {list.isLoading ? (
+      {trangThai === 'dang-tai' ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator testID="dang-tai-dien-dan" color={colors.primary} />
         </View>
-      ) : loiChiemManHinh ? (
+      ) : trangThai === 'mat-ket-noi' ? (
+        <EmptyState
+          title="Không có kết nối"
+          description="Bài viết sẽ tải khi có mạng trở lại."
+        />
+      ) : trangThai === 'loi' ? (
         <ErrorView error={list.error} onAction={() => void list.refetch()} />
       ) : (
         <FlatList

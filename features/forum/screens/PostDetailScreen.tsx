@@ -5,11 +5,15 @@
  * Bài viết và bình luận là HAI query độc lập, nên mỗi bên tự quyết trạng thái
  * hiển thị của mình: bình luận hỏng không được phép xoá bài viết khỏi màn hình,
  * và bài viết tải xong không có nghĩa là bình luận đã có.
+ *
+ * Việc quy cờ của TanStack thành một trạng thái hiển thị nằm ở
+ * `core/api/queryState.ts` — đọc JSDoc ở đó trước khi sửa mấy nhánh dưới đây.
  */
 
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 
+import { trangThaiTai } from '@/core/api/queryState';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
@@ -17,12 +21,10 @@ import { Screen } from '@/core/ui/Screen';
 import { colors } from '@/core/ui/theme';
 import { CommentItem } from '@/features/forum/components/CommentItem';
 import { useForumComments, useForumPost } from '@/features/forum/hooks/useForumQueries';
-import type { ForumCommentResponse } from '@/features/forum/types';
 
 export function PostDetailScreen({ postId }: { postId: string }) {
   const post = useForumPost(postId);
   const comments = useForumComments(postId);
-  const [, setReplyTo] = useState<ForumCommentResponse | null>(null);
 
   /**
    * Chốt chặn ĐỒNG BỘ cho việc tải trang bình luận kế — y hệt lý do đã ghi ở
@@ -44,7 +46,14 @@ export function PostDetailScreen({ postId }: { postId: string }) {
     void comments.refetch();
   };
 
-  if (post.isLoading) {
+  const trangThaiBai = trangThaiTai({
+    isPaused: post.isPaused,
+    isPending: post.isPending,
+    isError: post.isError,
+    coDuLieu: post.data !== undefined,
+  });
+
+  if (trangThaiBai === 'dang-tai') {
     return (
       <Screen testID="man-hinh-chi-tiet-bai-viet">
         <View className="flex-1 items-center justify-center">
@@ -54,16 +63,32 @@ export function PostDetailScreen({ postId }: { postId: string }) {
     );
   }
 
-  // Chỉ chiếm cả màn hình khi thật sự KHÔNG có gì để hiện. `isError` của TanStack
-  // v5 bật cả khi query đã có data và chỉ lần refetch nền hỏng; dựa vào mình nó
-  // thì một lần kéo-để-tải-lại hụt sóng sẽ xoá mất bài người dùng đang đọc.
-  if (post.isError && post.data === undefined) {
+  if (trangThaiBai === 'mat-ket-noi') {
+    return (
+      <Screen testID="man-hinh-chi-tiet-bai-viet">
+        <OfflineBanner />
+        <EmptyState
+          title="Không có kết nối"
+          description="Bài viết sẽ tải khi có mạng trở lại."
+        />
+      </Screen>
+    );
+  }
+
+  if (trangThaiBai === 'loi') {
     return (
       <Screen testID="man-hinh-chi-tiet-bai-viet">
         <ErrorView error={post.error} onAction={taiLai} />
       </Screen>
     );
   }
+
+  const trangThaiBinhLuan = trangThaiTai({
+    isPaused: comments.isPaused,
+    isPending: comments.isPending,
+    isError: comments.isError,
+    coDuLieu: comments.comments.length > 0,
+  });
 
   return (
     <Screen testID="man-hinh-chi-tiet-bai-viet">
@@ -102,27 +127,56 @@ export function PostDetailScreen({ postId }: { postId: string }) {
         }
         renderItem={({ item }) => (
           <View>
-            <CommentItem comment={item} onReply={setReplyTo} />
+            {/*
+              `buildCommentTree` nâng reply mồ côi — reply mà bình luận gốc của nó
+              nằm ở trang trước — lên làm gốc để nó không biến mất. Nhưng nó vẫn
+              LÀ một reply, nên phải giữ dòng "Trả lời ai"; bỏ đi thì người đọc
+              thấy một câu cụt lủn không hiểu đang nói với ai.
+            */}
+            <CommentItem comment={item} isReply={Boolean(item.replyToCommentId)} />
             {item.replies.map((reply) => (
-              <CommentItem key={reply.commentId} comment={reply} isReply onReply={setReplyTo} />
+              <CommentItem key={reply.commentId} comment={reply} isReply />
             ))}
           </View>
         )}
         onEndReachedThreshold={0.5}
         onEndReached={taiTrangKe}
-        refreshing={post.isRefetching}
+        // Cả hai query cùng tải lại, nên spinner chỉ được tắt khi cả hai xong.
+        refreshing={post.isRefetching || comments.isRefetching}
         onRefresh={taiLai}
         ListFooterComponent={
           comments.isFetchingNextPage ? (
             <View className="py-4">
               <ActivityIndicator testID="dang-tai-binh-luan-ke" color={colors.primary} />
             </View>
+          ) : comments.isError && comments.comments.length > 0 ? (
+            // Trang bình luận KẾ hỏng: danh sách đã có nội dung nên ListEmptyComponent
+            // không render, và không có chỗ nào khác báo cho người dùng biết.
+            <Pressable
+              testID="loi-tai-them-binh-luan"
+              accessibilityRole="button"
+              onPress={() => void comments.fetchNextPage()}
+              className="mx-4 my-3 rounded-md bg-danger-soft px-3 py-2"
+            >
+              <Text className="text-sm text-danger">
+                Không tải được thêm bình luận. Chạm để thử lại.
+              </Text>
+            </Pressable>
           ) : null
         }
         ListEmptyComponent={
-          // Ba trạng thái khác nhau, không gộp: đang tải, lỗi, và rỗng thật.
-          // Gộp lỗi vào rỗng sẽ nói dối người dùng là "bài này chưa ai bình luận".
-          comments.isLoading ? null : comments.isError ? (
+          // Bốn trạng thái khác nhau, không gộp. Gộp bất kỳ cái nào vào "rỗng"
+          // đều thành nói dối người dùng là "bài này chưa ai bình luận".
+          trangThaiBinhLuan === 'dang-tai' ? (
+            <View className="flex-1 items-center justify-center py-8">
+              <ActivityIndicator testID="dang-tai-binh-luan" color={colors.primary} />
+            </View>
+          ) : trangThaiBinhLuan === 'mat-ket-noi' ? (
+            <EmptyState
+              title="Không có kết nối"
+              description="Bình luận sẽ tải khi có mạng trở lại."
+            />
+          ) : trangThaiBinhLuan === 'loi' ? (
             <ErrorView error={comments.error} onAction={() => void comments.refetch()} />
           ) : (
             <EmptyState

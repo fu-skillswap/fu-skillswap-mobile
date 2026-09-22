@@ -1,4 +1,4 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { http, HttpResponse } from 'msw';
@@ -282,5 +282,28 @@ describe('ForumFeedScreen', () => {
     await fireEvent.press(screen.getByText('Học Spring Boot từ đâu?'));
 
     expect(mockPush).toHaveBeenCalledWith('/forum/p1');
+  });
+
+  it('MẤT MẠNG lúc mở tab thì nói mất kết nối, KHÔNG nói chưa có bài viết nào', async () => {
+    // `isLoading` KHÔNG bật khi mất mạng: với networkMode 'online' (mặc định),
+    // query nằm ở status 'pending' + fetchStatus 'paused', mà
+    // `isLoading = isPending && isFetching` nên nó là false. Màn hình rơi thẳng
+    // xuống nhánh rỗng và báo "Chưa có bài viết nào" trong khi chưa hề gọi được
+    // API — nói với người dùng rằng cả diễn đàn trống rỗng.
+    onlineManager.setOnline(false);
+    try {
+      server.use(topicsOk(), http.get(`${BASE}/api/forum/feed`, () => HttpResponse.json(envelope(cursorPage([])))));
+
+      await renderScreen();
+
+      await waitFor(() => expect(screen.getByText('Không có kết nối')).toBeTruthy());
+      expect(screen.queryByText('Chưa có bài viết nào')).toBeNull();
+    } finally {
+      // Bật mạng lại làm query đang hoãn chạy tiếp và setState trên màn hình vẫn
+      // còn gắn — phải nằm trong act đã await.
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
   });
 });

@@ -14,6 +14,8 @@ import type { ForumCommentResponse } from '@/features/forum/types';
 
 export interface CommentItemProps {
   comment: ForumCommentResponse;
+  /** Chỉ dùng trong test, để kiểm được lớp thụt lề và nền của bot */
+  testID?: string;
   /** Reply thì thụt vào và hiện tên người được trả lời */
   isReply?: boolean;
   onReply?: (comment: ForumCommentResponse) => void;
@@ -23,6 +25,7 @@ export interface CommentItemProps {
 
 export function CommentItem({
   comment,
+  testID,
   isReply = false,
   onReply,
   onToggleLike,
@@ -41,6 +44,7 @@ export function CommentItem({
 
   return (
     <View
+      testID={testID}
       className={`gap-1 px-4 py-3 ${isReply ? 'pl-12' : ''} ${cuaBot ? 'bg-primary-light' : 'bg-surface'}`}
     >
       <View className="flex-row items-center gap-2">
@@ -67,9 +71,9 @@ export function CommentItem({
         */}
         {onToggleLike ? (
           <Pressable
-            testID="so-thich-binh-luan"
+            testID={`so-thich-binh-luan-${comment.commentId}`}
             accessibilityRole="button"
-            accessibilityLabel={comment.reactedByCurrentUser ? 'Bỏ thích' : 'Thích'}
+            accessibilityLabel={comment.reactedByCurrentUser ? 'Bỏ thích bình luận' : 'Thích bình luận'}
             onPress={() => onToggleLike(comment)}
             className="flex-row items-center gap-1"
           >
@@ -77,7 +81,7 @@ export function CommentItem({
             {soLuotThich}
           </Pressable>
         ) : (
-          <View testID="so-thich-binh-luan" className="flex-row items-center gap-1">
+          <View testID={`so-thich-binh-luan-${comment.commentId}`} className="flex-row items-center gap-1">
             {icon}
             {soLuotThich}
           </View>
