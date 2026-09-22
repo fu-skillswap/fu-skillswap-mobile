@@ -7,7 +7,7 @@
  * sách), và rỗng (EmptyState — gọi API thành công nhưng không có bài nào).
  */
 
-import { useRouter, type Href } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 
@@ -42,9 +42,7 @@ export function ForumFeedScreen() {
     forumTopicId: topicId ?? undefined,
   });
 
-  // Cast tạm: route `/forum/[postId]` chưa tồn tại nên expo-router chưa sinh kiểu
-  // cho nó. Task 8 tạo `app/forum/[postId].tsx` — khi đó BỎ cast này đi.
-  const openPost = (postId: string) => router.push(`/forum/${postId}` as Href);
+  const openPost = (postId: string) => router.push(`/forum/${postId}`);
 
   /**
    * Chốt chặn ĐỒNG BỘ cho việc tải trang kế.

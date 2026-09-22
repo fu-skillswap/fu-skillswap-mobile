@@ -5,3 +5,4 @@
  */
 
 export { ForumFeedScreen } from '@/features/forum/screens/ForumFeedScreen';
+export { PostDetailScreen } from '@/features/forum/screens/PostDetailScreen';
