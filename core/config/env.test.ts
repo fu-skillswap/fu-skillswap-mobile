@@ -34,4 +34,23 @@ describe('readEnv', () => {
       'Thiếu EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
     );
   });
+
+  it('đọc forumBotUserId, để rỗng khi không cấu hình', () => {
+    const env = readEnv({
+      EXPO_PUBLIC_API_URL: 'https://api.skillswap.asia',
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 'abc.apps.googleusercontent.com',
+    });
+
+    expect(env.forumBotUserId).toBe('');
+  });
+
+  it('forumBotUserId được cắt khoảng trắng thừa', () => {
+    const env = readEnv({
+      EXPO_PUBLIC_API_URL: 'https://api.skillswap.asia',
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 'abc.apps.googleusercontent.com',
+      EXPO_PUBLIC_FORUM_BOT_USER_ID: '  bot-user-id  ',
+    });
+
+    expect(env.forumBotUserId).toBe('bot-user-id');
+  });
 });

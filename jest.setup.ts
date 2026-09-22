@@ -6,6 +6,7 @@
 
 process.env.EXPO_PUBLIC_API_URL ??= 'https://api.skillswap.asia';
 process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??= 'test-web-client-id.apps.googleusercontent.com';
+process.env.EXPO_PUBLIC_FORUM_BOT_USER_ID ??= 'bot-user-id';
 
 import axios from 'axios';
 
