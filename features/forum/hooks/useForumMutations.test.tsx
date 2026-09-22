@@ -1,4 +1,4 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { http, HttpResponse } from 'msw';
@@ -145,6 +145,32 @@ function renderHooks() {
       binhLuan: useForumComments('p1'),
       like: useTogglePostLike(),
       likeBinhLuan: useToggleCommentLike('p1'),
+    }),
+    { wrapper },
+  );
+}
+
+/**
+ * Nhường một nhịp macrotask BÊN TRONG act.
+ *
+ * TanStack gom thông báo re-render vào `notifyManager`, và notifyManager đẩy
+ * chúng qua một `setTimeout(0)`. Nếu test kết thúc trước khi macrotask đó nổ,
+ * React cập nhật ngoài phạm vi act và in "An update to ... was not wrapped in
+ * act(...)" — chập chờn, chỉ hiện ở vài lần chạy, nên rất dễ bị cho qua.
+ */
+async function nhuongMotNhip() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+/** Hai danh sách cùng sống: newsfeed và một danh sách CÓ lọc theo chủ đề */
+function renderHaiDanhSach() {
+  return renderHook(
+    () => ({
+      feed: useForumList({}),
+      theoChuDe: useForumList({ forumTopicId: 't1' }),
+      like: useTogglePostLike(),
     }),
     { wrapper },
   );
@@ -365,6 +391,108 @@ describe('useTogglePostLike', () => {
     });
     await waitFor(() => expect(result.current.like.isPending).toBe(false));
   });
+
+  it('cập nhật CẢ danh sách đã lọc theo chủ đề, không chỉ newsfeed', async () => {
+    // Bài viết sống trong nhiều entry cache: `feed()` và `posts(filters)` với
+    // TỪNG bộ lọc. Nếu phạm vi cập nhật bỏ nhánh `posts`, người dùng thả tim ở
+    // newsfeed rồi đổi sang chip chủ đề sẽ thấy tim rỗng trở lại. Mọi test khác
+    // trong file này đều chỉ dùng `useForumList({})`, nên không cái nào canh
+    // được nhánh đó.
+    server.use(
+      feedOk([post()]),
+      http.get(`${BASE}/api/forum/posts`, () => HttpResponse.json(envelope(cursorPage([post()])))),
+      http.put(`${BASE}/api/forum/posts/p1/reaction`, () =>
+        HttpResponse.json(envelope(post({ reactedByCurrentUser: true, reactionCount: 6 }))),
+      ),
+    );
+
+    const { result } = await renderHaiDanhSach();
+    await waitFor(() => expect(result.current.feed.posts).toHaveLength(1));
+    await waitFor(() => expect(result.current.theoChuDe.posts).toHaveLength(1));
+
+    await act(async () => {
+      result.current.like.toggle(result.current.feed.posts[0]!);
+    });
+    await nhuongMotNhip();
+
+    expect(result.current.feed.posts[0]?.reactedByCurrentUser).toBe(true);
+    expect(result.current.theoChuDe.posts[0]?.reactedByCurrentUser).toBe(true);
+  });
+
+  it('hoàn tác chỉ trả lại ba trường reaction, KHÔNG đắp đè bản cũ lên cache chi tiết', async () => {
+    // Bản chụp để hoàn tác lấy từ danh sách người dùng đang bấm. Nếu `onError`
+    // đắp nguyên object đó lên mọi cache, màn hình chi tiết — vốn có thể mới hơn
+    // — sẽ tụt về tiêu đề và số bình luận cũ. Một cú like hỏng kéo theo cả nội
+    // dung không liên quan.
+    server.use(
+      feedOk([post({ title: 'Tieu de CU', commentCount: 0 })]),
+      http.get(`${BASE}/api/forum/posts/p1`, () =>
+        HttpResponse.json(envelope(post({ title: 'Tieu de MOI', commentCount: 7 }))),
+      ),
+      binhLuanOk([]),
+      http.put(`${BASE}/api/forum/posts/p1/reaction`, () => loi429()),
+    );
+
+    const { result } = await renderHooks();
+    await waitFor(() => expect(result.current.list.posts).toHaveLength(1));
+    await waitFor(() => expect(result.current.chiTiet.data?.title).toBe('Tieu de MOI'));
+
+    await act(async () => {
+      result.current.like.toggle(result.current.list.posts[0]!);
+    });
+    await waitFor(() => expect(result.current.chiTiet.data?.reactedByCurrentUser).toBe(false));
+
+    // Reaction đã hoàn tác đúng...
+    expect(result.current.chiTiet.data?.reactionCount).toBe(5);
+    // ...nhưng phần còn lại của bài viết KHÔNG được đụng tới.
+    expect(result.current.chiTiet.data?.title).toBe('Tieu de MOI');
+    expect(result.current.chiTiet.data?.commentCount).toBe(7);
+  });
+
+  it('MẤT MẠNG thì vẫn gửi request và nhả chốt, không khoá cứng nút tim', async () => {
+    // Với `networkMode` mặc định ('online'), TanStack chạy `onMutate` rồi HOÃN
+    // request: giao diện hiện tim đầy trong khi chưa gửi gì, và vì `onSettled`
+    // không bao giờ chạy nên chốt chống bấm-hai-lần giữ postId vĩnh viễn —
+    // người dùng không bỏ tim lại được cho tới khi có mạng.
+    let soPut = 0;
+    server.use(
+      feedOk([post()]),
+      baiVietOk(),
+      binhLuanOk([]),
+      http.put(`${BASE}/api/forum/posts/p1/reaction`, () => {
+        soPut += 1;
+        return HttpResponse.json(envelope(post({ reactedByCurrentUser: true, reactionCount: 6 })));
+      }),
+      http.delete(`${BASE}/api/forum/posts/p1/reaction`, () =>
+        HttpResponse.json(envelope(post({ reactedByCurrentUser: false, reactionCount: 5 }))),
+      ),
+    );
+
+    // Tải xong dữ liệu TRƯỚC rồi mới ngắt mạng: `setOnline(false)` hoãn cả
+    // query chứ không riêng mutation, ngắt trước thì feed không bao giờ tải nổi.
+    const { result } = await renderHooks();
+    await waitFor(() => expect(result.current.list.posts).toHaveLength(1));
+
+    await act(async () => {
+      onlineManager.setOnline(false);
+    });
+    try {
+      await act(async () => {
+        result.current.like.toggle(result.current.list.posts[0]!);
+      });
+      await waitFor(() => expect(soPut).toBe(1));
+
+      // Chốt đã nhả: bấm lần nữa phải đi tiếp được, không im lặng.
+      await act(async () => {
+        result.current.like.toggle(result.current.list.posts[0]!);
+      });
+      await waitFor(() => expect(result.current.list.posts[0]?.reactedByCurrentUser).toBe(false));
+    } finally {
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
+  });
 });
 
 describe('useToggleCommentLike', () => {
@@ -378,8 +506,11 @@ describe('useToggleCommentLike', () => {
       http.put(`${BASE}/api/forum/comments/c1/reaction`, async () => {
         await chot.cho;
         daTraLoi = true;
+        // 9 chứ không phải 4: giữa hai lần tải, người khác cũng vừa thả tim.
+        // Nếu con số của backend trùng khít với kết quả lạc quan thì test không
+        // phân biệt được "app tự đoán" với "lấy từ backend".
         return HttpResponse.json(
-          envelope(comment('c1', { reactedByCurrentUser: true, reactionCount: 4 })),
+          envelope(comment('c1', { reactedByCurrentUser: true, reactionCount: 9 })),
         );
       }),
     );
@@ -402,7 +533,9 @@ describe('useToggleCommentLike', () => {
       chot.mo();
       await chot.cho;
     });
-    await waitFor(() => expect(result.current.binhLuan.comments[0]?.reactionCount).toBe(4));
+    // Số đếm THẬT của backend thắng con số tự cộng.
+    await waitFor(() => expect(result.current.binhLuan.comments[0]?.reactionCount).toBe(9));
+    await nhuongMotNhip();
   });
 
   it('bỏ like bình luận gửi DELETE và trừ số đếm ngay', async () => {
@@ -414,7 +547,7 @@ describe('useToggleCommentLike', () => {
       http.delete(`${BASE}/api/forum/comments/c1/reaction`, () => {
         soDelete += 1;
         return HttpResponse.json(
-          envelope(comment('c1', { reactedByCurrentUser: false, reactionCount: 3 })),
+          envelope(comment('c1', { reactedByCurrentUser: false, reactionCount: 2 })),
         );
       }),
     );
@@ -428,7 +561,108 @@ describe('useToggleCommentLike', () => {
 
     await waitFor(() => expect(soDelete).toBe(1));
     expect(result.current.binhLuan.comments[0]?.reactedByCurrentUser).toBe(false);
-    expect(result.current.binhLuan.comments[0]?.reactionCount).toBe(3);
+    // 2 là số của backend; trừ tại chỗ sẽ ra 3.
+    await waitFor(() => expect(result.current.binhLuan.comments[0]?.reactionCount).toBe(2));
+    await nhuongMotNhip();
+  });
+
+  it('hoàn tác bình luận chỉ trả lại hai trường reaction, không đắp đè bản cũ', async () => {
+    // Bản chụp để hoàn tác là cái người dùng đang CẦM trên tay lúc bấm. Nếu
+    // danh sách vừa tải lại xen vào (tác giả sửa nội dung, số báo cáo đổi...),
+    // bản cầm trên tay đã cũ — đắp nguyên nó đè lên cache là nuốt mất bản sửa.
+    let lanGoi = 0;
+    server.use(
+      feedOk([]),
+      baiVietOk(),
+      http.get(`${BASE}/api/forum/posts/p1/comments`, () => {
+        lanGoi += 1;
+        return HttpResponse.json(
+          envelope(
+            cursorPage([
+              comment('c1', { content: lanGoi === 1 ? 'noi dung CU' : 'noi dung DA SUA' }),
+            ]),
+          ),
+        );
+      }),
+      http.put(`${BASE}/api/forum/comments/c1/reaction`, () => loi429()),
+    );
+
+    const { result } = await renderHooks();
+    await waitFor(() => expect(result.current.binhLuan.comments[0]?.content).toBe('noi dung CU'));
+
+    // Người dùng cầm bản CŨ; danh sách tải lại và có nội dung mới.
+    const camTrenTay = result.current.binhLuan.comments[0]!;
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: forumKeys.comments('p1') });
+    });
+    await waitFor(() =>
+      expect(result.current.binhLuan.comments[0]?.content).toBe('noi dung DA SUA'),
+    );
+
+    await act(async () => {
+      result.current.likeBinhLuan.toggle(camTrenTay);
+    });
+
+    await waitFor(() => expect(result.current.binhLuan.comments[0]?.reactionCount).toBe(3));
+    expect(result.current.binhLuan.comments[0]?.reactedByCurrentUser).toBe(false);
+    // Nội dung đã sửa KHÔNG được bị cú like hỏng nuốt mất.
+    expect(result.current.binhLuan.comments[0]?.content).toBe('noi dung DA SUA');
+    await nhuongMotNhip();
+  });
+
+  it('huỷ request bình luận đang bay để phản hồi cũ không ghi đè kết quả lạc quan', async () => {
+    // Nhánh bình luận có `cancelQueries` riêng, và trước đây xoá nó đi thì toàn
+    // bộ suite vẫn xanh — không test nào canh.
+    const chotTai = taoChot();
+    const chotLike = taoChot();
+    let lanGoi = 0;
+    server.use(
+      feedOk([]),
+      baiVietOk(),
+      http.get(`${BASE}/api/forum/posts/p1/comments`, async () => {
+        lanGoi += 1;
+        // Lần tải lại (nền) cố tình về SAU cú bấm, và mang số đếm CŨ.
+        if (lanGoi > 1) await chotTai.cho;
+        return HttpResponse.json(envelope(cursorPage([comment('c1')])));
+      }),
+      http.put(`${BASE}/api/forum/comments/c1/reaction`, async () => {
+        await chotLike.cho;
+        return HttpResponse.json(
+          envelope(comment('c1', { reactedByCurrentUser: true, reactionCount: 9 })),
+        );
+      }),
+    );
+
+    const { result } = await renderHooks();
+    await waitFor(() => expect(result.current.binhLuan.comments).toHaveLength(1));
+
+    let taiLai!: Promise<void>;
+    await act(async () => {
+      taiLai = queryClient.refetchQueries({ queryKey: forumKeys.comments('p1') });
+    });
+    await waitFor(() => expect(lanGoi).toBe(2));
+
+    await act(async () => {
+      result.current.likeBinhLuan.toggle(result.current.binhLuan.comments[0]!);
+    });
+    expect(result.current.binhLuan.comments[0]?.reactionCount).toBe(4);
+
+    await act(async () => {
+      chotTai.mo();
+      await taiLai;
+      // Xem chú thích cùng loại ở test của bài viết: notifyManager gom thông báo
+      // vào một macrotask, đọc sớm là đọc lần render cũ.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.binhLuan.comments[0]?.reactedByCurrentUser).toBe(true);
+    expect(result.current.binhLuan.comments[0]?.reactionCount).toBe(4);
+
+    await act(async () => {
+      chotLike.mo();
+      await chotLike.cho;
+    });
+    await waitFor(() => expect(result.current.binhLuan.comments[0]?.reactionCount).toBe(9));
+    await nhuongMotNhip();
   });
 
   it('bình luận bị 429 thì hoàn tác về đúng số đếm cũ', async () => {
@@ -449,5 +683,6 @@ describe('useToggleCommentLike', () => {
     await waitFor(() => expect(result.current.binhLuan.comments[0]?.reactionCount).toBe(3));
     expect(result.current.binhLuan.comments[0]?.reactedByCurrentUser).toBe(false);
     expect(result.current.binhLuan.comments[1]?.reactionCount).toBe(3);
+    await nhuongMotNhip();
   });
 });

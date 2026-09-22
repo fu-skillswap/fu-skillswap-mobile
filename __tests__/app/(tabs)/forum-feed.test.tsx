@@ -99,6 +99,22 @@ afterEach(() => {
 afterAll(() => server.close());
 
 /**
+ * Để FlatList dọn xong hàng đợi của nó TRƯỚC khi test kết thúc.
+ *
+ * `VirtualizedList` gom việc render ô vào `_updateCellsToRenderBatcher`, một bộ
+ * hẹn giờ ~50ms. Nếu test kết thúc trước khi nó nổ, React cập nhật ngoài phạm vi
+ * act và in "An update to VirtualizedList inside a test was not wrapped in
+ * act(...)". Cảnh báo này CHẬP CHỜN — chạy 6 lần chỉ bẩn 1–2 lần — nên rất dễ
+ * bị kết luận nhầm là đã hết chỉ vì lần chạy gần nhất sạch.
+ */
+afterEach(async () => {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  });
+});
+
+
+/**
  * `render` của @testing-library/react-native@14 là HÀM ASYNC — phải await.
  * Gọi mà không await sẽ để lần render đầu ra ngoài phạm vi act(), khiến React
  * cảnh báo "An update to ForumFeedScreen inside a test was not wrapped in act(...)".

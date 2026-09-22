@@ -10,12 +10,27 @@
  *
  * 1. `cancelQueries` TRƯỚC khi ghi đè cache. Một lần tải lại đang bay sẽ trả về
  *    số đếm CŨ sau cú bấm và xoá sạch kết quả lạc quan nếu không huỷ nó.
- * 2. Hoàn tác trả về đúng bản ghi trước khi bấm, không phải "trừ đi 1". Nếu
- *    backend trả 429 sau khi người khác cũng vừa like, phép trừ cho ra một con
- *    số chưa từng tồn tại.
+ * 2. Hoàn tác trả về đúng GIÁ TRỊ REACTION trước khi bấm, không phải "trừ đi 1"
+ *    và cũng không phải đắp lại nguyên object cũ. Trừ đi 1 cho ra con số chưa
+ *    từng tồn tại nếu người khác vừa like xen vào. Còn đắp nguyên object thì tệ
+ *    hơn: bản chụp lấy từ danh sách người dùng đang bấm, đem đè lên cache chi
+ *    tiết vốn có thể mới hơn, làm tiêu đề và số bình luận ở màn chi tiết tụt về
+ *    bản cũ — một cú like hỏng kéo theo cả nội dung không liên quan.
  * 3. Một bài viết đang bay thì cú chạm thứ hai vào chính nó bị bỏ qua. Guard
  *    theo state render không chặn được hai lần chạm trong cùng một frame — cùng
  *    lý do đã ghi ở `ForumFeedScreen.taiTrangKe`, nên chốt chặn phải là `useRef`.
+ *
+ *    Giới hạn đã biết: chốt này thuộc về TỪNG instance hook. Nếu sau này có hai
+ *    nơi cùng gọi `useTogglePostLike()` và cùng sống trong một cây (ví dụ thêm
+ *    nút tim cho bài viết ở màn chi tiết, trong khi feed vẫn còn mounted), hai
+ *    chốt độc lập nhau và hai cú chạm vào cùng một bài vẫn gửi được hai request.
+ *    Khi đó phải chuyển chốt lên `scope: { id: postId }` của TanStack.
+ *
+ * 4. `networkMode: 'always'`. Mặc định `'online'` chạy `onMutate` rồi HOÃN
+ *    request: giao diện hiện tim đầy trong khi chưa gửi gì cả, `onSettled` không
+ *    bao giờ chạy nên chốt ở luật 3 khoá cứng bài đó — người dùng không bỏ tim
+ *    lại được cho tới khi có mạng. Với `'always'`, cú bấm lúc mất mạng thất bại
+ *    ngay và hoàn tác ngay; `OfflineBanner` đã nói vì sao.
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -96,6 +111,8 @@ export function useTogglePostLike() {
   const dangGui = useRef(new Set<string>());
 
   const mutation = useMutation({
+    // Xem luật 4 ở đầu file: mặc định 'online' sẽ hoãn request và khoá cứng nút.
+    networkMode: 'always',
     mutationFn: (post: ForumPostResponse) =>
       post.reactedByCurrentUser
         ? forumRepo.unlikePost(post.postId)
@@ -124,7 +141,13 @@ export function useTogglePostLike() {
     },
     onError: (_loi, _bien, context) => {
       if (context) {
-        patchPostInCache(queryClient, context.truoc.postId, () => context.truoc);
+        // Chỉ ba trường reaction — xem luật 2 ở đầu file.
+        patchPostInCache(queryClient, context.truoc.postId, (current) => ({
+          ...current,
+          reactedByCurrentUser: context.truoc.reactedByCurrentUser,
+          myReactionType: context.truoc.myReactionType,
+          reactionCount: context.truoc.reactionCount,
+        }));
       }
     },
     onSettled: (_data, _loi, post) => {
@@ -150,6 +173,7 @@ export function useToggleCommentLike(postId: string) {
   const dangGui = useRef(new Set<string>());
 
   const mutation = useMutation({
+    networkMode: 'always',
     mutationFn: (comment: ForumCommentResponse) =>
       comment.reactedByCurrentUser
         ? forumRepo.unlikeComment(comment.commentId)
@@ -173,12 +197,12 @@ export function useToggleCommentLike(postId: string) {
     },
     onError: (_loi, _bien, context) => {
       if (context) {
-        patchCommentInCache(
-          queryClient,
-          postId,
-          context.truoc.commentId,
-          () => context.truoc,
-        );
+        // Chỉ hai trường reaction — xem luật 2 ở đầu file.
+        patchCommentInCache(queryClient, postId, context.truoc.commentId, (current) => ({
+          ...current,
+          reactedByCurrentUser: context.truoc.reactedByCurrentUser,
+          reactionCount: context.truoc.reactionCount,
+        }));
       }
     },
     onSettled: (_data, _loi, comment) => {

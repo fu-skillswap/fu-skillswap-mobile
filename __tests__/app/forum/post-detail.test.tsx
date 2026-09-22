@@ -113,6 +113,22 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
+/**
+ * Để FlatList dọn xong hàng đợi của nó TRƯỚC khi test kết thúc.
+ *
+ * `VirtualizedList` gom việc render ô vào `_updateCellsToRenderBatcher`, một bộ
+ * hẹn giờ ~50ms. Nếu test kết thúc trước khi nó nổ, React cập nhật ngoài phạm vi
+ * act và in "An update to VirtualizedList inside a test was not wrapped in
+ * act(...)". Cảnh báo này CHẬP CHỜN — chạy 6 lần chỉ bẩn 1–2 lần — nên rất dễ
+ * bị kết luận nhầm là đã hết chỉ vì lần chạy gần nhất sạch.
+ */
+afterEach(async () => {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  });
+});
+
+
 /** `render` của RNTL 14 là hàm ASYNC — phải await, nếu không lần render đầu nằm ngoài act(). */
 async function renderScreen() {
   return render(
@@ -309,7 +325,7 @@ describe('PostDetailScreen', () => {
   });
 
   it('bấm tim một bình luận thì đổi ngay và gửi PUT tới đúng bình luận đó', async () => {
-    let duongDan: string[] = [];
+    const duongDan: string[] = [];
     server.use(
       postOk(),
       commentsOk([baseComment('c1'), baseComment('c2')]),
