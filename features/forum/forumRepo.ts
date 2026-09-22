@@ -74,4 +74,34 @@ export const forumRepo = {
       { params: cleanParams({ ...params }) },
     );
   },
+
+  /** Thả like bài viết; backend trả về bài đã cập nhật (forum.md §5.1) */
+  likePost(postId: string) {
+    return apiClient<ForumPostResponse>(`/api/forum/posts/${postId}/reaction`, {
+      method: 'PUT',
+      data: { reactionType: 'LIKE' },
+    });
+  },
+
+  /** Bỏ like bài viết; backend trả về bài đã cập nhật (forum.md §5.2) */
+  unlikePost(postId: string) {
+    return apiClient<ForumPostResponse>(`/api/forum/posts/${postId}/reaction`, {
+      method: 'DELETE',
+    });
+  },
+
+  /** Thả like bình luận (forum.md §5.3) */
+  likeComment(commentId: string) {
+    return apiClient<ForumCommentResponse>(`/api/forum/comments/${commentId}/reaction`, {
+      method: 'PUT',
+      data: { reactionType: 'LIKE' },
+    });
+  },
+
+  /** Bỏ like bình luận (forum.md §5.4) */
+  unlikeComment(commentId: string) {
+    return apiClient<ForumCommentResponse>(`/api/forum/comments/${commentId}/reaction`, {
+      method: 'DELETE',
+    });
+  },
 };

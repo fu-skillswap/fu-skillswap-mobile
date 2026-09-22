@@ -20,11 +20,13 @@ import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
 import { colors } from '@/core/ui/theme';
 import { CommentItem } from '@/features/forum/components/CommentItem';
+import { useToggleCommentLike } from '@/features/forum/hooks/useForumMutations';
 import { useForumComments, useForumPost } from '@/features/forum/hooks/useForumQueries';
 
 export function PostDetailScreen({ postId }: { postId: string }) {
   const post = useForumPost(postId);
   const comments = useForumComments(postId);
+  const { toggle: thaTimBinhLuan } = useToggleCommentLike(postId);
 
   /**
    * Chốt chặn ĐỒNG BỘ cho việc tải trang bình luận kế — y hệt lý do đã ghi ở
@@ -133,9 +135,18 @@ export function PostDetailScreen({ postId }: { postId: string }) {
               LÀ một reply, nên phải giữ dòng "Trả lời ai"; bỏ đi thì người đọc
               thấy một câu cụt lủn không hiểu đang nói với ai.
             */}
-            <CommentItem comment={item} isReply={Boolean(item.replyToCommentId)} />
+            <CommentItem
+              comment={item}
+              isReply={Boolean(item.replyToCommentId)}
+              onToggleLike={thaTimBinhLuan}
+            />
             {item.replies.map((reply) => (
-              <CommentItem key={reply.commentId} comment={reply} isReply />
+              <CommentItem
+                key={reply.commentId}
+                comment={reply}
+                isReply
+                onToggleLike={thaTimBinhLuan}
+              />
             ))}
           </View>
         )}

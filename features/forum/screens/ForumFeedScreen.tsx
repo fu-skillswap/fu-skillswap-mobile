@@ -20,6 +20,7 @@ import { Screen } from '@/core/ui/Screen';
 import { colors } from '@/core/ui/theme';
 import { PostCard } from '@/features/forum/components/PostCard';
 import { TopicChips } from '@/features/forum/components/TopicChips';
+import { useTogglePostLike } from '@/features/forum/hooks/useForumMutations';
 import { useForumList, useForumTopics } from '@/features/forum/hooks/useForumQueries';
 
 /**
@@ -44,6 +45,10 @@ export function ForumFeedScreen() {
   });
 
   const openPost = (postId: string) => router.push(`/forum/${postId}`);
+
+  // Một hook cho cả danh sách: chốt chặn chống bấm trùng nằm trong hook, nên
+  // mọi thẻ dùng chung nó mới chặn được.
+  const { toggle: thaTim } = useTogglePostLike();
 
   /**
    * Chốt chặn ĐỒNG BỘ cho việc tải trang kế.
@@ -109,7 +114,9 @@ export function ForumFeedScreen() {
           testID="danh-sach-bai-viet"
           data={list.posts}
           keyExtractor={(post) => post.postId}
-          renderItem={({ item }) => <PostCard post={item} onPress={openPost} />}
+          renderItem={({ item }) => (
+            <PostCard post={item} onPress={openPost} onToggleLike={thaTim} />
+          )}
           // `grow` để EmptyState (flex-1) căn giữa được theo chiều dọc: nếu thiếu,
           // contentContainer co lại vừa nội dung và khối rỗng dính lên đầu.
           contentContainerClassName="grow"

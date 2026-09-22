@@ -134,3 +134,61 @@ describe('forumRepo (đọc)', () => {
     expect(page.items).toHaveLength(1);
   });
 });
+
+describe('forumRepo (reaction)', () => {
+  it('thả like bài viết gửi PUT kèm reactionType LIKE', async () => {
+    let body: unknown = null;
+    server.use(
+      http.put(`${BASE}/api/forum/posts/p1/reaction`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(envelope({ postId: 'p1', reactedByCurrentUser: true }));
+      }),
+    );
+
+    await forumRepo.likePost('p1');
+
+    expect(body).toEqual({ reactionType: 'LIKE' });
+  });
+
+  it('bỏ like bài viết gửi DELETE', async () => {
+    let called = 0;
+    server.use(
+      http.delete(`${BASE}/api/forum/posts/p1/reaction`, () => {
+        called += 1;
+        return HttpResponse.json(envelope({ postId: 'p1', reactedByCurrentUser: false }));
+      }),
+    );
+
+    await forumRepo.unlikePost('p1');
+
+    expect(called).toBe(1);
+  });
+
+  it('thả like bình luận gửi PUT tới đúng đường dẫn comment', async () => {
+    let body: unknown = null;
+    server.use(
+      http.put(`${BASE}/api/forum/comments/c1/reaction`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(envelope({ commentId: 'c1', reactedByCurrentUser: true }));
+      }),
+    );
+
+    await forumRepo.likeComment('c1');
+
+    expect(body).toEqual({ reactionType: 'LIKE' });
+  });
+
+  it('bỏ like bình luận gửi DELETE', async () => {
+    let called = 0;
+    server.use(
+      http.delete(`${BASE}/api/forum/comments/c1/reaction`, () => {
+        called += 1;
+        return HttpResponse.json(envelope({ commentId: 'c1', reactedByCurrentUser: false }));
+      }),
+    );
+
+    await forumRepo.unlikeComment('c1');
+
+    expect(called).toBe(1);
+  });
+});

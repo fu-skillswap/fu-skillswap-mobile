@@ -1,12 +1,12 @@
 import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
-import { createQueryClient } from '@/core/api/queryClient';
+import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
 import { PostDetailScreen } from '@/features/forum';
 
 const BASE = 'https://api.skillswap.asia';
@@ -105,7 +105,9 @@ beforeEach(() => {
   queryClient = createQueryClient();
 });
 afterEach(() => {
-  queryClient.clear();
+  // `clear()` một mình bỏ sót bộ hẹn giờ gcTime của mutation và Jest treo sau
+  // khi test xong — xem JSDoc của `__resetQueryClientForTests`.
+  __resetQueryClientForTests(queryClient);
   server.resetHandlers();
   __resetApiClientForTests();
 });
@@ -304,5 +306,59 @@ describe('PostDetailScreen', () => {
     await waitFor(() => expect(screen.getByText('noi dung c1')).toBeTruthy());
 
     expect(screen.queryByRole('button', { name: 'Trả lời' })).toBeNull();
+  });
+
+  it('bấm tim một bình luận thì đổi ngay và gửi PUT tới đúng bình luận đó', async () => {
+    let duongDan: string[] = [];
+    server.use(
+      postOk(),
+      commentsOk([baseComment('c1'), baseComment('c2')]),
+      http.put(`${BASE}/api/forum/comments/:commentId/reaction`, ({ params }) => {
+        duongDan.push(String(params.commentId));
+        return HttpResponse.json(
+          envelope(baseComment('c2', { reactedByCurrentUser: true, reactionCount: 1 })),
+        );
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('noi dung c2')).toBeTruthy());
+
+    // Hai bình luận nên phải bấm đúng cái thứ hai, không lấy nhãn chung.
+    await fireEvent.press(
+      within(screen.getByTestId('so-thich-binh-luan-c2')).getByText('0'),
+    );
+
+    await waitFor(() =>
+      expect(within(screen.getByTestId('so-thich-binh-luan-c2')).getByText('1')).toBeTruthy(),
+    );
+    expect(duongDan).toEqual(['c2']);
+    // Bình luận bên cạnh giữ nguyên.
+    expect(within(screen.getByTestId('so-thich-binh-luan-c1')).getByText('0')).toBeTruthy();
+
+    // FlatList gom việc tính lại ô hiển thị vào một hẹn giờ ~50ms
+    // (`_updateCellsToRenderBatcher`). Test kết thúc trước khi nó nổ thì cú
+    // setState đó rơi ra ngoài mọi act() và React kêu "not wrapped in act(...)"
+    // — cảnh báo lại hiện ở một test khác vì nó nổ sau. Đợi cho nó nổ trong act.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+  });
+
+  it('cả bình luận gốc LẪN reply đều có nút thả tim thật', async () => {
+    // Reply được render ở một nhánh khác trong `renderItem`; quên truyền handler
+    // ở nhánh đó thì reply có ô lượt thích nhìn y hệt mà bấm không ăn.
+    server.use(
+      postOk(),
+      commentsOk([
+        baseComment('c1'),
+        baseComment('r1', { replyToCommentId: 'c1', replyToUserName: 'Nguyen Van A' }),
+      ]),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('noi dung r1')).toBeTruthy());
+
+    expect(screen.getAllByRole('button', { name: 'Thích bình luận' })).toHaveLength(2);
   });
 });

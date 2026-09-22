@@ -1,12 +1,12 @@
 import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
-import { createQueryClient } from '@/core/api/queryClient';
+import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
 import { ForumFeedScreen } from '@/features/forum';
 
 const BASE = 'https://api.skillswap.asia';
@@ -90,7 +90,9 @@ beforeEach(() => {
   mockPush.mockClear();
 });
 afterEach(() => {
-  queryClient.clear();
+  // `clear()` một mình bỏ sót bộ hẹn giờ gcTime của mutation và Jest treo sau
+  // khi test xong — xem JSDoc của `__resetQueryClientForTests`.
+  __resetQueryClientForTests(queryClient);
   server.resetHandlers();
   __resetApiClientForTests();
 });
@@ -305,5 +307,39 @@ describe('ForumFeedScreen', () => {
         onlineManager.setOnline(true);
       });
     }
+  });
+
+  it('bấm tim trên thẻ bài viết thì đổi ngay và gửi PUT reaction', async () => {
+    // Task 7 cố tình để ô lượt thích là View thường khi chưa có handler, để
+    // không dựng nút chết. Task 9 nối `useTogglePostLike` vào thì nó mới thành
+    // nút thật — không có bước này thì cả cập nhật lạc quan cũng vô dụng.
+    let soPut = 0;
+    server.use(
+      topicsOk(),
+      http.get(`${BASE}/api/forum/feed`, () => HttpResponse.json(envelope(cursorPage([POST])))),
+      http.put(`${BASE}/api/forum/posts/p1/reaction`, () => {
+        soPut += 1;
+        return HttpResponse.json(
+          envelope({ ...POST, reactedByCurrentUser: true, reactionCount: 1 }),
+        );
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy());
+
+    await fireEvent.press(screen.getByLabelText('Thích'));
+
+    await waitFor(() => expect(screen.getByLabelText('Bỏ thích')).toBeTruthy());
+    expect(within(screen.getByTestId('so-luot-thich')).getByText('1')).toBeTruthy();
+    expect(soPut).toBe(1);
+
+    // FlatList gom việc tính lại ô hiển thị vào một hẹn giờ ~50ms
+    // (`_updateCellsToRenderBatcher`). Test kết thúc trước khi nó nổ thì cú
+    // setState đó rơi ra ngoài mọi act() và React kêu "not wrapped in act(...)"
+    // — cảnh báo lại hiện ở một test khác vì nó nổ sau. Đợi cho nó nổ trong act.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
   });
 });
