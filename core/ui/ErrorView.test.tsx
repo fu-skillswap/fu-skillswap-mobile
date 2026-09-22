@@ -42,6 +42,33 @@ describe('ErrorView', () => {
     expect(screen.getByText(/45 giây/)).toBeTruthy();
   });
 
+  it('lỗi kiểm duyệt vẫn KHÔNG có nút kể cả khi người gọi truyền onAction', async () => {
+    // Đây là kịch bản component này sinh ra để ngăn: nội dung bị backend từ
+    // chối vì chứa từ cấm, thử lại đúng nội dung đó chắc chắn bị từ chối lần
+    // nữa. Nếu về sau ai đó tách việc hiện nút ra khỏi ACTION_LABEL và chỉ
+    // dựa vào `onAction`, người dùng sẽ có nút "Thử lại" dẫn vào vòng lặp —
+    // test này là thứ chặn lại.
+    await render(
+      <ErrorView
+        error={new ApiClientError(400, 'FORUM_4201', 'Nội dung chứa từ ngữ vi phạm')}
+        onAction={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Nội dung chứa từ ngữ vi phạm')).toBeTruthy();
+    expect(screen.queryByText('Thử lại')).toBeNull();
+    expect(screen.queryByText('Tải lại')).toBeNull();
+    expect(screen.queryByText('Đăng nhập lại')).toBeNull();
+  });
+
+  it('lỗi 401: nhãn nút là "Đăng nhập lại"', async () => {
+    await render(
+      <ErrorView error={new ApiClientError(401, 'AUTH_1003', 'Hết phiên')} onAction={jest.fn()} />,
+    );
+
+    expect(screen.getByText('Đăng nhập lại')).toBeTruthy();
+  });
+
   it('không truyền onAction thì không hiện nút dù action khác NONE', async () => {
     await render(<ErrorView error={new ApiClientError(500, 'SYS_0010', 'Lỗi')} />);
 

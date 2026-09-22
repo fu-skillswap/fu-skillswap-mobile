@@ -7,6 +7,8 @@
 
 import { ActivityIndicator, Pressable, Text } from 'react-native';
 
+import { colors } from '@/core/ui/theme';
+
 export type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
 export interface ButtonProps {
@@ -51,7 +53,7 @@ export function Button({
       className={`h-control-lg items-center justify-center rounded-md px-4 ${CONTAINER_BY_VARIANT[variant]} ${inactive ? 'opacity-50' : ''}`}
     >
       {busy ? (
-        <ActivityIndicator color={variant === 'secondary' ? undefined : '#ffffff'} />
+        <ActivityIndicator color={variant === 'secondary' ? undefined : colors.surface} />
       ) : (
         <Text className={`font-semibold ${LABEL_BY_VARIANT[variant]}`}>{label}</Text>
       )}
