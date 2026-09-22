@@ -1,3 +1,4 @@
+import { resetEnvCache } from '@/core/config/env';
 import { buildCommentTree, isBotComment } from '@/features/forum/commentTree';
 import type { ForumCommentResponse } from '@/features/forum/types';
 
@@ -60,5 +61,31 @@ describe('isBotComment', () => {
 
   it('bình luận của người thật không bị gắn badge', () => {
     expect(isBotComment(comment('c1', { authorUserId: 'u1' }))).toBe(false);
+  });
+
+  describe('khi chưa cấu hình EXPO_PUBLIC_FORUM_BOT_USER_ID', () => {
+    const originalBotUserId = process.env.EXPO_PUBLIC_FORUM_BOT_USER_ID;
+
+    beforeEach(() => {
+      process.env.EXPO_PUBLIC_FORUM_BOT_USER_ID = '';
+      resetEnvCache();
+    });
+
+    afterEach(() => {
+      process.env.EXPO_PUBLIC_FORUM_BOT_USER_ID = originalBotUserId;
+      resetEnvCache();
+    });
+
+    it('không gắn badge cho bình luận nào', () => {
+      expect(isBotComment(comment('c1', { authorUserId: 'u1' }))).toBe(false);
+    });
+
+    it('bình luận có authorUserId rỗng cũng KHÔNG bị gắn badge', () => {
+      // Đây là ca nguy hiểm nhất: nếu guard chỉ so `authorUserId === botUserId`
+      // thì '' === '' cho true, và một payload dị dạng sẽ được gắn badge "AI"
+      // của người khác. Thiếu badge chỉ xấu giao diện; gắn nhầm là quy sai tác
+      // giả cho một sinh viên thật, và sẽ không ai báo lỗi cho mình biết.
+      expect(isBotComment(comment('c1', { authorUserId: '' }))).toBe(false);
+    });
   });
 });

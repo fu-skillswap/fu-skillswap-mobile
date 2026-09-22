@@ -22,6 +22,11 @@ export interface ThreadedComment extends ForumCommentResponse {
  * Reply mồ côi — có `replyToCommentId` nhưng không tìm thấy gốc trong danh sách
  * đang có — được nâng lên thành bình luận gốc thay vì bị bỏ đi: bình luận phân
  * trang theo cursor nên gốc của nó có thể nằm ở trang trước.
+ *
+ * Lưu ý về thứ tự: reply mồ côi được nâng lên luôn nằm SAU mọi bình luận gốc
+ * thật, không giữ đúng vị trí thời gian của nó trong mảng backend trả về. Đây
+ * là đánh đổi có chủ ý để chỉ duyệt một lượt; đừng giả định thứ tự gốc trả về
+ * luôn là thứ tự createdAt.
  */
 export function buildCommentTree(comments: ForumCommentResponse[]): ThreadedComment[] {
   const roots: ThreadedComment[] = [];
