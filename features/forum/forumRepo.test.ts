@@ -93,6 +93,25 @@ describe('forumRepo (đọc)', () => {
     expect(seen?.has('forumTopicId')).toBe(false);
   });
 
+  it('giữ lại tham số có giá trị false hoặc 0, không gộp chung với tham số rỗng', async () => {
+    // `cleanParams` phải lọc theo `undefined`/chuỗi rỗng, KHÔNG theo tính truthy.
+    // Nếu ai đó rút gọn thành `if (value)`, `mine=false` và `limit=0` sẽ bị âm
+    // thầm vứt đi — backend nhận thiếu tham số và trả về tập dữ liệu khác hẳn,
+    // mà không test nào cũ bắt được vì chúng chỉ dùng `mine: true` và chuỗi rỗng.
+    let seen = null as URLSearchParams | null;
+    server.use(
+      http.get(`${BASE}/api/forum/posts`, ({ request }) => {
+        seen = new URL(request.url).searchParams;
+        return HttpResponse.json(envelope(cursorPage([])));
+      }),
+    );
+
+    await forumRepo.getPosts({ mine: false, limit: 0 });
+
+    expect(seen?.get('mine')).toBe('false');
+    expect(seen?.get('limit')).toBe('0');
+  });
+
   it('lấy chi tiết bài viết', async () => {
     server.use(
       http.get(`${BASE}/api/forum/posts/p1`, () =>
