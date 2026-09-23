@@ -21,8 +21,37 @@ const BASE = 'https://api.skillswap.asia';
  * Mock giữ đúng hình dạng thật (`useRouter()` trả về object có `push`) để nếu
  * sau này màn hình chi tiết cần điều hướng thì mock không phải viết lại.
  */
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('expo-router', () => {
+  const push = jest.fn();
+  const back = jest.fn();
+  return { useRouter: () => ({ push, back }), __mockPush: push, __mockBack: back };
+});
 jest.mock('@/core/net/onlineStatus', () => ({ useIsOffline: () => false }));
+
+/**
+ * Màn hình chi tiết chỉ bày nút sửa/xoá cho CHÍNH tác giả, nên nó cần biết ai
+ * đang đăng nhập. Mock giữ đúng hình dạng thật của `AuthContextValue`
+ * (`status`, `user`, `signInWithGoogle`, `signOut`) — trả về mỗi `user` thì
+ * chỗ nào đọc `status` sau này sẽ chỉ vỡ trong test chứ không vỡ trên máy thật.
+ *
+ * Biến phải mở đầu bằng `mock` mới được tham chiếu từ trong factory (Jest hoist
+ * `jest.mock` lên trên mọi khai báo); nó chỉ được ĐỌC lúc render nên TDZ không
+ * chạm tới.
+ */
+let mockNguoiDungHienTai: { publicId: string } | null = null;
+jest.mock('@/core/auth/AuthProvider', () => ({
+  useAuth: () => ({
+    status: mockNguoiDungHienTai ? 'authenticated' : 'unauthenticated',
+    user: mockNguoiDungHienTai,
+    signInWithGoogle: jest.fn(),
+    signOut: jest.fn(),
+  }),
+}));
+
+const { __mockPush: mockPush, __mockBack: mockBack } = jest.requireMock<{
+  __mockPush: jest.Mock;
+  __mockBack: jest.Mock;
+}>('expo-router');
 
 function envelope(data: unknown) {
   return { timestamp: '2026-09-22T00:00:00Z', status: 200, code: 'SUCCESS', message: 'OK', data };
@@ -103,6 +132,10 @@ let queryClient: QueryClient;
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => {
   queryClient = createQueryClient();
+  mockPush.mockClear();
+  mockBack.mockClear();
+  // Mặc định: khách vãng lai, không phải tác giả — mọi test cũ giữ nguyên hành vi.
+  mockNguoiDungHienTai = null;
 });
 afterEach(() => {
   // `clear()` một mình bỏ sót bộ hẹn giờ gcTime của mutation và Jest treo sau
@@ -376,5 +409,135 @@ describe('PostDetailScreen', () => {
     await waitFor(() => expect(screen.getByText('noi dung r1')).toBeTruthy());
 
     expect(screen.getAllByRole('button', { name: 'Thích bình luận' })).toHaveLength(2);
+  });
+});
+
+describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () => {
+  it('bài của NGƯỜI KHÁC thì không bày nút sửa hay nút xoá', async () => {
+    // Backend trả 403 cho việc sửa/xoá bài người khác; bày nút ra chỉ để nhận
+    // 403 là mời người dùng bấm vào một cái chắc chắn hỏng.
+    mockNguoiDungHienTai = { publicId: 'u-khac' };
+    server.use(postOk(), commentsOk([]));
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy());
+
+    expect(screen.queryByTestId('nut-sua-bai')).toBeNull();
+    expect(screen.queryByTestId('nut-xoa-bai')).toBeNull();
+  });
+
+  it('bài của MÌNH thì bấm Sửa bài mở form soạn kèm đúng postId', async () => {
+    mockNguoiDungHienTai = { publicId: 'u1' };
+    server.use(postOk(), commentsOk([]));
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-sua-bai')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-sua-bai'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/forum/compose',
+      params: { postId: 'p1' },
+    });
+  });
+
+  it('bấm Xoá bài thì HỎI LẠI trước, chưa gửi DELETE nào', async () => {
+    // Xoá không hoàn tác được. Một cú chạm nhầm mà gửi thẳng DELETE là mất bài.
+    let soDelete = 0;
+    mockNguoiDungHienTai = { publicId: 'u1' };
+    server.use(
+      postOk(),
+      commentsOk([]),
+      http.delete(`${BASE}/api/forum/posts/p1`, () => {
+        soDelete += 1;
+        return HttpResponse.json(envelope(POST));
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-xoa-bai')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-xoa-bai'));
+
+    expect(screen.getByTestId('hop-xac-nhan-xoa')).toBeTruthy();
+    expect(soDelete).toBe(0);
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('huỷ trong hộp xác nhận thì đóng hộp và không xoá gì', async () => {
+    let soDelete = 0;
+    mockNguoiDungHienTai = { publicId: 'u1' };
+    server.use(
+      postOk(),
+      commentsOk([]),
+      http.delete(`${BASE}/api/forum/posts/p1`, () => {
+        soDelete += 1;
+        return HttpResponse.json(envelope(POST));
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-xoa-bai')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('nut-xoa-bai'));
+
+    await fireEvent.press(screen.getByTestId('nut-huy-xoa'));
+
+    await waitFor(() => expect(screen.queryByTestId('hop-xac-nhan-xoa')).toBeNull());
+    expect(soDelete).toBe(0);
+  });
+
+  it('xác nhận xoá thì gửi DELETE tới đúng bài rồi quay lại màn trước', async () => {
+    let duongDan = '';
+    mockNguoiDungHienTai = { publicId: 'u1' };
+    server.use(
+      postOk(),
+      commentsOk([]),
+      http.delete(`${BASE}/api/forum/posts/:postId`, ({ params }) => {
+        duongDan = String(params.postId);
+        return HttpResponse.json(envelope({ ...POST, status: 'DELETED' }));
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-xoa-bai')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('nut-xoa-bai'));
+
+    await fireEvent.press(screen.getByTestId('nut-xac-nhan-xoa'));
+
+    await waitFor(() => expect(mockBack).toHaveBeenCalledTimes(1));
+    expect(duongDan).toBe('p1');
+  });
+
+  it('xoá HỎNG thì nói rõ vì sao, không đóng hộp và im lặng', async () => {
+    // Nếu DELETE hỏng mà giao diện không nói gì, hộp vẫn mở và nút hết quay:
+    // người dùng không biết bài đã xoá được hay chưa và sẽ bấm lại.
+    mockNguoiDungHienTai = { publicId: 'u1' };
+    server.use(
+      postOk(),
+      commentsOk([]),
+      http.delete(`${BASE}/api/forum/posts/p1`, () =>
+        HttpResponse.json(
+          {
+            timestamp: '',
+            status: 403,
+            code: 'FORUM_4303',
+            message: 'Ban khong phai tac gia bai viet nay',
+            data: null,
+          },
+          { status: 403 },
+        ),
+      ),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-xoa-bai')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-xoa-bai'));
+    await fireEvent.press(screen.getByTestId('nut-xac-nhan-xoa'));
+
+    await waitFor(() => expect(screen.getByTestId('loi-xoa-bai')).toBeTruthy());
+    expect(screen.getByText('Ban khong phai tac gia bai viet nay')).toBeTruthy();
+    // Hộp vẫn mở để người dùng đọc được lý do.
+    expect(screen.getByTestId('hop-xac-nhan-xoa')).toBeTruthy();
   });
 });

@@ -85,3 +85,23 @@ export interface ForumCommentResponse {
   /** Tối đa 1 URL */
   imageUrls: string[];
 }
+
+/**
+ * Payload tạo và sửa bài viết (`POST /api/forum/posts`, `PUT /api/forum/posts/{id}`).
+ *
+ * Giới hạn độ dài là của backend (forum.md §3.5) và giao diện phải chặn TRƯỚC
+ * khi gửi: một lần gửi hỏng vẫn tiêu một lượt trong hạn mức 5 bài/10 phút.
+ */
+export interface ForumPostUpsertRequest {
+  /** Bắt buộc, tối đa 200 ký tự */
+  title: string;
+  /** Bắt buộc, tối đa 5000 ký tự */
+  content: string;
+  /** UUID chủ đề lấy từ `GET /api/forum/topics` */
+  forumTopicId: string;
+  /**
+   * Tối đa 4 URL. Giai đoạn này KHÔNG gửi: `forum.md` không mô tả endpoint
+   * upload ảnh cho diễn đàn, nên không có cách nào lấy URL hợp lệ mà không bịa.
+   */
+  imageUrls?: string[];
+}

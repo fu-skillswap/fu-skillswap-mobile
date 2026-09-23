@@ -9,6 +9,7 @@ import type { CursorPageResponse } from '@/core/api/pagination';
 import type {
   ForumCommentResponse,
   ForumPostResponse,
+  ForumPostUpsertRequest,
   ForumTopicResponse,
 } from '@/features/forum/types';
 
@@ -73,6 +74,24 @@ export const forumRepo = {
       `/api/forum/posts/${postId}/comments`,
       { params: cleanParams({ ...params }) },
     );
+  },
+
+  /** Tạo bài viết mới (forum.md §3.5) */
+  createPost(input: ForumPostUpsertRequest) {
+    return apiClient<ForumPostResponse>('/api/forum/posts', { method: 'POST', data: input });
+  },
+
+  /** Sửa bài viết của chính mình; backend từ chối bài của người khác bằng 403 (forum.md §3.6) */
+  updatePost(postId: string, input: ForumPostUpsertRequest) {
+    return apiClient<ForumPostResponse>(`/api/forum/posts/${postId}`, {
+      method: 'PUT',
+      data: input,
+    });
+  },
+
+  /** Xoá mềm bài viết của chính mình (forum.md §3.7) */
+  deletePost(postId: string) {
+    return apiClient<ForumPostResponse>(`/api/forum/posts/${postId}`, { method: 'DELETE' });
   },
 
   /** Thả like bài viết; backend trả về bài đã cập nhật (forum.md §5.1) */

@@ -4,5 +4,6 @@
  * chỉ được import từ đây, không với tay vào file nội bộ.
  */
 
+export { ComposeScreen } from '@/features/forum/screens/ComposeScreen';
 export { ForumFeedScreen } from '@/features/forum/screens/ForumFeedScreen';
 export { PostDetailScreen } from '@/features/forum/screens/PostDetailScreen';

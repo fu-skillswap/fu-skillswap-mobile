@@ -192,3 +192,50 @@ describe('forumRepo (reaction)', () => {
     expect(called).toBe(1);
   });
 });
+
+describe('forumRepo (ghi bài viết)', () => {
+  it('tạo bài gửi POST kèm đúng payload upsert', async () => {
+    let body: unknown = null;
+    server.use(
+      http.post(`${BASE}/api/forum/posts`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(envelope({ postId: 'p9' }));
+      }),
+    );
+
+    await forumRepo.createPost({ title: 'Tiêu đề', content: 'Nội dung', forumTopicId: 't1' });
+
+    expect(body).toEqual({ title: 'Tiêu đề', content: 'Nội dung', forumTopicId: 't1' });
+  });
+
+  it('sửa bài gửi PUT tới đúng postId và giữ nguyên payload', async () => {
+    let body: unknown = null;
+    let duongDan = '';
+    server.use(
+      http.put(`${BASE}/api/forum/posts/:postId`, async ({ request, params }) => {
+        duongDan = String(params.postId);
+        body = await request.json();
+        return HttpResponse.json(envelope({ postId: 'p1' }));
+      }),
+    );
+
+    await forumRepo.updatePost('p1', { title: 'T moi', content: 'C moi', forumTopicId: 't2' });
+
+    expect(duongDan).toBe('p1');
+    expect(body).toEqual({ title: 'T moi', content: 'C moi', forumTopicId: 't2' });
+  });
+
+  it('xoá bài gửi DELETE tới đúng postId', async () => {
+    let duongDan = '';
+    server.use(
+      http.delete(`${BASE}/api/forum/posts/:postId`, ({ params }) => {
+        duongDan = String(params.postId);
+        return HttpResponse.json(envelope({ postId: 'p1' }));
+      }),
+    );
+
+    await forumRepo.deletePost('p1');
+
+    expect(duongDan).toBe('p1');
+  });
+});

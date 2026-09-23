@@ -10,23 +10,45 @@
  * `core/api/queryState.ts` — đọc JSDoc ở đó trước khi sửa mấy nhánh dưới đây.
  */
 
-import { useRef } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Modal, Pressable, Text, View } from 'react-native';
 
+import { toUserMessage } from '@/core/api/errors';
 import { trangThaiTai } from '@/core/api/queryState';
+import { useAuth } from '@/core/auth/AuthProvider';
+import { Button } from '@/core/ui/Button';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
 import { colors } from '@/core/ui/theme';
 import { CommentItem } from '@/features/forum/components/CommentItem';
-import { useToggleCommentLike } from '@/features/forum/hooks/useForumMutations';
+import { useDeletePost, useToggleCommentLike } from '@/features/forum/hooks/useForumMutations';
 import { useForumComments, useForumPost } from '@/features/forum/hooks/useForumQueries';
 
 export function PostDetailScreen({ postId }: { postId: string }) {
+  const router = useRouter();
+  const { user } = useAuth();
   const post = useForumPost(postId);
   const comments = useForumComments(postId);
   const { toggle: thaTimBinhLuan } = useToggleCommentLike(postId);
+  const xoaBai = useDeletePost();
+
+  /**
+   * Hộp xác nhận xoá là một `Modal` TỰ VẼ, không phải `Alert.alert`.
+   *
+   * `Alert` là hộp thoại chặn của hệ điều hành: nó không nằm trong cây React nên
+   * không kiểm được bằng test, và trong môi trường tự động hoá nó chặn luôn
+   * luồng đang chạy. Modal tự vẽ đổi lại được cả hai điều đó, và Task 11 sẽ
+   * dùng lại đúng khuôn này cho `ReportSheet`.
+   */
+  const [dangHoiXoa, setDangHoiXoa] = useState(false);
+
+  // Backend chỉ cho CHÍNH tác giả sửa/xoá (forum.md §3.6–3.7). So sánh ở đây là
+  // để giao diện không bày ra nút chắc chắn nhận 403, không phải để thay cho
+  // việc kiểm tra của backend.
+  const laTacGia = Boolean(user && post.data && user.publicId === post.data.authorUserId);
 
   /**
    * Chốt chặn ĐỒNG BỘ cho việc tải trang bình luận kế — y hệt lý do đã ghi ở
@@ -124,6 +146,23 @@ export function PostDetailScreen({ postId }: { postId: string }) {
               <Text className="pt-2 text-xs text-text-muted">
                 {post.data?.commentCount} bình luận
               </Text>
+
+              {laTacGia ? (
+                <View className="flex-row gap-2 pt-2">
+                  <Button
+                    label="Sửa bài"
+                    variant="secondary"
+                    onPress={() => router.push({ pathname: '/forum/compose', params: { postId } })}
+                    testID="nut-sua-bai"
+                  />
+                  <Button
+                    label="Xoá bài"
+                    variant="danger"
+                    onPress={() => setDangHoiXoa(true)}
+                    testID="nut-xoa-bai"
+                  />
+                </View>
+              ) : null}
             </View>
           </View>
         }
@@ -197,6 +236,59 @@ export function PostDetailScreen({ postId }: { postId: string }) {
           )
         }
       />
+
+      <Modal
+        visible={dangHoiXoa}
+        transparent
+        animationType="fade"
+        // Nút back cứng của Android cũng phải đóng được hộp này, nếu không
+        // người dùng bị kẹt trong một câu hỏi không có đường thoát.
+        onRequestClose={() => setDangHoiXoa(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/40 px-8">
+          <View testID="hop-xac-nhan-xoa" className="w-full gap-3 rounded-lg bg-surface p-4">
+            <Text className="text-base font-semibold text-text-main">Xoá bài viết này?</Text>
+            <Text className="text-text-secondary">
+              Bài viết và toàn bộ bình luận sẽ biến mất. Thao tác này không hoàn tác được.
+            </Text>
+
+            {xoaBai.isError ? (
+              // Xoá hỏng mà không nói gì là kiểu tệ nhất: hộp vẫn mở, nút hết
+              // quay, và người dùng không biết bài đã xoá được hay chưa — họ sẽ
+              // bấm lại. Thông điệp lấy nguyên văn của backend (403 khi không
+              // phải tác giả, 404 khi bài đã bị xoá sẵn).
+              <View testID="loi-xoa-bai" className="gap-1 rounded-md bg-danger-soft p-3">
+                <Text className="font-semibold text-danger">
+                  {toUserMessage(xoaBai.error).title}
+                </Text>
+                <Text className="text-danger">{toUserMessage(xoaBai.error).description}</Text>
+              </View>
+            ) : null}
+            <View className="flex-row justify-end gap-2">
+              <Button
+                label="Không xoá"
+                variant="secondary"
+                onPress={() => setDangHoiXoa(false)}
+                testID="nut-huy-xoa"
+              />
+              <Button
+                label="Xoá hẳn"
+                variant="danger"
+                busy={xoaBai.isPending}
+                onPress={() =>
+                  xoaBai.mutate(postId, {
+                    onSuccess: () => {
+                      setDangHoiXoa(false);
+                      router.back();
+                    },
+                  })
+                }
+                testID="nut-xac-nhan-xoa"
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }

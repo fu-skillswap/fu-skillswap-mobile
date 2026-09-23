@@ -40,7 +40,11 @@ import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 import type { CursorPageResponse } from '@/core/api/pagination';
 import { forumRepo } from '@/features/forum/forumRepo';
 import { forumKeys } from '@/features/forum/queryKeys';
-import type { ForumCommentResponse, ForumPostResponse } from '@/features/forum/types';
+import type {
+  ForumCommentResponse,
+  ForumPostResponse,
+  ForumPostUpsertRequest,
+} from '@/features/forum/types';
 
 type PostPages = InfiniteData<CursorPageResponse<ForumPostResponse>>;
 type CommentPages = InfiniteData<CursorPageResponse<ForumCommentResponse>>;
@@ -54,6 +58,23 @@ type CommentPages = InfiniteData<CursorPageResponse<ForumCommentResponse>>;
  * — quét cả nhánh rồi so `postId` sẽ lật tim của mọi bình luận thuộc bài đó.
  */
 const NHANH_DANH_SACH_BAI = [forumKeys.feed(), forumKeys.postsAll()];
+
+/**
+ * Đánh dấu mọi danh sách bài viết là cũ sau khi nội dung diễn đàn thay đổi.
+ *
+ * Quét đúng HAI nhánh, không quét `forumKeys.all`: nhánh `comments` cũng nằm
+ * dưới `['forum']`, và bắt toàn bộ bình luận của mọi bài tải lại chỉ vì người
+ * dùng vừa đăng một bài khác là tốn băng thông vô ích.
+ *
+ * `postsAll()` là TIỀN TỐ của mọi danh sách có lọc — mỗi bộ lọc là một entry
+ * cache riêng và ở đây không biết trước bộ lọc nào đang sống, nên phải khớp
+ * theo nhánh chứ không theo một khoá cụ thể.
+ */
+function lamMoiDanhSachBai(queryClient: QueryClient) {
+  for (const queryKey of NHANH_DANH_SACH_BAI) {
+    void queryClient.invalidateQueries({ queryKey });
+  }
+}
 
 /** Áp một phép biến đổi lên mọi bản sao của `postId` trong cache bài viết */
 function patchPostInCache(
@@ -219,4 +240,66 @@ export function useToggleCommentLike(postId: string) {
       mutation.mutate(comment);
     },
   };
+}
+
+/**
+ * Tạo bài viết mới.
+ *
+ * KHÔNG cập nhật lạc quan: backend kiểm duyệt từ cấm và chặn trùng bài trong 15
+ * phút, nên bài chỉ thực sự tồn tại sau khi máy chủ trả lời. Vẽ trước rồi rút
+ * lại là cách chắc chắn nhất để người dùng tưởng đã đăng xong và đóng app.
+ */
+export function useCreatePost() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // Xem luật 4 ở đầu file: mặc định 'online' hoãn request, màn hình đóng lại
+    // như thể đã đăng xong trong khi chưa gửi gì cả.
+    networkMode: 'always',
+    mutationFn: (input: ForumPostUpsertRequest) => forumRepo.createPost(input),
+    onSuccess: () => {
+      lamMoiDanhSachBai(queryClient);
+    },
+  });
+}
+
+/**
+ * Sửa bài viết của chính mình.
+ *
+ * Sau khi sửa phải lấy lại bài TỪ MÁY CHỦ chứ không đắp payload vừa gõ vào
+ * cache: những trường mà form không đụng tới (số bình luận, số lượt thích,
+ * `lastActivityAt`) vẫn đang đổi ở phía người khác.
+ */
+export function useUpdatePost(postId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: (input: ForumPostUpsertRequest) => forumRepo.updatePost(postId, input),
+    onSuccess: () => {
+      lamMoiDanhSachBai(queryClient);
+      void queryClient.invalidateQueries({ queryKey: forumKeys.post(postId) });
+    },
+  });
+}
+
+/**
+ * Xoá mềm bài viết của chính mình.
+ *
+ * CHỈ làm mới các danh sách. Cache chi tiết của bài vừa xoá được để nguyên cho
+ * `gcTime` dọn: màn hình chi tiết vẫn còn mounted ngay lúc này (nó mới là nơi
+ * bấm nút xoá), nên vứt cache của nó đi chỉ khiến observer đang sống gọi lại
+ * `GET /api/forum/posts/{id}` và nhận 404 — một màn hình lỗi loé lên ngay trước
+ * khi điều hướng quay lại.
+ */
+export function useDeletePost() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: (postId: string) => forumRepo.deletePost(postId),
+    onSuccess: () => {
+      lamMoiDanhSachBai(queryClient);
+    },
+  });
 }

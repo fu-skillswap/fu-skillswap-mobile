@@ -24,6 +24,25 @@ jest.mock('expo-router', () => {
   return { useRouter: () => ({ push }), __mockPush: push };
 });
 jest.mock('@/core/net/onlineStatus', () => ({ useIsOffline: () => false }));
+/**
+ * Màn hình này KHÔNG dùng phiên đăng nhập, nhưng nó được lấy qua barrel
+ * `@/features/forum` — barrel kéo theo `PostDetailScreen`, file đó import
+ * `@/core/auth/AuthProvider`, và AuthProvider import `@react-native-google-signin`
+ * vốn gọi `TurboModuleRegistry.getEnforcing` ngay lúc nạp module: không có
+ * native module trong Jest nên test nổ ngay ở bước import.
+ *
+ * Mock giữ đúng hình dạng thật của `AuthContextValue`; `user: null` là khách
+ * vãng lai, đủ cho mọi test trong file này.
+ */
+jest.mock('@/core/auth/AuthProvider', () => ({
+  useAuth: () => ({
+    status: 'unauthenticated',
+    user: null,
+    signInWithGoogle: jest.fn(),
+    signOut: jest.fn(),
+  }),
+}));
+
 
 
 const { __mockPush: mockPush } = jest.requireMock<{ __mockPush: jest.Mock }>('expo-router');
@@ -300,6 +319,22 @@ describe('ForumFeedScreen', () => {
     await fireEvent.press(screen.getByText('Học Spring Boot từ đâu?'));
 
     expect(mockPush).toHaveBeenCalledWith('/forum/p1');
+  });
+
+  it('feed RỖNG vẫn có nút mở màn soạn bài, bấm vào thì sang /forum/compose', async () => {
+    // Trạng thái rỗng là lúc người dùng cần nút đăng bài nhất; nếu nút nằm
+    // trong `FlatList` thì đúng lúc đó nó biến mất.
+    server.use(
+      topicsOk(),
+      http.get(`${BASE}/api/forum/feed`, () => HttpResponse.json(envelope(cursorPage([])))),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Chưa có bài viết nào')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-mo-soan-bai'));
+
+    expect(mockPush).toHaveBeenCalledWith('/forum/compose');
   });
 
   it('MẤT MẠNG lúc mở tab thì nói mất kết nối, KHÔNG nói chưa có bài viết nào', async () => {

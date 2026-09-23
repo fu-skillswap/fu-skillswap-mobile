@@ -13,6 +13,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'r
 
 import { trangThaiTai } from '@/core/api/queryState';
 import { useDebouncedValue } from '@/core/hooks/useDebouncedValue';
+import { Button } from '@/core/ui/Button';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
@@ -153,6 +154,19 @@ export function ForumFeedScreen() {
           }
         />
       )}
+
+      {/*
+        Nút nổi nằm NGOÀI nhánh điều kiện ở trên, không nằm trong `FlatList`:
+        lúc feed rỗng, lỗi hay mất mạng mới là lúc người dùng cần chỗ để bắt đầu
+        một bài viết, mà đó đúng là những lúc danh sách không được render.
+      */}
+      <View className="absolute bottom-6 right-4">
+        <Button
+          label="Đăng bài"
+          onPress={() => router.push('/forum/compose')}
+          testID="nut-mo-soan-bai"
+        />
+      </View>
     </Screen>
   );
 }

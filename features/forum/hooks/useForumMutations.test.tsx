@@ -8,8 +8,11 @@ import React from 'react';
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
 import {
+  useCreatePost,
+  useDeletePost,
   useToggleCommentLike,
   useTogglePostLike,
+  useUpdatePost,
 } from '@/features/forum/hooks/useForumMutations';
 import {
   useForumComments,
@@ -683,6 +686,193 @@ describe('useToggleCommentLike', () => {
     await waitFor(() => expect(result.current.binhLuan.comments[0]?.reactionCount).toBe(3));
     expect(result.current.binhLuan.comments[0]?.reactedByCurrentUser).toBe(false);
     expect(result.current.binhLuan.comments[1]?.reactionCount).toBe(3);
+    await nhuongMotNhip();
+  });
+});
+
+/**
+ * Ba hook ghi bài viết cùng sống trong MỘT renderHook, kèm hai danh sách và màn
+ * chi tiết — đúng cảnh thật: người dùng đăng bài xong thì newsfeed, danh sách
+ * đang lọc và bài đang mở đều phải nói cùng một câu chuyện.
+ */
+function renderHookGhiBai() {
+  return renderHook(
+    () => ({
+      feed: useForumList({}),
+      theoChuDe: useForumList({ forumTopicId: 't1' }),
+      chiTiet: useForumPost('p1'),
+      taoBai: useCreatePost(),
+      suaBai: useUpdatePost('p1'),
+      xoaBai: useDeletePost(),
+    }),
+    { wrapper },
+  );
+}
+
+/** Trả về trang khác nhau cho mỗi lần gọi, để thấy được có tải lại hay không */
+function traLanLuot(cacLan: unknown[][]) {
+  let lan = 0;
+  return () => {
+    const items = cacLan[Math.min(lan, cacLan.length - 1)]!;
+    lan += 1;
+    return HttpResponse.json(envelope(cursorPage(items)));
+  };
+}
+
+describe('useCreatePost', () => {
+  it('đăng xong thì tải lại CẢ newsfeed LẪN danh sách đang lọc theo chủ đề', async () => {
+    server.use(
+      baiVietOk(),
+      binhLuanOk([]),
+      http.get(`${BASE}/api/forum/feed`, traLanLuot([[], [post({ postId: 'p9' })]])),
+      http.get(`${BASE}/api/forum/posts`, traLanLuot([[], [post({ postId: 'p9' })]])),
+      http.post(`${BASE}/api/forum/posts`, () => HttpResponse.json(envelope(post({ postId: 'p9' })))),
+    );
+
+    const { result } = await renderHookGhiBai();
+    await waitFor(() => expect(result.current.feed.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.theoChuDe.isSuccess).toBe(true));
+    expect(result.current.feed.posts).toHaveLength(0);
+    expect(result.current.theoChuDe.posts).toHaveLength(0);
+
+    await act(async () => {
+      await result.current.taoBai.mutateAsync({
+        title: 'Bài mới',
+        content: 'Nội dung',
+        forumTopicId: 't1',
+      });
+    });
+
+    await waitFor(() => expect(result.current.feed.posts.map((p) => p.postId)).toEqual(['p9']));
+    await waitFor(() =>
+      expect(result.current.theoChuDe.posts.map((p) => p.postId)).toEqual(['p9']),
+    );
+    await nhuongMotNhip();
+  });
+
+  it('mất mạng thì vẫn GỬI NGAY và kết thúc, không nằm im chờ có mạng', async () => {
+    let soPost = 0;
+    server.use(
+      baiVietOk(),
+      binhLuanOk([]),
+      feedOk([]),
+      http.get(`${BASE}/api/forum/posts`, () => HttpResponse.json(envelope(cursorPage([])))),
+      http.post(`${BASE}/api/forum/posts`, () => {
+        soPost += 1;
+        return HttpResponse.json(envelope(post({ postId: 'p9' })));
+      }),
+    );
+
+    const { result } = await renderHookGhiBai();
+    await waitFor(() => expect(result.current.feed.isSuccess).toBe(true));
+
+    await act(async () => {
+      onlineManager.setOnline(false);
+    });
+    try {
+      await act(async () => {
+        await result.current.taoBai.mutateAsync({
+          title: 'Bài mới',
+          content: 'Nội dung',
+          forumTopicId: 't1',
+        });
+      });
+
+      // Với `networkMode` mặc định ('online'), mutation nằm ở trạng thái hoãn:
+      // `isPaused` bật, request chưa hề rời máy, và `mutateAsync` không bao giờ
+      // trả lời — giao diện sẽ đứng hình với nút "đang gửi".
+      expect(soPost).toBe(1);
+      expect(result.current.taoBai.isPaused).toBe(false);
+      expect(result.current.taoBai.isSuccess).toBe(true);
+    } finally {
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
+    await nhuongMotNhip();
+  });
+});
+
+describe('useUpdatePost', () => {
+  it('sửa xong thì màn chi tiết lấy lại bài TỪ MÁY CHỦ, không đắp bản mình vừa gõ', async () => {
+    let lanGetChiTiet = 0;
+    server.use(
+      feedOk([]),
+      binhLuanOk([]),
+      http.get(`${BASE}/api/forum/posts`, () => HttpResponse.json(envelope(cursorPage([])))),
+      http.get(`${BASE}/api/forum/posts/p1`, () => {
+        lanGetChiTiet += 1;
+        // Lần hai khác HẲN thứ mà client vừa gửi lên: nếu màn hình chỉ đắp lại
+        // payload của chính mình thì tiêu đề sẽ là 'Tiêu đề tôi vừa gõ' và test đỏ.
+        return HttpResponse.json(
+          envelope(
+            post({
+              title: lanGetChiTiet === 1 ? 'Tiêu đề cũ' : 'Tiêu đề máy chủ đã kiểm duyệt',
+              commentCount: 12,
+            }),
+          ),
+        );
+      }),
+      http.put(`${BASE}/api/forum/posts/p1`, () =>
+        HttpResponse.json(envelope(post({ title: 'Tiêu đề tôi vừa gõ' }))),
+      ),
+    );
+
+    const { result } = await renderHookGhiBai();
+    await waitFor(() => expect(result.current.chiTiet.data?.title).toBe('Tiêu đề cũ'));
+
+    await act(async () => {
+      await result.current.suaBai.mutateAsync({
+        title: 'Tiêu đề tôi vừa gõ',
+        content: 'Nội dung mới',
+        forumTopicId: 't1',
+      });
+    });
+
+    await waitFor(() =>
+      expect(result.current.chiTiet.data?.title).toBe('Tiêu đề máy chủ đã kiểm duyệt'),
+    );
+    expect(result.current.chiTiet.data?.commentCount).toBe(12);
+    await nhuongMotNhip();
+  });
+});
+
+describe('useDeletePost', () => {
+  it('xoá xong thì bài biến khỏi newsfeed lẫn danh sách đang lọc', async () => {
+    server.use(
+      baiVietOk(),
+      binhLuanOk([]),
+      http.get(
+        `${BASE}/api/forum/feed`,
+        traLanLuot([
+          [post({ postId: 'p1' }), post({ postId: 'p2' })],
+          [post({ postId: 'p2' })],
+        ]),
+      ),
+      http.get(
+        `${BASE}/api/forum/posts`,
+        traLanLuot([
+          [post({ postId: 'p1' }), post({ postId: 'p2' })],
+          [post({ postId: 'p2' })],
+        ]),
+      ),
+      http.delete(`${BASE}/api/forum/posts/p1`, () =>
+        HttpResponse.json(envelope(post({ postId: 'p1', status: 'DELETED' }))),
+      ),
+    );
+
+    const { result } = await renderHookGhiBai();
+    await waitFor(() => expect(result.current.feed.posts).toHaveLength(2));
+    await waitFor(() => expect(result.current.theoChuDe.posts).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.xoaBai.mutateAsync('p1');
+    });
+
+    await waitFor(() => expect(result.current.feed.posts.map((p) => p.postId)).toEqual(['p2']));
+    await waitFor(() =>
+      expect(result.current.theoChuDe.posts.map((p) => p.postId)).toEqual(['p2']),
+    );
     await nhuongMotNhip();
   });
 });

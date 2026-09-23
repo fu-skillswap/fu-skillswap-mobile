@@ -52,11 +52,19 @@ export function useForumList(filters: ForumListFilters) {
   return { ...query, posts };
 }
 
-/** Chi tiết một bài viết */
+/**
+ * Chi tiết một bài viết.
+ *
+ * `enabled` tồn tại vì màn hình soạn bài dùng chung hook này: ở chế độ TẠO MỚI
+ * nó không có `postId` nào, và thiếu chốt này thì mỗi lần mở form đăng bài sẽ
+ * có một `GET /api/forum/posts/` (đường dẫn cụt) rời máy. Query bị tắt đứng yên
+ * ở `isPending`, nên nơi gọi phải tự biết khi nào được hỏi tới trạng thái đó.
+ */
 export function useForumPost(postId: string) {
   return useQuery({
     queryKey: forumKeys.post(postId),
     queryFn: () => forumRepo.getPost(postId),
+    enabled: postId.length > 0,
   });
 }
 
