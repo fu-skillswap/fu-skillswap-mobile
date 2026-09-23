@@ -8,6 +8,7 @@ import React from 'react';
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
 import { ComposeScreen } from '@/features/forum';
+import { forumKeys } from '@/features/forum/queryKeys';
 
 const BASE = 'https://api.skillswap.asia';
 
@@ -16,10 +17,24 @@ const BASE = 'https://api.skillswap.asia';
  * hoist `jest.mock` lên trên mọi khai báo, và `useRouter: () => ({ back: jest.fn() })`
  * đẻ một hàm giả mới mỗi lần gọi nên không assert được gì (xem forum-feed.test.tsx).
  */
+/**
+ * Mock giữ đúng hình dạng thật của `useRouter()`: `canGoBack` là hàm, không phải
+ * giá trị. Màn hình gọi nó trước khi `back()` vì vào thẳng bằng deep link thì
+ * stack rỗng và `back()` là no-op. `__mockCanGoBack` cho phép từng test dựng
+ * lại tình huống đó.
+ */
 jest.mock('expo-router', () => {
   const back = jest.fn();
   const push = jest.fn();
-  return { useRouter: () => ({ back, push }), __mockBack: back, __mockPush: push };
+  const replace = jest.fn();
+  const canGoBack = jest.fn(() => true);
+  return {
+    useRouter: () => ({ back, push, replace, canGoBack }),
+    __mockBack: back,
+    __mockPush: push,
+    __mockReplace: replace,
+    __mockCanGoBack: canGoBack,
+  };
 });
 jest.mock('@/core/net/onlineStatus', () => ({ useIsOffline: () => false }));
 /**
@@ -42,7 +57,15 @@ jest.mock('@/core/auth/AuthProvider', () => ({
 }));
 
 
-const { __mockBack: mockBack } = jest.requireMock<{ __mockBack: jest.Mock }>('expo-router');
+const {
+  __mockBack: mockBack,
+  __mockReplace: mockReplace,
+  __mockCanGoBack: mockCanGoBack,
+} = jest.requireMock<{
+  __mockBack: jest.Mock;
+  __mockReplace: jest.Mock;
+  __mockCanGoBack: jest.Mock;
+}>('expo-router');
 
 function envelope(data: unknown) {
   return { timestamp: '2026-09-22T00:00:00Z', status: 200, code: 'SUCCESS', message: 'OK', data };
@@ -98,6 +121,8 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => {
   queryClient = createQueryClient();
   mockBack.mockClear();
+  mockReplace.mockClear();
+  mockCanGoBack.mockReturnValue(true);
 });
 afterEach(() => {
   // `clear()` một mình bỏ sót bộ hẹn giờ gcTime của mutation và Jest treo sau
@@ -113,11 +138,26 @@ afterAll(() => server.close());
  * thông báo re-render qua `setTimeout(0)`, nổ SAU khi act scope đóng nếu không
  * chờ. Cảnh báo act() sinh ra từ đó chập chờn, chỉ bẩn ở vài lần chạy.
  */
-afterEach(async () => {
+/**
+ * Nhường một nhịp cho `VirtualizedList` dọn hàng đợi của nó, gọi ở CUỐI mỗi test
+ * có render danh sách.
+ *
+ * FlatList gom việc render ô vào `_updateCellsToRenderBatcher` — một bộ hẹn giờ
+ * ~50ms. Nếu nó nổ trong khoảng giữa lúc thân test kết thúc và lúc RNTL gỡ cây,
+ * React cập nhật ngoài phạm vi act và in cảnh báo; chạy 6 lần mới bẩn 1 lần nên
+ * rất dễ bị kết luận nhầm là đã hết.
+ *
+ * Phải gọi trong THÂN test chứ không đặt được vào `afterEach`: auto-cleanup của
+ * RNTL đăng ký `afterEach` ngay lúc import và jest-circus chạy hook theo đúng
+ * thứ tự khai báo, nên nó luôn gỡ cây trước mọi `afterEach` viết ở đây (kiểm
+ * chứng: gọi `screen.unmount()` trong afterEach ném "`render` function has not
+ * been called").
+ */
+async function donHangDoiDanhSach() {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 60));
   });
-});
+}
 
 /** `render` của RNTL 14 là hàm ASYNC — phải await, nếu không lần render đầu nằm ngoài act(). */
 async function renderScreen(postId?: string) {
@@ -159,6 +199,7 @@ describe('ComposeScreen — đăng bài mới', () => {
     // Chặn TRƯỚC khi gửi: một lần gửi hỏng vẫn tiêu một lượt trong hạn mức
     // 5 bài/10 phút của backend.
     expect(soPost).toBe(0);
+    await donHangDoiDanhSach();
   });
 
   it('mở form ĐĂNG MỚI thì không đi hỏi chi tiết bài nào cả', async () => {
@@ -183,6 +224,7 @@ describe('ComposeScreen — đăng bài mới', () => {
     await waitFor(() => expect(screen.getByText('Hỏi đáp')).toBeTruthy());
 
     expect(soGet).toBe(0);
+    await donHangDoiDanhSach();
   });
 
   it('đăng thành công thì gửi nội dung ĐÃ cắt khoảng trắng và quay lại màn trước', async () => {
@@ -205,6 +247,7 @@ describe('ComposeScreen — đăng bài mới', () => {
       content: 'Bắt đầu từ đâu?',
       forumTopicId: 't1',
     });
+    await donHangDoiDanhSach();
   });
 
   it('lỗi kiểm duyệt FORUM_4201 hiện đúng thông điệp của BACKEND, không có nút Thử lại', async () => {
@@ -237,6 +280,7 @@ describe('ComposeScreen — đăng bài mới', () => {
     // người dùng vào vòng lặp và đốt hạn mức — xem luật ACTION_LABEL của ErrorView.
     expect(screen.queryByText('Thử lại')).toBeNull();
     expect(mockBack).not.toHaveBeenCalled();
+    await donHangDoiDanhSach();
   });
 
   it('vượt hạn mức 5 bài/10 phút thì hiện SỐ GIÂY chờ của backend, vẫn không mời thử lại', async () => {
@@ -264,6 +308,7 @@ describe('ComposeScreen — đăng bài mới', () => {
 
     await waitFor(() => expect(screen.getByText(/537 giây/)).toBeTruthy());
     expect(screen.queryByText('Thử lại')).toBeNull();
+    await donHangDoiDanhSach();
   });
 });
 
@@ -287,6 +332,7 @@ describe('ComposeScreen — sửa bài có sẵn', () => {
     // Chủ đề của bài là "Chia sẻ" (t2), KHÔNG phải chip đầu tiên trong danh sách.
     expect(screen.getByRole('button', { name: 'Chia sẻ' })).toBeSelected();
     expect(screen.getByRole('button', { name: 'Hỏi đáp' })).not.toBeSelected();
+    await donHangDoiDanhSach();
   });
 
   it('lưu thay đổi thì gửi PUT tới đúng bài rồi quay lại', async () => {
@@ -316,5 +362,165 @@ describe('ComposeScreen — sửa bài có sẵn', () => {
       content: 'Nội dung đã lưu trước đó',
       forumTopicId: 't2',
     });
+    await donHangDoiDanhSach();
+  });
+
+  it('tải chủ đề HỎNG thì báo lỗi kèm nút thử lại, không để form thành ngõ cụt', async () => {
+    // `topics.data ?? []` nuốt lỗi: form vẫn vẽ đầy đủ, nhưng vì chủ đề là bắt
+    // buộc nên nút Đăng bài khoá vĩnh viễn và không một dòng nào nói vì sao,
+    // cũng không có cách nào thử lại.
+    server.use(
+      http.get(`${BASE}/api/forum/topics`, () =>
+        HttpResponse.json(
+          { timestamp: '', status: 500, code: 'SYS_0010', message: 'Loi', data: null },
+          { status: 500 },
+        ),
+      ),
+    );
+
+    await renderScreen();
+
+    await waitFor(() => expect(screen.getByText('Hệ thống đang bận')).toBeTruthy(), {
+      timeout: 10_000,
+    });
+    expect(screen.getByText('Thử lại')).toBeTruthy();
+    expect(screen.queryByLabelText('Tiêu đề bài viết')).toBeNull();
+    await donHangDoiDanhSach();
+  }, 15_000);
+
+  it('form soạn bài KHÔNG có chip "Tất cả" — đó là khái niệm của màn lọc', async () => {
+    // "Tất cả" nghĩa là bỏ lọc. Trên form ghi nó đọc thành "bỏ chủ đề": bấm vào
+    // là nút Đăng bài khoá lại mà không giải thích gì.
+    server.use(topicsOk());
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Hỏi đáp')).toBeTruthy());
+
+    expect(screen.queryByText('Tất cả')).toBeNull();
+    await donHangDoiDanhSach();
+  });
+
+  it('đang gõ dở mà bấm Quay lại thì HỎI trước, chưa rời đi', async () => {
+    // Ô nội dung chứa tới 5000 ký tự. Rời đi im lặng là mất trắng.
+    server.use(topicsOk());
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Hỏi đáp')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Tiêu đề bài viết'), 'Đang gõ dở');
+
+    await fireEvent.press(screen.getByTestId('nut-quay-lai'));
+
+    expect(screen.getByTestId('hop-xac-nhan-roi-di')).toBeTruthy();
+    expect(mockBack).not.toHaveBeenCalled();
+    await donHangDoiDanhSach();
+  });
+
+  it('chưa gõ gì thì bấm Quay lại là đi luôn, không hỏi vô cớ', async () => {
+    server.use(topicsOk());
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Hỏi đáp')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-quay-lai'));
+
+    expect(screen.queryByTestId('hop-xac-nhan-roi-di')).toBeNull();
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    await donHangDoiDanhSach();
+  });
+
+  it('chọn "Soạn tiếp" thì đóng hộp và giữ nguyên thứ đang gõ', async () => {
+    server.use(topicsOk());
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Hỏi đáp')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Tiêu đề bài viết'), 'Đang gõ dở');
+    await fireEvent.press(screen.getByTestId('nut-quay-lai'));
+
+    await fireEvent.press(screen.getByTestId('nut-soan-tiep'));
+
+    expect(screen.queryByTestId('hop-xac-nhan-roi-di')).toBeNull();
+    expect(screen.getByLabelText('Tiêu đề bài viết')).toHaveDisplayValue('Đang gõ dở');
+    expect(mockBack).not.toHaveBeenCalled();
+    await donHangDoiDanhSach();
+  });
+
+  it('chọn "Bỏ luôn" thì mới thật sự rời đi', async () => {
+    server.use(topicsOk());
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Hỏi đáp')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Tiêu đề bài viết'), 'Đang gõ dở');
+    await fireEvent.press(screen.getByTestId('nut-quay-lai'));
+
+    await fireEvent.press(screen.getByTestId('nut-bo-ban-nhap'));
+
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    await donHangDoiDanhSach();
+  });
+
+  it('stack rỗng (vào thẳng bằng deep link) thì rời đi bằng replace, không phải back', async () => {
+    // `back()` khi stack rỗng là no-op: người dùng đứng yên tại chỗ mà không
+    // hiểu vì sao nút không ăn.
+    mockCanGoBack.mockReturnValue(false);
+    server.use(topicsOk());
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Hỏi đáp')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-quay-lai'));
+
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
+    await donHangDoiDanhSach();
+  });
+
+  it('tải lại nền KHÔNG nuốt mất bản nháp đang gõ đè lên bài cũ', async () => {
+    // Chốt `daNapBaiCu` tồn tại vì lý do này; trước đây bỏ chốt đi mà suite vẫn
+    // xanh, tức là lập luận trong JSDoc không được gì bảo vệ.
+    // Lần tải lại phải trả về dữ liệu KHÁC, nếu không object `data` giữ nguyên
+    // tham chiếu và `useEffect` chẳng buồn chạy lại — test sẽ xanh kể cả khi bỏ
+    // hẳn chốt, tức là không chứng minh được gì.
+    let lanGoi = 0;
+    server.use(
+      topicsOk(),
+      http.get(`${BASE}/api/forum/posts/p1`, () => {
+        lanGoi += 1;
+        return HttpResponse.json(
+          envelope(
+            lanGoi === 1
+              ? POST_CUA_TOI
+              : { ...POST_CUA_TOI, title: 'Tiêu đề máy chủ vừa đổi', reactionCount: 99 },
+          ),
+        );
+      }),
+    );
+
+    await renderScreen('p1');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Tiêu đề bài viết')).toHaveDisplayValue(
+        'Tiêu đề đã lưu trước đó',
+      ),
+    );
+
+    await fireEvent.changeText(screen.getByLabelText('Tiêu đề bài viết'), 'Tôi đang sửa dở');
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: forumKeys.post('p1') });
+    });
+
+    // Dữ liệu mới đã vào cache...
+    await waitFor(() =>
+      expect(queryClient.getQueryData<{ title: string }>(forumKeys.post('p1'))?.title).toBe(
+        'Tiêu đề máy chủ vừa đổi',
+      ),
+    );
+    // ...và React đã render lại với nó. Thiếu nhịp này thì khẳng định bên dưới
+    // đọc lần render CŨ và sẽ xanh kể cả khi bản nháp sắp bị nuốt — xem chú
+    // thích cùng loại ở `useForumMutations.test.tsx`.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.getByLabelText('Tiêu đề bài viết')).toHaveDisplayValue('Tôi đang sửa dở');
+    await donHangDoiDanhSach();
   });
 });

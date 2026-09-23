@@ -126,11 +126,26 @@ afterAll(() => server.close());
  * act(...)". Cảnh báo này CHẬP CHỜN — chạy 6 lần chỉ bẩn 1–2 lần — nên rất dễ
  * bị kết luận nhầm là đã hết chỉ vì lần chạy gần nhất sạch.
  */
-afterEach(async () => {
+/**
+ * Nhường một nhịp cho `VirtualizedList` dọn hàng đợi của nó, gọi ở CUỐI mỗi test
+ * có render danh sách.
+ *
+ * FlatList gom việc render ô vào `_updateCellsToRenderBatcher` — một bộ hẹn giờ
+ * ~50ms. Nếu nó nổ trong khoảng giữa lúc thân test kết thúc và lúc RNTL gỡ cây,
+ * React cập nhật ngoài phạm vi act và in cảnh báo; chạy 6 lần mới bẩn 1 lần nên
+ * rất dễ bị kết luận nhầm là đã hết.
+ *
+ * Phải gọi trong THÂN test chứ không đặt được vào `afterEach`: auto-cleanup của
+ * RNTL đăng ký `afterEach` ngay lúc import và jest-circus chạy hook theo đúng
+ * thứ tự khai báo, nên nó luôn gỡ cây trước mọi `afterEach` viết ở đây (kiểm
+ * chứng: gọi `screen.unmount()` trong afterEach ném "`render` function has not
+ * been called").
+ */
+async function donHangDoiDanhSach() {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 60));
   });
-});
+}
 
 
 /**
@@ -156,6 +171,7 @@ describe('ForumFeedScreen', () => {
     await renderScreen();
 
     await waitFor(() => expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy());
+    await donHangDoiDanhSach();
   });
 
   it('feed rỗng thì hiện trạng thái rỗng, không phải lỗi', async () => {
@@ -167,6 +183,7 @@ describe('ForumFeedScreen', () => {
     await renderScreen();
 
     await waitFor(() => expect(screen.getByText('Chưa có bài viết nào')).toBeTruthy());
+    await donHangDoiDanhSach();
   });
 
   it('feed lỗi 500 ngay từ đầu thì hiện ErrorView kèm nút thử lại', async () => {
@@ -186,6 +203,7 @@ describe('ForumFeedScreen', () => {
       timeout: 10_000,
     });
     expect(screen.getByText('Thử lại')).toBeTruthy();
+    await donHangDoiDanhSach();
   });
 
   it('tải lại HỎNG khi đã có dữ liệu thì GIỮ NGUYÊN danh sách, chỉ báo nhẹ', async () => {
@@ -217,6 +235,7 @@ describe('ForumFeedScreen', () => {
     });
     expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy();
     expect(screen.queryByText('Hệ thống đang bận')).toBeNull();
+    await donHangDoiDanhSach();
   });
 
   it('gõ từ khoá thì chuyển sang /api/forum/posts và CHỈ gửi giá trị cuối', async () => {
@@ -245,6 +264,7 @@ describe('ForumFeedScreen', () => {
       timeout: 3_000,
     });
     expect(tuKhoaDaGui).toEqual(['spring']);
+    await donHangDoiDanhSach();
   });
 
   it('bấm chip chủ đề thì gửi forumTopicId lên /api/forum/posts', async () => {
@@ -265,6 +285,7 @@ describe('ForumFeedScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Bài theo chủ đề')).toBeTruthy());
     expect(topicIdDaGui).toBe('t1');
+    await donHangDoiDanhSach();
   });
 
   it('cuộn tới cuối thì tải trang kế, và không gọi trùng khi đang tải', async () => {
@@ -305,6 +326,7 @@ describe('ForumFeedScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Bài trang hai')).toBeTruthy());
     expect(cursorDaGui).toEqual([null, 'c2']);
+    await donHangDoiDanhSach();
   });
 
   it('bấm vào một bài thì điều hướng sang trang chi tiết của đúng bài đó', async () => {
@@ -319,6 +341,7 @@ describe('ForumFeedScreen', () => {
     await fireEvent.press(screen.getByText('Học Spring Boot từ đâu?'));
 
     expect(mockPush).toHaveBeenCalledWith('/forum/p1');
+    await donHangDoiDanhSach();
   });
 
   it('feed RỖNG vẫn có nút mở màn soạn bài, bấm vào thì sang /forum/compose', async () => {
@@ -335,6 +358,7 @@ describe('ForumFeedScreen', () => {
     await fireEvent.press(screen.getByTestId('nut-mo-soan-bai'));
 
     expect(mockPush).toHaveBeenCalledWith('/forum/compose');
+    await donHangDoiDanhSach();
   });
 
   it('MẤT MẠNG lúc mở tab thì nói mất kết nối, KHÔNG nói chưa có bài viết nào', async () => {
@@ -358,6 +382,7 @@ describe('ForumFeedScreen', () => {
         onlineManager.setOnline(true);
       });
     }
+    await donHangDoiDanhSach();
   });
 
   it('bấm tim trên thẻ bài viết thì đổi ngay và gửi PUT reaction', async () => {
@@ -392,5 +417,6 @@ describe('ForumFeedScreen', () => {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
     });
+    await donHangDoiDanhSach();
   });
 });

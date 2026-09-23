@@ -29,6 +29,20 @@ import { useForumComments, useForumPost } from '@/features/forum/hooks/useForumQ
 
 export function PostDetailScreen({ postId }: { postId: string }) {
   const router = useRouter();
+  /**
+   * Rời màn hình cho an toàn.
+   *
+   * Vào thẳng `/forum/{id}` bằng deep link hay thông báo đẩy thì stack rỗng, và
+   * `back()` là no-op: xoá bài xong người dùng ngồi nhìn chính bài vừa xoá, hộp
+   * xác nhận đã đóng, không hiểu chuyện gì vừa xảy ra.
+   */
+  const roiDi = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/(tabs)');
+  };
   const { user } = useAuth();
   const post = useForumPost(postId);
   const comments = useForumComments(postId);
@@ -238,6 +252,7 @@ export function PostDetailScreen({ postId }: { postId: string }) {
       />
 
       <Modal
+        testID="hop-thoai-xoa"
         visible={dangHoiXoa}
         transparent
         animationType="fade"
@@ -279,7 +294,7 @@ export function PostDetailScreen({ postId }: { postId: string }) {
                   xoaBai.mutate(postId, {
                     onSuccess: () => {
                       setDangHoiXoa(false);
-                      router.back();
+                      roiDi();
                     },
                   })
                 }

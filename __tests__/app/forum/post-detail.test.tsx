@@ -21,10 +21,24 @@ const BASE = 'https://api.skillswap.asia';
  * Mock giữ đúng hình dạng thật (`useRouter()` trả về object có `push`) để nếu
  * sau này màn hình chi tiết cần điều hướng thì mock không phải viết lại.
  */
+/**
+ * Mock giữ đúng hình dạng thật của `useRouter()`: `canGoBack` là hàm, không phải
+ * giá trị. Màn hình gọi nó trước khi `back()` vì vào thẳng bằng deep link thì
+ * stack rỗng và `back()` là no-op. `__mockCanGoBack` cho phép từng test dựng
+ * lại tình huống đó.
+ */
 jest.mock('expo-router', () => {
   const push = jest.fn();
   const back = jest.fn();
-  return { useRouter: () => ({ push, back }), __mockPush: push, __mockBack: back };
+  const replace = jest.fn();
+  const canGoBack = jest.fn(() => true);
+  return {
+    useRouter: () => ({ push, back, replace, canGoBack }),
+    __mockPush: push,
+    __mockBack: back,
+    __mockReplace: replace,
+    __mockCanGoBack: canGoBack,
+  };
 });
 jest.mock('@/core/net/onlineStatus', () => ({ useIsOffline: () => false }));
 
@@ -48,9 +62,16 @@ jest.mock('@/core/auth/AuthProvider', () => ({
   }),
 }));
 
-const { __mockPush: mockPush, __mockBack: mockBack } = jest.requireMock<{
+const {
+  __mockPush: mockPush,
+  __mockBack: mockBack,
+  __mockReplace: mockReplace,
+  __mockCanGoBack: mockCanGoBack,
+} = jest.requireMock<{
   __mockPush: jest.Mock;
   __mockBack: jest.Mock;
+  __mockReplace: jest.Mock;
+  __mockCanGoBack: jest.Mock;
 }>('expo-router');
 
 function envelope(data: unknown) {
@@ -134,6 +155,9 @@ beforeEach(() => {
   queryClient = createQueryClient();
   mockPush.mockClear();
   mockBack.mockClear();
+  mockReplace.mockClear();
+  mockCanGoBack.mockReturnValue(true);
+  mockBack.mockClear();
   // Mặc định: khách vãng lai, không phải tác giả — mọi test cũ giữ nguyên hành vi.
   mockNguoiDungHienTai = null;
 });
@@ -155,11 +179,26 @@ afterAll(() => server.close());
  * act(...)". Cảnh báo này CHẬP CHỜN — chạy 6 lần chỉ bẩn 1–2 lần — nên rất dễ
  * bị kết luận nhầm là đã hết chỉ vì lần chạy gần nhất sạch.
  */
-afterEach(async () => {
+/**
+ * Nhường một nhịp cho `VirtualizedList` dọn hàng đợi của nó, gọi ở CUỐI mỗi test
+ * có render danh sách.
+ *
+ * FlatList gom việc render ô vào `_updateCellsToRenderBatcher` — một bộ hẹn giờ
+ * ~50ms. Nếu nó nổ trong khoảng giữa lúc thân test kết thúc và lúc RNTL gỡ cây,
+ * React cập nhật ngoài phạm vi act và in cảnh báo; chạy 6 lần mới bẩn 1 lần nên
+ * rất dễ bị kết luận nhầm là đã hết.
+ *
+ * Phải gọi trong THÂN test chứ không đặt được vào `afterEach`: auto-cleanup của
+ * RNTL đăng ký `afterEach` ngay lúc import và jest-circus chạy hook theo đúng
+ * thứ tự khai báo, nên nó luôn gỡ cây trước mọi `afterEach` viết ở đây (kiểm
+ * chứng: gọi `screen.unmount()` trong afterEach ném "`render` function has not
+ * been called").
+ */
+async function donHangDoiDanhSach() {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 60));
   });
-});
+}
 
 
 /** `render` của RNTL 14 là hàm ASYNC — phải await, nếu không lần render đầu nằm ngoài act(). */
@@ -191,6 +230,7 @@ describe('PostDetailScreen', () => {
     await waitFor(() => expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy());
     expect(screen.getByText('AI')).toBeTruthy();
     expect(screen.getByText(/Trả lời Nguyen Van A/)).toBeTruthy();
+    await donHangDoiDanhSach();
   });
 
   it('bài chưa có bình luận thì hiện trạng thái rỗng, không phải lỗi', async () => {
@@ -199,6 +239,7 @@ describe('PostDetailScreen', () => {
     await renderScreen();
 
     await waitFor(() => expect(screen.getByText('Chưa có bình luận')).toBeTruthy());
+    await donHangDoiDanhSach();
   });
 
   it('bình luận lỗi 500 thì báo lỗi, KHÔNG nói dối là chưa ai bình luận', async () => {
@@ -220,6 +261,7 @@ describe('PostDetailScreen', () => {
     // 15s: `shouldRetryQuery` retry hai lần trước khi báo lỗi nên waitFor chờ
     // 10s. Không nới timeout của `it` thì Jest cắt ở mốc mặc định 5s và báo
     // "Exceeded timeout", che mất assertion thật sự hỏng.
+    await donHangDoiDanhSach();
   }, 15_000);
 
   it('bài viết lỗi 500 ngay từ đầu thì hiện ErrorView kèm nút thử lại', async () => {
@@ -234,6 +276,7 @@ describe('PostDetailScreen', () => {
       timeout: 10_000,
     });
     expect(screen.getByText('Thử lại')).toBeTruthy();
+    await donHangDoiDanhSach();
   }, 15_000);
 
   it('tải lại HỎNG khi đã có bài thì GIỮ NGUYÊN nội dung, chỉ báo nhẹ', async () => {
@@ -259,6 +302,7 @@ describe('PostDetailScreen', () => {
     });
     expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy();
     expect(screen.queryByText('Hệ thống đang bận')).toBeNull();
+    await donHangDoiDanhSach();
   }, 15_000);
 
   it('cuộn tới cuối thì tải trang bình luận kế, và không gọi trùng khi đang tải', async () => {
@@ -293,6 +337,7 @@ describe('PostDetailScreen', () => {
 
     await waitFor(() => expect(screen.getByText('noi dung c2')).toBeTruthy());
     expect(cursorDaGui).toEqual([null, 'c2']);
+    await donHangDoiDanhSach();
   });
 
   it('MẤT MẠNG lúc mở màn hình thì nói mất kết nối, KHÔNG nói chưa có bình luận', async () => {
@@ -318,6 +363,7 @@ describe('PostDetailScreen', () => {
         onlineManager.setOnline(true);
       });
     }
+    await donHangDoiDanhSach();
   });
 
   it('reply mồ côi vẫn giữ dòng Trả lời ai dù bị nâng lên làm bình luận gốc', async () => {
@@ -341,6 +387,7 @@ describe('PostDetailScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Dung roi ban oi')).toBeTruthy());
     expect(screen.getByText(/Trả lời Tran Thi B/)).toBeTruthy();
+    await donHangDoiDanhSach();
   });
 
   it('chưa có ô nhập thì màn hình KHÔNG được hiện nút Trả lời chết', async () => {
@@ -355,6 +402,7 @@ describe('PostDetailScreen', () => {
     await waitFor(() => expect(screen.getByText('noi dung c1')).toBeTruthy());
 
     expect(screen.queryByRole('button', { name: 'Trả lời' })).toBeNull();
+    await donHangDoiDanhSach();
   });
 
   it('bấm tim một bình luận thì đổi ngay và gửi PUT tới đúng bình luận đó', async () => {
@@ -392,6 +440,7 @@ describe('PostDetailScreen', () => {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
     });
+    await donHangDoiDanhSach();
   });
 
   it('cả bình luận gốc LẪN reply đều có nút thả tim thật', async () => {
@@ -409,6 +458,7 @@ describe('PostDetailScreen', () => {
     await waitFor(() => expect(screen.getByText('noi dung r1')).toBeTruthy());
 
     expect(screen.getAllByRole('button', { name: 'Thích bình luận' })).toHaveLength(2);
+    await donHangDoiDanhSach();
   });
 });
 
@@ -424,6 +474,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
 
     expect(screen.queryByTestId('nut-sua-bai')).toBeNull();
     expect(screen.queryByTestId('nut-xoa-bai')).toBeNull();
+    await donHangDoiDanhSach();
   });
 
   it('bài của MÌNH thì bấm Sửa bài mở form soạn kèm đúng postId', async () => {
@@ -439,6 +490,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
       pathname: '/forum/compose',
       params: { postId: 'p1' },
     });
+    await donHangDoiDanhSach();
   });
 
   it('bấm Xoá bài thì HỎI LẠI trước, chưa gửi DELETE nào', async () => {
@@ -462,6 +514,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
     expect(screen.getByTestId('hop-xac-nhan-xoa')).toBeTruthy();
     expect(soDelete).toBe(0);
     expect(mockBack).not.toHaveBeenCalled();
+    await donHangDoiDanhSach();
   });
 
   it('huỷ trong hộp xác nhận thì đóng hộp và không xoá gì', async () => {
@@ -484,6 +537,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
 
     await waitFor(() => expect(screen.queryByTestId('hop-xac-nhan-xoa')).toBeNull());
     expect(soDelete).toBe(0);
+    await donHangDoiDanhSach();
   });
 
   it('xác nhận xoá thì gửi DELETE tới đúng bài rồi quay lại màn trước', async () => {
@@ -506,6 +560,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
 
     await waitFor(() => expect(mockBack).toHaveBeenCalledTimes(1));
     expect(duongDan).toBe('p1');
+    await donHangDoiDanhSach();
   });
 
   it('xoá HỎNG thì nói rõ vì sao, không đóng hộp và im lặng', async () => {
@@ -539,5 +594,53 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
     expect(screen.getByText('Ban khong phai tac gia bai viet nay')).toBeTruthy();
     // Hộp vẫn mở để người dùng đọc được lý do.
     expect(screen.getByTestId('hop-xac-nhan-xoa')).toBeTruthy();
+    await donHangDoiDanhSach();
+  });
+
+  it('nút back cứng của Android đóng được hộp xác nhận xoá', async () => {
+    // Comment trong code khẳng định điều này; trước đây gỡ hẳn `onRequestClose`
+    // đi mà cả suite vẫn xanh, tức là lời khẳng định không được gì bảo vệ. Kẹt
+    // trong một câu hỏi không có đường thoát là lỗi thật trên Android.
+    mockNguoiDungHienTai = { publicId: 'u1' };
+    server.use(postOk(), commentsOk([]));
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-xoa-bai')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('nut-xoa-bai'));
+    expect(screen.getByTestId('hop-xac-nhan-xoa')).toBeTruthy();
+
+    // RNTL 14 đã bỏ `UNSAFE_getByType`, nên lấy `Modal` bằng testID của chính nó
+    // rồi gọi thẳng handler mà Android nối vào nút back cứng.
+    const hop = screen.getByTestId('hop-thoai-xoa');
+    await act(async () => {
+      (hop.props.onRequestClose as () => void)();
+    });
+
+    expect(screen.queryByTestId('hop-xac-nhan-xoa')).toBeNull();
+    await donHangDoiDanhSach();
+  });
+
+  it('stack rỗng thì xoá xong rời đi bằng replace, không phải back', async () => {
+    // Vào thẳng `/forum/{id}` bằng deep link hay thông báo đẩy thì stack rỗng và
+    // `back()` là no-op: người dùng ngồi nhìn chính bài vừa xoá, hộp đã đóng,
+    // không hiểu chuyện gì vừa xảy ra.
+    mockCanGoBack.mockReturnValue(false);
+    mockNguoiDungHienTai = { publicId: 'u1' };
+    server.use(
+      postOk(),
+      commentsOk([]),
+      http.delete(`${BASE}/api/forum/posts/p1`, () =>
+        HttpResponse.json(envelope({ ...POST, status: 'DELETED' })),
+      ),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-xoa-bai')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('nut-xoa-bai'));
+    await fireEvent.press(screen.getByTestId('nut-xac-nhan-xoa'));
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(tabs)'));
+    expect(mockBack).not.toHaveBeenCalled();
+    await donHangDoiDanhSach();
   });
 });

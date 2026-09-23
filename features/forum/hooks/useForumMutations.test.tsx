@@ -835,6 +835,49 @@ describe('useUpdatePost', () => {
     expect(result.current.chiTiet.data?.commentCount).toBe(12);
     await nhuongMotNhip();
   });
+
+  it('mất mạng thì vẫn GỬI NGAY và kết thúc, không nằm im chờ có mạng', async () => {
+    // Global Constraints bắt mọi mutation đặt `networkMode: 'always'`. Thiếu nó,
+    // mutation nằm ở trạng thái hoãn: request chưa rời máy, `mutateAsync` không
+    // bao giờ trả lời, và giao diện đứng hình với nút "đang gửi". Lỗi này vừa
+    // xảy ra thật ở `useCreatePost`, nên hai hook còn lại cũng cần chốt riêng.
+    let soPut = 0;
+    server.use(
+      baiVietOk(),
+      binhLuanOk([]),
+      feedOk([]),
+      http.get(`${BASE}/api/forum/posts`, () => HttpResponse.json(envelope(cursorPage([])))),
+      http.put(`${BASE}/api/forum/posts/p1`, () => {
+        soPut += 1;
+        return HttpResponse.json(envelope(post({ title: 'Tiêu đề mới' })));
+      }),
+    );
+
+    const { result } = await renderHookGhiBai();
+    await waitFor(() => expect(result.current.feed.isSuccess).toBe(true));
+
+    await act(async () => {
+      onlineManager.setOnline(false);
+    });
+    try {
+      await act(async () => {
+        await result.current.suaBai.mutateAsync({
+          title: 'Tiêu đề mới',
+          content: 'Nội dung mới',
+          forumTopicId: 't1',
+        });
+      });
+
+      expect(soPut).toBe(1);
+      expect(result.current.suaBai.isPaused).toBe(false);
+      expect(result.current.suaBai.isSuccess).toBe(true);
+    } finally {
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
+    await nhuongMotNhip();
+  });
 });
 
 describe('useDeletePost', () => {
@@ -873,6 +916,70 @@ describe('useDeletePost', () => {
     await waitFor(() =>
       expect(result.current.theoChuDe.posts.map((p) => p.postId)).toEqual(['p2']),
     );
+    await nhuongMotNhip();
+  });
+
+  it('mất mạng thì vẫn GỬI NGAY và kết thúc, không nằm im chờ có mạng', async () => {
+    // Global Constraints bắt mọi mutation đặt `networkMode: 'always'`. Thiếu nó,
+    // mutation nằm ở trạng thái hoãn: request chưa rời máy, `mutateAsync` không
+    // bao giờ trả lời, và giao diện đứng hình với nút "đang gửi". Lỗi này vừa
+    // xảy ra thật ở `useCreatePost`, nên hai hook còn lại cũng cần chốt riêng.
+    let soDelete = 0;
+    server.use(
+      baiVietOk(),
+      binhLuanOk([]),
+      feedOk([]),
+      http.get(`${BASE}/api/forum/posts`, () => HttpResponse.json(envelope(cursorPage([])))),
+      http.delete(`${BASE}/api/forum/posts/p1`, () => {
+        soDelete += 1;
+        return HttpResponse.json(envelope(post({ postId: 'p1', status: 'DELETED' })));
+      }),
+    );
+
+    const { result } = await renderHookGhiBai();
+    await waitFor(() => expect(result.current.feed.isSuccess).toBe(true));
+
+    await act(async () => {
+      onlineManager.setOnline(false);
+    });
+    try {
+      await act(async () => {
+        await result.current.xoaBai.mutateAsync('p1');
+      });
+
+      expect(soDelete).toBe(1);
+      expect(result.current.xoaBai.isPaused).toBe(false);
+      expect(result.current.xoaBai.isSuccess).toBe(true);
+    } finally {
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
+    await nhuongMotNhip();
+  });
+
+  it('xoá xong thì cache chi tiết mang status DELETED, không còn nói bài vẫn sống', async () => {
+    // Không `removeQueries` (observer đang sống sẽ refetch rồi nhận 404), nhưng
+    // cũng không được để nguyên bản cũ: suốt `gcTime` 5 phút cache vẫn khai bài
+    // là 'PUBLISHED'. Backend trả về chính bài đó với status mới — dùng nó.
+    server.use(
+      binhLuanOk([]),
+      feedOk([]),
+      http.get(`${BASE}/api/forum/posts`, () => HttpResponse.json(envelope(cursorPage([])))),
+      http.get(`${BASE}/api/forum/posts/p1`, () => HttpResponse.json(envelope(post()))),
+      http.delete(`${BASE}/api/forum/posts/p1`, () =>
+        HttpResponse.json(envelope(post({ postId: 'p1', status: 'DELETED' }))),
+      ),
+    );
+
+    const { result } = await renderHookGhiBai();
+    await waitFor(() => expect(result.current.chiTiet.data?.status).toBe('PUBLISHED'));
+
+    await act(async () => {
+      await result.current.xoaBai.mutateAsync('p1');
+    });
+
+    await waitFor(() => expect(result.current.chiTiet.data?.status).toBe('DELETED'));
     await nhuongMotNhip();
   });
 });

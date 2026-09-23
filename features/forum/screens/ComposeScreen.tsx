@@ -14,8 +14,17 @@
  */
 
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  BackHandler,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
 import { trangThaiTai } from '@/core/api/queryState';
@@ -55,6 +64,13 @@ export function ComposeScreen({ postId }: { postId?: string }) {
    * `data` đổi thì một lần refetch nền sẽ xoá đúng thứ người dùng đang gõ dở.
    */
   const daNapBaiCu = useRef(false);
+  // Mở lại chốt khi chuyển sang bài khác trong cùng một instance. Hiện
+  // `router.push` luôn dựng instance mới nên chưa với tới được, nhưng một lần
+  // `router.setParams`/`replace` sau này sẽ khiến form sửa bài B hiện nội dung
+  // bài A mà không có gì báo.
+  useEffect(() => {
+    daNapBaiCu.current = false;
+  }, [postId]);
   useEffect(() => {
     if (daNapBaiCu.current || !baiCanSua.data) {
       return;
@@ -76,13 +92,54 @@ export function ComposeScreen({ postId }: { postId?: string }) {
     content.length <= CONTENT_MAX &&
     topicId !== null;
 
+  /**
+   * Có gì đang gõ dở mà chưa gửi không?
+   *
+   * Ở chế độ sửa, "bản nháp" nghĩa là KHÁC bài gốc — mở form sửa rồi thoát ngay
+   * không phải là mất gì cả.
+   */
+  const coBanNhap = dangSua
+    ? title !== (baiCanSua.data?.title ?? '') ||
+      content !== (baiCanSua.data?.content ?? '') ||
+      topicId !== (baiCanSua.data?.forumTopic.id ?? null)
+    : title.trim().length > 0 || content.trim().length > 0;
+
+  const [dangHoiRoiDi, setDangHoiRoiDi] = useState(false);
+
+  /** Rời màn hình cho an toàn: stack có thể rỗng nếu vào thẳng bằng deep link. */
+  const roiDi = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/(tabs)');
+  }, [router]);
+
+  const thuRoiDi = useCallback(() => {
+    if (coBanNhap) {
+      setDangHoiRoiDi(true);
+      return;
+    }
+    roiDi();
+  }, [coBanNhap, roiDi]);
+
+  // Nút back cứng của Android cũng phải đi qua cùng một câu hỏi, nếu không nó là
+  // một đường thoát bí mật làm mất trắng tới 5000 ký tự vừa gõ.
+  useEffect(() => {
+    const dangKy = BackHandler.addEventListener('hardwareBackPress', () => {
+      thuRoiDi();
+      return true;
+    });
+    return () => dangKy.remove();
+  }, [thuRoiDi]);
+
   const gui = () => {
     if (!guiDuoc || topicId === null) {
       return;
     }
     guiBai.mutate(
       { title: title.trim(), content: content.trim(), forumTopicId: topicId },
-      { onSuccess: () => router.back() },
+      { onSuccess: roiDi },
     );
   };
 
@@ -117,6 +174,16 @@ export function ComposeScreen({ postId }: { postId?: string }) {
     );
   }
 
+  // Chủ đề là bắt buộc để đăng bài, nên tải chủ đề hỏng KHÔNG được nuốt lặng
+  // bằng `topics.data ?? []`: form vẫn vẽ đầy đủ, nút Đăng bài khoá vĩnh viễn,
+  // và người dùng không có cách nào biết vì sao hay thử lại.
+  const trangThaiChuDe = trangThaiTai({
+    isPaused: topics.isPaused,
+    isPending: topics.isPending,
+    isError: topics.isError,
+    coDuLieu: (topics.data?.length ?? 0) > 0,
+  });
+
   if (dangSua && trangThaiBaiCu === 'loi') {
     // Đây là lỗi ĐỌC bài cũ, không phải lỗi ghi: thử lại ở đây vô hại và không
     // đụng tới hạn mức đăng bài, nên nút hành động được phép xuất hiện.
@@ -127,11 +194,52 @@ export function ComposeScreen({ postId }: { postId?: string }) {
     );
   }
 
+  if (trangThaiChuDe === 'mat-ket-noi') {
+    return (
+      <Screen testID="man-hinh-soan-bai">
+        <OfflineBanner />
+        <EmptyState
+          title="Không có kết nối"
+          description="Danh sách chủ đề sẽ tải khi có mạng trở lại."
+        />
+      </Screen>
+    );
+  }
+
+  if (trangThaiChuDe === 'loi') {
+    // Lỗi ĐỌC danh sách chủ đề: thử lại vô hại, không đụng hạn mức đăng bài.
+    return (
+      <Screen testID="man-hinh-soan-bai">
+        <ErrorView error={topics.error} onAction={() => void topics.refetch()} />
+      </Screen>
+    );
+  }
+
   const loi = guiBai.isError ? toUserMessage(guiBai.error) : null;
 
   return (
     <Screen testID="man-hinh-soan-bai">
       <OfflineBanner />
+
+      {/*
+        Thanh trên cùng tự vẽ thay cho header của Stack: nút quay lại phải đi qua
+        `thuRoiDi` để hỏi trước khi vứt bản nháp. `app/forum/_layout.tsx` vì thế
+        tắt header cho riêng route này.
+      */}
+      <View className="flex-row items-center gap-3 border-b border-border-light px-4 py-3">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Quay lại"
+          testID="nut-quay-lai"
+          onPress={thuRoiDi}
+        >
+          <Text className="text-base text-primary">Quay lại</Text>
+        </Pressable>
+        <Text className="text-base font-semibold text-text-main">
+          {dangSua ? 'Sửa bài viết' : 'Đăng bài mới'}
+        </Text>
+      </View>
+
       <ScrollView contentContainerClassName="gap-3 p-4">
         <TextInput
           accessibilityLabel="Tiêu đề bài viết"
@@ -145,7 +253,14 @@ export function ComposeScreen({ postId }: { postId?: string }) {
           {title.length}/{TITLE_MAX}
         </Text>
 
-        <TopicChips topics={topics.data ?? []} selectedTopicId={topicId} onSelect={setTopicId} />
+        <TopicChips
+          topics={topics.data ?? []}
+          selectedTopicId={topicId}
+          onSelect={setTopicId}
+          // "Tất cả" nghĩa là bỏ lọc — ở đây nó sẽ đọc thành "bỏ chủ đề" và
+          // khoá nút Đăng bài mà không giải thích gì.
+          choPhepBoChon={false}
+        />
 
         <TextInput
           accessibilityLabel="Nội dung bài viết"
@@ -182,6 +297,31 @@ export function ComposeScreen({ postId }: { postId?: string }) {
           testID="nut-dang-bai"
         />
       </ScrollView>
+
+      <Modal
+        visible={dangHoiRoiDi}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDangHoiRoiDi(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/40 px-8">
+          <View testID="hop-xac-nhan-roi-di" className="w-full gap-3 rounded-lg bg-surface p-4">
+            <Text className="text-base font-semibold text-text-main">Bỏ bài đang soạn?</Text>
+            <Text className="text-text-secondary">
+              Nội dung bạn vừa gõ chưa được gửi đi và sẽ mất.
+            </Text>
+            <View className="flex-row justify-end gap-2">
+              <Button
+                label="Soạn tiếp"
+                variant="secondary"
+                onPress={() => setDangHoiRoiDi(false)}
+                testID="nut-soan-tiep"
+              />
+              <Button label="Bỏ luôn" variant="danger" onPress={roiDi} testID="nut-bo-ban-nhap" />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }

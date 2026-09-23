@@ -10,12 +10,14 @@ import { Stack } from 'expo-router';
  */
 export default function ForumLayout() {
   return (
-    <Stack
-      screenOptions={{
-        headerShown: true,
-        headerBackTitle: 'Quay lại',
-        headerTitle: 'Bài viết',
-      }}
-    />
+    <Stack screenOptions={{ headerShown: true, headerBackTitle: 'Quay lại' }}>
+      <Stack.Screen name="[postId]" options={{ headerTitle: 'Bài viết' }} />
+      {/*
+        Màn soạn bài tự vẽ thanh trên cùng của nó: nút quay lại ở đó phải hỏi
+        trước khi vứt bản nháp, mà header của Stack thì không làm được việc đó
+        bằng API công khai của expo-router 57.
+      */}
+      <Stack.Screen name="compose" options={{ headerShown: false }} />
+    </Stack>
   );
 }

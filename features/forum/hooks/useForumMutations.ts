@@ -286,11 +286,14 @@ export function useUpdatePost(postId: string) {
 /**
  * Xoá mềm bài viết của chính mình.
  *
- * CHỈ làm mới các danh sách. Cache chi tiết của bài vừa xoá được để nguyên cho
- * `gcTime` dọn: màn hình chi tiết vẫn còn mounted ngay lúc này (nó mới là nơi
- * bấm nút xoá), nên vứt cache của nó đi chỉ khiến observer đang sống gọi lại
- * `GET /api/forum/posts/{id}` và nhận 404 — một màn hình lỗi loé lên ngay trước
- * khi điều hướng quay lại.
+ * KHÔNG `removeQueries` cache chi tiết: màn hình chi tiết vẫn còn mounted ngay
+ * lúc này (nó mới là nơi bấm nút xoá), nên vứt cache đi chỉ khiến observer đang
+ * sống gọi lại `GET /api/forum/posts/{id}` và nhận 404 — một màn hình lỗi loé
+ * lên ngay trước khi điều hướng quay lại.
+ *
+ * Nhưng cũng KHÔNG để nguyên bản cũ: backend trả về chính bài đó với
+ * `status: 'DELETED'`, nên ghi đè bằng nó. Vừa không kích hoạt refetch, vừa
+ * không để lại một bản cache nói bài vẫn 'PUBLISHED' suốt `gcTime`.
  */
 export function useDeletePost() {
   const queryClient = useQueryClient();
@@ -298,7 +301,8 @@ export function useDeletePost() {
   return useMutation({
     networkMode: 'always',
     mutationFn: (postId: string) => forumRepo.deletePost(postId),
-    onSuccess: () => {
+    onSuccess: (baiDaXoa) => {
+      queryClient.setQueryData(forumKeys.post(baiDaXoa.postId), baiDaXoa);
       lamMoiDanhSachBai(queryClient);
     },
   });

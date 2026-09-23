@@ -13,6 +13,14 @@ export interface TopicChipsProps {
   topics: ForumTopicResponse[];
   selectedTopicId: string | null;
   onSelect: (topicId: string | null) => void;
+  /**
+   * Có vẽ chip "Tất cả" (nghĩa là bỏ lọc) hay không.
+   *
+   * Màn danh sách cần nó. Màn SOẠN BÀI thì không: ở đó "Tất cả" đọc thành "bỏ
+   * chủ đề", và bấm vào sẽ khoá nút Đăng bài mà không một dòng nào giải thích —
+   * một khái niệm của màn đọc rò sang màn ghi.
+   */
+  choPhepBoChon?: boolean;
 }
 
 function Chip({
@@ -42,14 +50,21 @@ function Chip({
   );
 }
 
-export function TopicChips({ topics, selectedTopicId, onSelect }: TopicChipsProps) {
+export function TopicChips({
+  topics,
+  selectedTopicId,
+  onSelect,
+  choPhepBoChon = true,
+}: TopicChipsProps) {
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerClassName="gap-2 px-4 py-2"
     >
-      <Chip label="Tất cả" active={selectedTopicId === null} onPress={() => onSelect(null)} />
+      {choPhepBoChon ? (
+        <Chip label="Tất cả" active={selectedTopicId === null} onPress={() => onSelect(null)} />
+      ) : null}
       {topics.map((topic) => (
         <Chip
           key={topic.id}
