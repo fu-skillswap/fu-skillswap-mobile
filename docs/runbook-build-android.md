@@ -235,6 +235,13 @@ cho ông biết vì sao.
    `preview` và `production` luôn tắt bất kể biến môi trường có giá trị gì. Đây là
    thứ duy nhất ngăn một bản lên Play Store đi kèm đường vòng qua đăng nhập, và có
    test khoá đúng điều đó (`core/config/env.test.ts`).
+
+   Ngoài ra, MSW và toàn bộ fixture còn bị loại khỏi **bundle** của bản không bật
+   mock: `metro.config.js` đổi hướng `core/dev/mockHandlers` sang bản rỗng khi
+   `EXPO_PUBLIC_MOCK_MODE !== '1'`. Đo được bằng
+   `npx expo export --platform android`: **4.1MB** khi tắt so với **5.0MB** khi
+   bật. Mặc định là loại bỏ, nên quên đặt biến thì mất chế độ mock chứ không lỡ
+   ship MSW.
 2. **Mock không có trạng thái.** Thả tim, đăng bài, gửi bình luận đều phản hồi hợp
    lệ nhưng không ghi lại: kéo xuống làm mới là mọi thứ về như cũ. Đủ để xem giao
    diện phản ứng, không phải một backend thu nhỏ.
