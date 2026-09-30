@@ -103,18 +103,43 @@ eas credentials    # → Android → keystore → Download
 
 Ba profile trong `eas.json`:
 
-| Profile | Lệnh | Ra cái gì | Dùng khi |
-|---|---|---|---|
-| `development` | `npm run build:dev` | APK + development client | Vừa chạy Metro vừa sửa code, reload nóng |
-| `preview` | `npm run build:preview` | APK độc lập | Đưa người khác cài thử, không cần Metro |
-| `production` | `npm run build:prod` | AAB | Nộp Play Store (Play chỉ nhận AAB) |
+| Profile | Lệnh | Ra cái gì | `__DEV__` | Chế độ mock chạy được? |
+|---|---|---|---|---|
+| `development` | `npm run build:dev` | APK debug + development client | `true` | **Có** |
+| `preview` | `npm run build:preview` | APK release độc lập | `false` | Không |
+| `production` | `npm run build:prod` | AAB (Play chỉ nhận AAB) | `false` | Không |
 
-Lần đầu nên dùng **`preview`**: một file APK, cài là chạy, không cần Metro — đủ để
-trả lời câu "app có chạy trên máy thật không".
+### Lần đầu dùng profile nào — tuỳ ông muốn thấy gì
+
+**Muốn XEM GIAO DIỆN (diễn đàn, hồ sơ...) khi backend chưa xong → `development`.**
+
+```bash
+npm run build:dev     # build một lần, ~10-20 phút
+npx expo start        # rồi mở Metro mỗi khi muốn chạy
+```
+
+Chỉ `development` mới bật được chế độ mock. Lý do: `developmentClient: true` làm
+EAS build bằng `:app:assembleDebug` (xem
+https://docs.expo.dev/eas/json/), nên `__DEV__` là `true` — và `isMockMode()` yêu
+cầu `__DEV__` để bản phát hành không thể đi đường vòng qua đăng nhập. `eas.json`
+đã cắm sẵn `EXPO_PUBLIC_MOCK_MODE=1` cho riêng profile này.
+
+Đánh đổi: bản `development` cần Metro đang chạy trên máy tính cùng mạng Wi-Fi mới
+mở được app.
+
+**Muốn biết app có compile và chạy độc lập được không → `preview`.**
 
 ```bash
 npm run build:preview
 ```
+
+Một file APK, cài là chạy, không cần Metro. Nhưng nó là bản **release** nên
+`__DEV__` là `false`: chế độ mock tắt, app đi vào backend thật, và **sẽ dừng ở màn
+hình đăng nhập** cho tới khi backend có `/api/auth/google/mobile` (mục 5).
+
+Giá trị riêng của `preview`: nó vẫn trả lời được câu hỏi lớn nhất hiện nay — hai
+native module (`@preeternal/react-native-cookie-manager`, google-signin) có compile
+được trên New Architecture hay không.
 
 Build chạy trên máy của EAS, khoảng 10–20 phút. Xong thì nó in một link; mở link
 đó trên điện thoại rồi tải APK, hoặc quét QR. Android sẽ hỏi cho phép cài từ
@@ -169,6 +194,63 @@ hỏng.
 trên máy thật hay giả lập lần nào**. Bản build này là lần đầu.
 
 ---
+
+---
+
+## 5b. Chế độ mock — xem giao diện khi backend chưa sẵn sàng
+
+Đăng nhập thật đang bị chặn (mục 5). Chế độ mock bỏ qua chỗ đó để xem mọi màn
+hình đã dựng, với dữ liệu giả.
+
+### Bật thế nào
+
+**Với bản `development` build từ EAS: đã bật sẵn.** `eas.json` cắm
+`EXPO_PUBLIC_MOCK_MODE=1` cho riêng profile đó, không cần làm gì thêm.
+
+**Với Metro chạy từ máy tính**, thêm vào `.env`:
+
+```
+EXPO_PUBLIC_MOCK_MODE=1
+EXPO_PUBLIC_FORUM_BOT_USER_ID=bot-user-id
+```
+
+Biến thứ hai không phải tuỳ chọn cho vui: `isBotComment` **cố ý** trả `false` khi
+nó rỗng (gắn nhầm badge "AI" cho một sinh viên thật là quy sai tác giả, tệ hơn
+thiếu badge). Không có nó thì bình luận của bot không có badge và không có gì báo
+cho ông biết vì sao.
+
+### Khi bật, chuyện gì xảy ra
+
+- MSW chạy **ngay trong app**, trả lời mọi `/api/*` bằng dữ liệu giả.
+- Bấm "Đăng nhập với Google" **không** mở hộp thoại Google — app nhận token giả và
+  vào thẳng các tab. Màn hình đăng nhập **vẫn xem được** trước đó, vì lần refresh
+  đầu cố ý trả 401 như một máy chưa có phiên.
+- Dòng `[mock] MSW đã bật` xuất hiện trong Metro để biết chắc nó đang chạy.
+- Xem được: tab **Diễn đàn** (lướt, lọc chủ đề, tìm kiếm, mở bài, cây bình luận,
+  badge "AI") và tab **Hồ sơ** (mã sinh viên, cơ sở, ngành, chuyên ngành, đăng xuất).
+
+### Ba giới hạn, đều là chủ ý
+
+1. **Chỉ chạy trên bản dev.** `isMockMode()` yêu cầu cả `__DEV__`, nên bản
+   `preview` và `production` luôn tắt bất kể biến môi trường có giá trị gì. Đây là
+   thứ duy nhất ngăn một bản lên Play Store đi kèm đường vòng qua đăng nhập, và có
+   test khoá đúng điều đó (`core/config/env.test.ts`).
+
+   Ngoài ra, MSW và toàn bộ fixture còn bị loại khỏi **bundle** của bản không bật
+   mock: `metro.config.js` đổi hướng `core/dev/mockHandlers` sang bản rỗng khi
+   `EXPO_PUBLIC_MOCK_MODE !== '1'`. Đo được bằng
+   `npx expo export --platform android`: **4.1MB** khi tắt so với **5.0MB** khi
+   bật. Mặc định là loại bỏ, nên quên đặt biến thì mất chế độ mock chứ không lỡ
+   ship MSW.
+2. **Mock không có trạng thái.** Thả tim, đăng bài, gửi bình luận đều phản hồi hợp
+   lệ nhưng không ghi lại: kéo xuống làm mới là mọi thứ về như cũ. Đủ để xem giao
+   diện phản ứng, không phải một backend thu nhỏ.
+3. **Endpoint chưa mock được cho đi thật** (`onUnhandledRequest: 'bypass'`), nên
+   màn hình chưa mock hiện lỗi mạng chứ không làm app chết. Ba tab Đặt lịch, Lịch,
+   Trợ lý AI vẫn là placeholder nên chưa gọi gì.
+
+Ảnh trong bài viết trỏ `picsum.photos` nên cần mạng mới hiện; không có mạng thì ô
+ảnh trống, phần còn lại vẫn chạy.
 
 ## 6. Còn lại gì để lên Google Play
 

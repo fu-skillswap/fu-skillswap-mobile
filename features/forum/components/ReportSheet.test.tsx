@@ -27,7 +27,18 @@ describe('ReportSheet', () => {
       reasonType: 'SPAM',
       description: undefined,
     });
-  });
+    // 20s cho ĐÚNG test đầu tiên của file.
+    //
+    // Test này chịu toàn bộ chi phí nạp module của môi trường React Native trong
+    // worker; các test sau chỉ mất vài ms. Khi cả suite chạy song song, worker bị
+    // tranh chấp và lần render đầu vượt mốc mặc định 5s — đã đo: chạy riêng file
+    // thì 7/7 xanh trong ~0.4s, chạy full suite thì đỏ 5/6 lần với
+    // "Exceeded timeout of 5000 ms" và file mất ~9.4s.
+    //
+    // Đây KHÔNG phải sản phẩm chậm, và cũng không nới `testTimeout` toàn cục
+    // (nằm trong `package.json`, mà Global Constraints cấm sửa) để không che
+    // những test thật sự chậm ở nơi khác.
+  }, 20_000);
 
   it('chưa chọn lý do thì không gửi được', async () => {
     // `reasonType` là trường bắt buộc của backend (forum.md §6.1): gửi thiếu nó

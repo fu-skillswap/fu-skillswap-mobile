@@ -81,3 +81,7 @@ Cho tới khi endpoint đó lên, spike R1/R2 trong `docs/spike/` chưa kết lu
 Toàn bộ bằng chứng hiện có là test và typecheck. Hai native module ở trên **chưa
 được biên dịch lần nào** — bản EAS build đầu tiên là lần đầu biết chúng có compile
 được trên New Architecture hay không.
+
+Muốn xem giao diện trước khi backend xong: **chế độ mock**, bật bằng
+`EXPO_PUBLIC_MOCK_MODE=1` và chỉ chạy trên bản dev. Xem mục 5b của
+[`docs/runbook-build-android.md`](docs/runbook-build-android.md).
