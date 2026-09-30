@@ -1,5 +1,5 @@
 import { resetEnvCache } from '@/core/config/env';
-import { buildCommentTree, isBotComment } from '@/features/forum/commentTree';
+import { buildCommentTree, isBotComment, resolveReplyTarget } from '@/features/forum/commentTree';
 import type { ForumCommentResponse } from '@/features/forum/types';
 
 function comment(
@@ -87,5 +87,17 @@ describe('isBotComment', () => {
       // giả cho một sinh viên thật, và sẽ không ai báo lỗi cho mình biết.
       expect(isBotComment(comment('c1', { authorUserId: '' }))).toBe(false);
     });
+  });
+});
+
+describe('resolveReplyTarget', () => {
+  it('trả lời một bình luận gốc thì gửi chính id của nó', () => {
+    expect(resolveReplyTarget(comment('c1'))).toBe('c1');
+  });
+
+  it('trả lời một reply thì vẫn gửi id của bình luận GỐC', () => {
+    // Backend từ chối reply lồng trong reply với lỗi 400. Đây là chỗ duy nhất
+    // biết cách quy về gốc, để màn hình không phải tự nhớ luật.
+    expect(resolveReplyTarget(comment('r1', { replyToCommentId: 'c1' }))).toBe('c1');
   });
 });

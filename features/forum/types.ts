@@ -105,3 +105,39 @@ export interface ForumPostUpsertRequest {
    */
   imageUrls?: string[];
 }
+
+/**
+ * Payload tạo bình luận (`POST /api/forum/posts/{postId}/comments`).
+ *
+ * Giới hạn độ dài là của backend (forum.md §4.3) và giao diện phải chặn TRƯỚC
+ * khi gửi: một lần gửi hỏng vẫn tiêu một lượt trong hạn mức 20 bình luận/10 phút.
+ */
+export interface ForumCommentUpsertRequest {
+  /** Bắt buộc, tối đa 2000 ký tự */
+  content: string;
+  /**
+   * Tối đa 1 URL. Giai đoạn này KHÔNG gửi: `forum.md` không mô tả endpoint
+   * upload ảnh cho diễn đàn nên không có cách lấy URL hợp lệ mà không bịa.
+   */
+  imageUrls?: string[];
+  /**
+   * ID bình luận GỐC nếu đây là reply, `null` nếu là bình luận mới.
+   *
+   * Luôn lấy qua `resolveReplyTarget`: backend chỉ hỗ trợ 1 cấp và trả `400`
+   * "Chỉ hỗ trợ trả lời bình luận 1 cấp" nếu nhận ID của một reply.
+   */
+  replyToCommentId?: string | null;
+}
+
+/** Lý do báo cáo vi phạm (forum.md §6.1) */
+export type ForumReportReason = 'SPAM' | 'OFF_TOPIC' | 'HARASSMENT' | 'MISLEADING' | 'OTHER';
+
+/** Payload báo cáo vi phạm (`POST /api/forum/reports`) */
+export interface ForumReportCreateRequest {
+  targetType: 'POST' | 'COMMENT';
+  /** UUID của bài viết hoặc bình luận bị báo cáo */
+  targetId: string;
+  reasonType: ForumReportReason;
+  /** Tối đa 1000 ký tự */
+  description?: string;
+}

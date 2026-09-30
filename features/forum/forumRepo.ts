@@ -8,8 +8,10 @@ import { apiClient } from '@/core/api/client';
 import type { CursorPageResponse } from '@/core/api/pagination';
 import type {
   ForumCommentResponse,
+  ForumCommentUpsertRequest,
   ForumPostResponse,
   ForumPostUpsertRequest,
+  ForumReportCreateRequest,
   ForumTopicResponse,
 } from '@/features/forum/types';
 
@@ -122,5 +124,41 @@ export const forumRepo = {
     return apiClient<ForumCommentResponse>(`/api/forum/comments/${commentId}/reaction`, {
       method: 'DELETE',
     });
+  },
+
+  /**
+   * Tạo bình luận, hoặc trả lời một bình luận gốc (forum.md §4.3).
+   *
+   * `input.replyToCommentId` phải là ID bình luận GỐC — repo không tự quy đổi,
+   * việc đó thuộc `resolveReplyTarget`; ở đây mà đoán thêm thì có hai nơi cùng
+   * biết một luật và chúng sẽ lệch nhau.
+   */
+  createComment(postId: string, input: ForumCommentUpsertRequest) {
+    return apiClient<ForumCommentResponse>(`/api/forum/posts/${postId}/comments`, {
+      method: 'POST',
+      data: input,
+    });
+  },
+
+  /**
+   * Xoá bình luận của chính mình (forum.md §4.5); backend từ chối bình luận của
+   * người khác bằng 403. Xoá bình luận gốc thì backend xoá luôn mọi reply của nó
+   * và trừ đúng số đó vào `commentCount` của bài.
+   */
+  deleteComment(commentId: string) {
+    return apiClient<ForumCommentResponse>(`/api/forum/comments/${commentId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Báo cáo một bài viết hoặc bình luận (forum.md §6.1).
+   *
+   * Trả về `unknown`: `forum.md` chỉ nói phản hồi là `ForumReportResponse` mà
+   * không mô tả trường nào, và không chỗ nào trên mobile cần đọc nó. Bịa ra một
+   * DTO để typecheck xanh là đúng lớp lỗi mà Global Constraints cấm.
+   */
+  createReport(input: ForumReportCreateRequest) {
+    return apiClient<unknown>('/api/forum/reports', { method: 'POST', data: input });
   },
 };

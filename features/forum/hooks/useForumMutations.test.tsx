@@ -8,8 +8,11 @@ import React from 'react';
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
 import {
+  useCreateComment,
   useCreatePost,
+  useDeleteComment,
   useDeletePost,
+  useReport,
   useToggleCommentLike,
   useTogglePostLike,
   useUpdatePost,
@@ -980,6 +983,192 @@ describe('useDeletePost', () => {
     });
 
     await waitFor(() => expect(result.current.chiTiet.data?.status).toBe('DELETED'));
+    await nhuongMotNhip();
+  });
+});
+
+/**
+ * Ba hook ghi bình luận cùng sống trong MỘT renderHook, kèm newsfeed và màn chi
+ * tiết — đúng cảnh thật: gửi một bình luận thì danh sách bình luận, số bình luận
+ * của bài đang mở và số bình luận ở newsfeed đều phải nói cùng một câu chuyện.
+ */
+function renderHookGhiBinhLuan() {
+  return renderHook(
+    () => ({
+      feed: useForumList({}),
+      chiTiet: useForumPost('p1'),
+      binhLuan: useForumComments('p1'),
+      taoBinhLuan: useCreateComment('p1'),
+      xoaBinhLuan: useDeleteComment('p1'),
+      baoCao: useReport(),
+    }),
+    { wrapper },
+  );
+}
+
+/** Trả về bài viết khác nhau cho mỗi lần gọi, để thấy được có tải lại hay không */
+function traBaiLanLuot(cacLan: Record<string, unknown>[]) {
+  let lan = 0;
+  return () => {
+    const bai = cacLan[Math.min(lan, cacLan.length - 1)]!;
+    lan += 1;
+    return HttpResponse.json(envelope(bai));
+  };
+}
+
+describe('useCreateComment', () => {
+  it('bình luận xong thì tải lại CẢ danh sách bình luận LẪN bài viết', async () => {
+    // Bỏ một trong hai: bình luận vừa gửi không xuất hiện, hoặc dòng "N bình
+    // luận" ở đầu bài đứng yên ở số cũ — cả hai đều khiến người dùng gửi lại.
+    server.use(
+      feedOk([post()]),
+      http.get(`${BASE}/api/forum/posts/p1`, traBaiLanLuot([post({ commentCount: 0 }), post({ commentCount: 1 })])),
+      http.get(`${BASE}/api/forum/posts/p1/comments`, traLanLuot([[], [comment('c1')]])),
+      http.post(`${BASE}/api/forum/posts/p1/comments`, () =>
+        HttpResponse.json(envelope(comment('c1'))),
+      ),
+    );
+
+    const { result } = await renderHookGhiBinhLuan();
+    await waitFor(() => expect(result.current.chiTiet.data?.commentCount).toBe(0));
+    await waitFor(() => expect(result.current.binhLuan.isSuccess).toBe(true));
+
+    await act(async () => {
+      await result.current.taoBinhLuan.mutateAsync({ content: 'Toi cung thac mac' });
+    });
+
+    await waitFor(() => expect(result.current.binhLuan.comments).toHaveLength(1));
+    await waitFor(() => expect(result.current.chiTiet.data?.commentCount).toBe(1));
+    await nhuongMotNhip();
+  });
+
+  it('bình luận xong thì số bình luận ở NEWSFEED cũng mới lại', async () => {
+    // Người dùng bình luận rồi bấm quay lại: thẻ bài trong feed vẫn hiện số cũ
+    // suốt `staleTime` nếu không đánh dấu danh sách là cũ.
+    server.use(
+      http.get(`${BASE}/api/forum/feed`, traLanLuot([[post({ commentCount: 0 })], [post({ commentCount: 1 })]])),
+      baiVietOk(),
+      binhLuanOk([]),
+      http.post(`${BASE}/api/forum/posts/p1/comments`, () =>
+        HttpResponse.json(envelope(comment('c1'))),
+      ),
+    );
+
+    const { result } = await renderHookGhiBinhLuan();
+    await waitFor(() => expect(result.current.feed.posts[0]?.commentCount).toBe(0));
+
+    await act(async () => {
+      await result.current.taoBinhLuan.mutateAsync({ content: 'Toi cung thac mac' });
+    });
+
+    await waitFor(() => expect(result.current.feed.posts[0]?.commentCount).toBe(1));
+    await nhuongMotNhip();
+  });
+
+  it('mất mạng thì vẫn GỬI NGAY và kết thúc, không nằm im chờ có mạng', async () => {
+    // Thiếu `networkMode: 'always'`, mutation nằm ở trạng thái hoãn: nút "Gửi"
+    // quay mãi, `mutateAsync` không bao giờ trả lời, và ô nhập không được dọn
+    // nên người dùng tưởng mình chưa gõ gì.
+    let soPost = 0;
+    server.use(
+      feedOk([]),
+      baiVietOk(),
+      binhLuanOk([]),
+      http.post(`${BASE}/api/forum/posts/p1/comments`, () => {
+        soPost += 1;
+        return HttpResponse.json(envelope(comment('c1')));
+      }),
+    );
+
+    const { result } = await renderHookGhiBinhLuan();
+    await waitFor(() => expect(result.current.feed.isSuccess).toBe(true));
+
+    await act(async () => {
+      onlineManager.setOnline(false);
+    });
+    try {
+      await act(async () => {
+        await result.current.taoBinhLuan.mutateAsync({ content: 'Toi cung thac mac' });
+      });
+
+      expect(soPost).toBe(1);
+      expect(result.current.taoBinhLuan.isPaused).toBe(false);
+      expect(result.current.taoBinhLuan.isSuccess).toBe(true);
+    } finally {
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
+    await nhuongMotNhip();
+  });
+});
+
+describe('useDeleteComment', () => {
+  it('xoá xong thì bình luận biến khỏi danh sách và số bình luận của bài giảm', async () => {
+    // Backend xoá theo kiểu cascade (gốc kéo theo mọi reply), nên số bình luận
+    // mới phải LẤY TỪ MÁY CHỦ chứ không trừ đi 1 tại chỗ.
+    server.use(
+      feedOk([post()]),
+      http.get(`${BASE}/api/forum/posts/p1`, traBaiLanLuot([post({ commentCount: 2 }), post({ commentCount: 0 })])),
+      http.get(`${BASE}/api/forum/posts/p1/comments`, traLanLuot([[comment('c1'), comment('r1', { replyToCommentId: 'c1' })], []])),
+      http.delete(`${BASE}/api/forum/comments/c1`, () =>
+        HttpResponse.json(envelope(comment('c1', { status: 'DELETED' }))),
+      ),
+    );
+
+    const { result } = await renderHookGhiBinhLuan();
+    await waitFor(() => expect(result.current.binhLuan.comments).toHaveLength(1));
+    await waitFor(() => expect(result.current.chiTiet.data?.commentCount).toBe(2));
+
+    await act(async () => {
+      await result.current.xoaBinhLuan.mutateAsync('c1');
+    });
+
+    await waitFor(() => expect(result.current.binhLuan.comments).toHaveLength(0));
+    await waitFor(() => expect(result.current.chiTiet.data?.commentCount).toBe(0));
+    await nhuongMotNhip();
+  });
+});
+
+describe('useReport', () => {
+  it('gửi đúng payload báo cáo, và mất mạng thì vẫn gửi ngay chứ không nằm im', async () => {
+    // Báo cáo không có cập nhật lạc quan nào để hoàn tác, nhưng vẫn cần
+    // `networkMode: 'always'`: hoãn lại thì hộp báo cáo đứng im với nút đang
+    // quay, người dùng đóng đi và tưởng đã báo cáo xong.
+    let body: unknown = null;
+    server.use(
+      feedOk([]),
+      baiVietOk(),
+      binhLuanOk([]),
+      http.post(`${BASE}/api/forum/reports`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(envelope({ reportId: 'r1' }));
+      }),
+    );
+
+    const { result } = await renderHookGhiBinhLuan();
+    await waitFor(() => expect(result.current.feed.isSuccess).toBe(true));
+
+    await act(async () => {
+      onlineManager.setOnline(false);
+    });
+    try {
+      await act(async () => {
+        await result.current.baoCao.mutateAsync({
+          targetType: 'COMMENT',
+          targetId: 'c1',
+          reasonType: 'SPAM',
+        });
+      });
+
+      expect(body).toEqual({ targetType: 'COMMENT', targetId: 'c1', reasonType: 'SPAM' });
+      expect(result.current.baoCao.isPaused).toBe(false);
+      expect(result.current.baoCao.isSuccess).toBe(true);
+    } finally {
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
     await nhuongMotNhip();
   });
 });

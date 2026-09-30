@@ -8,11 +8,23 @@
  *
  * Việc quy cờ của TanStack thành một trạng thái hiển thị nằm ở
  * `core/api/queryState.ts` — đọc JSDoc ở đó trước khi sửa mấy nhánh dưới đây.
+ *
+ * Ô nhập bình luận nằm ở đây, nhưng luật 1 cấp thì KHÔNG: màn hình chỉ nhớ người
+ * dùng đang trả lời bình luận nào, còn việc quy về bình luận GỐC là của
+ * `resolveReplyTarget`. Gửi thẳng id của một reply thì backend trả `400`.
  */
 
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
 import { trangThaiTai } from '@/core/api/queryState';
@@ -23,9 +35,21 @@ import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
 import { colors } from '@/core/ui/theme';
+import { resolveReplyTarget } from '@/features/forum/commentTree';
 import { CommentItem } from '@/features/forum/components/CommentItem';
-import { useDeletePost, useToggleCommentLike } from '@/features/forum/hooks/useForumMutations';
+import { ReportSheet } from '@/features/forum/components/ReportSheet';
+import type { ReportTarget } from '@/features/forum/components/ReportSheet';
+import {
+  useCreateComment,
+  useDeletePost,
+  useReport,
+  useToggleCommentLike,
+} from '@/features/forum/hooks/useForumMutations';
 import { useForumComments, useForumPost } from '@/features/forum/hooks/useForumQueries';
+import type { ForumCommentResponse } from '@/features/forum/types';
+
+/** Giới hạn của backend, forum.md §4.3 */
+const COMMENT_MAX = 2000;
 
 export function PostDetailScreen({ postId }: { postId: string }) {
   const router = useRouter();
@@ -48,6 +72,60 @@ export function PostDetailScreen({ postId }: { postId: string }) {
   const comments = useForumComments(postId);
   const { toggle: thaTimBinhLuan } = useToggleCommentLike(postId);
   const xoaBai = useDeletePost();
+  const guiBinhLuan = useCreateComment(postId);
+  const baoCao = useReport();
+
+  /**
+   * Bình luận đang được trả lời, `null` là đang viết một bình luận gốc.
+   *
+   * Giữ cả object chứ không chỉ id: chỉ báo "Đang trả lời X" cần tên tác giả, và
+   * `resolveReplyTarget` cần `replyToCommentId` để quy về bình luận gốc.
+   */
+  const [replyTo, setReplyTo] = useState<ForumCommentResponse | null>(null);
+  const [draft, setDraft] = useState('');
+  /** Đối tượng đang bị báo cáo; `null` là chưa mở hộp báo cáo */
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+
+  const guiBinhLuanDuoc = draft.trim().length > 0 && draft.length <= COMMENT_MAX;
+
+  const gui = () => {
+    if (!guiBinhLuanDuoc) {
+      return;
+    }
+    guiBinhLuan.mutate(
+      {
+        content: draft.trim(),
+        // Luật 1 cấp: trả lời một reply VẪN phải trỏ về bình luận GỐC, nếu không
+        // backend trả 400 "Chỉ hỗ trợ trả lời bình luận 1 cấp".
+        // `resolveReplyTarget` là nơi duy nhất biết luật này.
+        replyToCommentId: replyTo ? resolveReplyTarget(replyTo) : null,
+      },
+      {
+        // Chỉ dọn ô nhập KHI backend đã nhận. Dọn trước thì một lần 429 (hạn mức
+        // 20 bình luận/10 phút) làm mất trắng thứ người dùng vừa gõ.
+        onSuccess: () => {
+          setDraft('');
+          setReplyTo(null);
+        },
+      },
+    );
+  };
+
+  /**
+   * Đóng hộp báo cáo và xoá dấu vết của lần gửi trước.
+   *
+   * `useMutation` giữ `error`/`isSuccess` cho tới khi `reset()`; quên reset thì
+   * lần mở hộp sau cho một đối tượng khác lại hiện câu lỗi — hoặc lời cảm ơn —
+   * của lần trước.
+   */
+  const dongHopBaoCao = () => {
+    setReportTarget(null);
+    baoCao.reset();
+  };
+
+  const baoCaoBinhLuan = (comment: ForumCommentResponse) => {
+    setReportTarget({ targetType: 'COMMENT', targetId: comment.commentId });
+  };
 
   /**
    * Hộp xác nhận xoá là một `Modal` TỰ VẼ, không phải `Alert.alert`.
@@ -176,7 +254,18 @@ export function PostDetailScreen({ postId }: { postId: string }) {
                     testID="nut-xoa-bai"
                   />
                 </View>
-              ) : null}
+              ) : (
+                // Báo cáo bài của CHÍNH MÌNH là vô nghĩa, nên nút chỉ hiện với
+                // người khác — và nó nằm đúng chỗ của nút Sửa/Xoá.
+                <View className="flex-row pt-2">
+                  <Button
+                    label="Báo cáo bài viết"
+                    variant="secondary"
+                    onPress={() => setReportTarget({ targetType: 'POST', targetId: postId })}
+                    testID="nut-bao-cao-bai"
+                  />
+                </View>
+              )}
             </View>
           </View>
         }
@@ -191,14 +280,21 @@ export function PostDetailScreen({ postId }: { postId: string }) {
             <CommentItem
               comment={item}
               isReply={Boolean(item.replyToCommentId)}
+              onReply={setReplyTo}
               onToggleLike={thaTimBinhLuan}
+              onReport={baoCaoBinhLuan}
             />
             {item.replies.map((reply) => (
               <CommentItem
                 key={reply.commentId}
                 comment={reply}
                 isReply
+                // `setReplyTo` nhận nguyên bình luận được bấm, KỂ CẢ khi đó là
+                // một reply: việc quy về bình luận gốc là của `resolveReplyTarget`
+                // lúc gửi, không phải của chỗ này.
+                onReply={setReplyTo}
                 onToggleLike={thaTimBinhLuan}
+                onReport={baoCaoBinhLuan}
               />
             ))}
           </View>
@@ -250,6 +346,79 @@ export function PostDetailScreen({ postId }: { postId: string }) {
           )
         }
       />
+
+      {/*
+        Khu nhập bình luận nằm NGOÀI FlatList và dính đáy màn hình: đặt vào
+        `ListFooterComponent` thì nó trôi theo danh sách và biến mất khỏi tầm mắt
+        ngay khi bài có vài bình luận.
+      */}
+      <View className="gap-2 border-t border-border-color bg-surface p-3">
+        {replyTo ? (
+          <View testID="dang-tra-loi" className="flex-row items-center justify-between">
+            <Text className="text-xs text-text-muted">
+              Đang trả lời {replyTo.authorFullName}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Huỷ trả lời"
+              testID="nut-huy-tra-loi"
+              onPress={() => setReplyTo(null)}
+            >
+              <Text className="text-xs text-primary">Huỷ</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {guiBinhLuan.isError ? (
+          // Khối đứng yên ngay trên ô nhập, KHÔNG kèm nút thử lại: hai lỗi hay
+          // gặp nhất ở đây là `FORUM_4201` (từ ngữ vi phạm) và 429 (quá 20 bình
+          // luận/10 phút, hoặc trùng nội dung trong 5 phút). Gửi lại y nguyên
+          // nội dung đó chắc chắn hỏng tiếp và vẫn tiêu một lượt — đúng luật mà
+          // `core/ui/ErrorView.tsx` áp cho `action: 'NONE'`.
+          <View testID="loi-gui-binh-luan" className="gap-1 rounded-md bg-danger-soft p-3">
+            <Text className="font-semibold text-danger">
+              {toUserMessage(guiBinhLuan.error).title}
+            </Text>
+            <Text className="text-danger">{toUserMessage(guiBinhLuan.error).description}</Text>
+            {toUserMessage(guiBinhLuan.error).retryAfterSeconds ? (
+              <Text className="text-danger">
+                Vui lòng thử lại sau {toUserMessage(guiBinhLuan.error).retryAfterSeconds} giây.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        <View className="flex-row items-end gap-2">
+          <TextInput
+            accessibilityLabel="Nội dung bình luận"
+            placeholder={replyTo ? 'Viết câu trả lời' : 'Viết bình luận'}
+            value={draft}
+            onChangeText={setDraft}
+            maxLength={COMMENT_MAX}
+            multiline
+            className="min-h-11 flex-1 rounded-md border border-border-color px-3 py-2 text-text-main"
+          />
+          <Button
+            label="Gửi"
+            onPress={gui}
+            busy={guiBinhLuan.isPending}
+            disabled={!guiBinhLuanDuoc}
+            testID="nut-gui-binh-luan"
+          />
+        </View>
+      </View>
+
+      {reportTarget ? (
+        <ReportSheet
+          visible
+          target={reportTarget}
+          onClose={dongHopBaoCao}
+          onSubmit={(input) => baoCao.mutate(input)}
+          busy={baoCao.isPending}
+          error={baoCao.error}
+          daGui={baoCao.isSuccess}
+        />
+      ) : null}
 
       <Modal
         testID="hop-thoai-xoa"

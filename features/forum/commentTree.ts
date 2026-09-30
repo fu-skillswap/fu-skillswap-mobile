@@ -68,3 +68,15 @@ export function isBotComment(comment: ForumCommentResponse): boolean {
   const botUserId = getEnv().forumBotUserId;
   return botUserId !== '' && comment.authorUserId === botUserId;
 }
+
+/**
+ * Xác định `replyToCommentId` phải gửi lên khi trả lời một bình luận.
+ *
+ * Backend chỉ hỗ trợ 1 cấp: trả lời một reply vẫn phải trỏ về bình luận GỐC,
+ * nếu không sẽ nhận `400` "Chỉ hỗ trợ trả lời bình luận 1 cấp" (forum.md §4.3).
+ * Đây là nơi DUY NHẤT biết luật này — màn hình không được tự nhớ, vì chỗ người
+ * dùng bấm "Trả lời" trên một reply nhìn giống hệt chỗ bấm trên bình luận gốc.
+ */
+export function resolveReplyTarget(comment: ForumCommentResponse): string {
+  return comment.replyToCommentId ?? comment.commentId;
+}

@@ -390,18 +390,233 @@ describe('PostDetailScreen', () => {
     await donHangDoiDanhSach();
   });
 
-  it('chưa có ô nhập thì màn hình KHÔNG được hiện nút Trả lời chết', async () => {
-    // Trước đây màn hình truyền `onReply={setReplyTo}` với state không ai đọc:
+  it('bấm Trả lời thì nói rõ đang trả lời AI, và huỷ được', async () => {
+    // Trước Task 11 màn hình truyền `onReply` trỏ vào một state không ai đọc:
     // người dùng bấm "Trả lời", cả màn hình render lại, và không có gì xảy ra.
-    // `CommentItem` đã tự bảo vệ bằng cách chỉ vẽ nút khi có handler — rồi màn
-    // hình đưa vào một handler rỗng và dựng lại đúng cái bẫy đó. Task 11 thêm ô
-    // nhập thì mới được truyền `onReply` trở lại.
+    // Nút chỉ được phép tồn tại khi đã có ô nhập thật VÀ có chỉ báo cho biết
+    // mình đang trả lời ai — thiếu chỉ báo thì bình luận rơi vào chỗ khác với
+    // chỗ người dùng tưởng.
     server.use(postOk(), commentsOk([baseComment('c1')]));
 
     await renderScreen();
     await waitFor(() => expect(screen.getByText('noi dung c1')).toBeTruthy());
 
-    expect(screen.queryByRole('button', { name: 'Trả lời' })).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Trả lời' }));
+
+    expect(screen.getByTestId('dang-tra-loi')).toBeTruthy();
+    expect(screen.getByText(/Đang trả lời Nguyen Van A/)).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('nut-huy-tra-loi'));
+
+    expect(screen.queryByTestId('dang-tra-loi')).toBeNull();
+    await donHangDoiDanhSach();
+  });
+
+  it('ô nhập rỗng thì nút Gửi bị khoá, không gửi bình luận trắng', async () => {
+    // Bình luận rỗng chỉ nhận về 400 mà vẫn tiêu một lượt trong hạn mức 20 bình
+    // luận/10 phút. Nút phải TỰ KHOÁ chứ không im lặng khi bấm.
+    server.use(postOk(), commentsOk([]));
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Chưa có bình luận')).toBeTruthy());
+
+    expect(screen.getByTestId('nut-gui-binh-luan').props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
+
+    // Chỉ có khoảng trắng cũng là rỗng.
+    await fireEvent.changeText(screen.getByLabelText('Nội dung bình luận'), '   ');
+    expect(screen.getByTestId('nut-gui-binh-luan').props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
+    await donHangDoiDanhSach();
+  });
+
+  it('bình luận mới (không trả lời ai) gửi replyToCommentId là null và dọn ô nhập', async () => {
+    // Ô nhập không được dọn là cái bẫy im lặng nhất: người dùng thấy chữ mình
+    // còn nguyên, tưởng chưa gửi được, bấm Gửi lần nữa và ăn chặn trùng nội
+    // dung cùng bài trong 5 phút của backend.
+    let body = null as Record<string, unknown> | null;
+    let lanLayBinhLuan = 0;
+    server.use(
+      postOk(),
+      http.get(`${BASE}/api/forum/posts/p1/comments`, () => {
+        lanLayBinhLuan += 1;
+        return HttpResponse.json(
+          envelope(cursorPage(lanLayBinhLuan === 1 ? [] : [baseComment('c9')])),
+        );
+      }),
+      http.post(`${BASE}/api/forum/posts/p1/comments`, async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(envelope(baseComment('c9')));
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Chưa có bình luận')).toBeTruthy());
+
+    await fireEvent.changeText(screen.getByLabelText('Nội dung bình luận'), 'Minh cung dang hoc');
+    await fireEvent.press(screen.getByTestId('nut-gui-binh-luan'));
+
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toEqual({ content: 'Minh cung dang hoc', replyToCommentId: null });
+    await waitFor(() => expect(screen.getByLabelText('Nội dung bình luận').props.value).toBe(''));
+    await donHangDoiDanhSach();
+  });
+
+  it('trả lời một REPLY vẫn gửi replyToCommentId là id của bình luận GỐC', async () => {
+    // Test đáng giá nhất của task: gửi id của reply thì backend trả 400 "Chỉ hỗ
+    // trợ trả lời bình luận 1 cấp", và không test nào khác bắt được.
+    // `as` thay vì chú thích kiểu — xem giải thích ở Task 4 (narrowing qua closure).
+    let body = null as Record<string, unknown> | null;
+    server.use(
+      postOk(),
+      commentsOk([
+        baseComment('c1'),
+        baseComment('r1', {
+          replyToCommentId: 'c1',
+          replyToUserName: 'Nguyen Van A',
+          authorFullName: 'Tran Thi B',
+        }),
+      ]),
+      http.post(`${BASE}/api/forum/posts/p1/comments`, async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(envelope(baseComment('c9')));
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Tran Thi B')).toBeTruthy());
+
+    // Bấm "Trả lời" trên REPLY (phần tử thứ hai), không phải trên bình luận gốc.
+    await fireEvent.press(screen.getAllByRole('button', { name: 'Trả lời' })[1]!);
+    // Chỉ báo vẫn nói tên người viết reply — đó là người mình đang trả lời.
+    expect(screen.getByText(/Đang trả lời Tran Thi B/)).toBeTruthy();
+
+    await fireEvent.changeText(screen.getByLabelText('Nội dung bình luận'), 'Toi cung thac mac');
+    await fireEvent.press(screen.getByTestId('nut-gui-binh-luan'));
+
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body?.replyToCommentId).toBe('c1');
+    await donHangDoiDanhSach();
+  });
+
+  it('bình luận bị 429 thì hiện nguyên văn câu của backend, không nút Thử lại và GIỮ nội dung', async () => {
+    // Hạn mức 20 bình luận/10 phút và chặn trùng nội dung trong 5 phút. Bày nút
+    // "Thử lại" là mời vào vòng lặp chắc chắn hỏng tiếp, còn xoá nội dung vừa gõ
+    // thì người dùng mất luôn thứ họ định sửa lại.
+    server.use(
+      postOk(),
+      commentsOk([]),
+      http.post(`${BASE}/api/forum/posts/p1/comments`, () =>
+        HttpResponse.json(
+          {
+            timestamp: '',
+            status: 429,
+            code: 'TOO_MANY_REQUESTS',
+            message: 'Ban binh luan qua nhanh, thu lai sau',
+            data: null,
+            retryAfterSeconds: 90,
+          },
+          { status: 429 },
+        ),
+      ),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Chưa có bình luận')).toBeTruthy());
+
+    await fireEvent.changeText(screen.getByLabelText('Nội dung bình luận'), 'Spam spam');
+    await fireEvent.press(screen.getByTestId('nut-gui-binh-luan'));
+
+    await waitFor(() => expect(screen.getByTestId('loi-gui-binh-luan')).toBeTruthy());
+    expect(screen.getByText('Ban binh luan qua nhanh, thu lai sau')).toBeTruthy();
+    expect(screen.queryByText('Thử lại')).toBeNull();
+    expect(screen.getByLabelText('Nội dung bình luận').props.value).toBe('Spam spam');
+    await donHangDoiDanhSach();
+  });
+
+  it('báo cáo một BÌNH LUẬN gửi đúng targetType COMMENT và id của bình luận đó', async () => {
+    let body = null as Record<string, unknown> | null;
+    server.use(
+      postOk(),
+      commentsOk([baseComment('c1'), baseComment('c2')]),
+      http.post(`${BASE}/api/forum/reports`, async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(envelope({ reportId: 'r1' }));
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('noi dung c2')).toBeTruthy());
+
+    // Hai bình luận, nên phải báo cáo đúng cái thứ hai.
+    await fireEvent.press(screen.getAllByRole('button', { name: 'Báo cáo' })[1]!);
+    await fireEvent.press(screen.getByText('Quấy rối, công kích cá nhân'));
+    await fireEvent.press(screen.getByTestId('nut-gui-bao-cao'));
+
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toEqual({ targetType: 'COMMENT', targetId: 'c2', reasonType: 'HARASSMENT' });
+    // Gửi xong phải nói là đã gửi, không đóng im lặng.
+    await waitFor(() => expect(screen.getByTestId('da-gui-bao-cao')).toBeTruthy());
+    await donHangDoiDanhSach();
+  });
+
+  it('báo cáo BÀI VIẾT gửi targetType POST kèm postId', async () => {
+    let body = null as Record<string, unknown> | null;
+    server.use(
+      postOk(),
+      commentsOk([]),
+      http.post(`${BASE}/api/forum/reports`, async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(envelope({ reportId: 'r1' }));
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-bao-cao-bai')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-bao-cao-bai'));
+    await fireEvent.press(screen.getByText('Spam, quảng cáo rác'));
+    await fireEvent.press(screen.getByTestId('nut-gui-bao-cao'));
+
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toEqual({ targetType: 'POST', targetId: 'p1', reasonType: 'SPAM' });
+    await donHangDoiDanhSach();
+  });
+
+  it('đóng hộp báo cáo rồi mở lại thì không còn mang lỗi của lần trước', async () => {
+    // `useMutation` giữ lỗi cho tới khi `reset()`. Quên reset thì người dùng mở
+    // hộp báo cáo cho một đối tượng KHÁC và thấy ngay câu lỗi của lần trước.
+    server.use(
+      postOk(),
+      commentsOk([baseComment('c1')]),
+      http.post(`${BASE}/api/forum/reports`, () =>
+        HttpResponse.json(
+          {
+            timestamp: '',
+            status: 429,
+            code: 'TOO_MANY_REQUESTS',
+            message: 'Ban da bao cao qua nhieu lan',
+            data: null,
+          },
+          { status: 429 },
+        ),
+      ),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('noi dung c1')).toBeTruthy());
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Báo cáo' }));
+    await fireEvent.press(screen.getByText('Spam, quảng cáo rác'));
+    await fireEvent.press(screen.getByTestId('nut-gui-bao-cao'));
+    await waitFor(() => expect(screen.getByTestId('loi-gui-bao-cao')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-dong-bao-cao'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Báo cáo' }));
+
+    expect(screen.queryByTestId('loi-gui-bao-cao')).toBeNull();
     await donHangDoiDanhSach();
   });
 
@@ -474,6 +689,19 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
 
     expect(screen.queryByTestId('nut-sua-bai')).toBeNull();
     expect(screen.queryByTestId('nut-xoa-bai')).toBeNull();
+    await donHangDoiDanhSach();
+  });
+
+  it('bài của MÌNH thì không bày nút báo cáo bài viết', async () => {
+    // Báo cáo bài của chính mình là vô nghĩa, và nút đó nằm đúng chỗ của nút
+    // Sửa/Xoá nên rất dễ bấm nhầm.
+    mockNguoiDungHienTai = { publicId: 'u1' };
+    server.use(postOk(), commentsOk([]));
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-xoa-bai')).toBeTruthy());
+
+    expect(screen.queryByTestId('nut-bao-cao-bai')).toBeNull();
     await donHangDoiDanhSach();
   });
 

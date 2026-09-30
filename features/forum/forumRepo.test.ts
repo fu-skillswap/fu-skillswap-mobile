@@ -239,3 +239,60 @@ describe('forumRepo (ghi bài viết)', () => {
     expect(duongDan).toBe('p1');
   });
 });
+
+describe('forumRepo (bình luận và báo cáo)', () => {
+  it('tạo bình luận gửi POST tới đúng bài kèm replyToCommentId', async () => {
+    let body: unknown = null;
+    let duongDan = '';
+    server.use(
+      http.post(`${BASE}/api/forum/posts/:postId/comments`, async ({ request, params }) => {
+        duongDan = String(params.postId);
+        body = await request.json();
+        return HttpResponse.json(envelope({ commentId: 'c9' }));
+      }),
+    );
+
+    await forumRepo.createComment('p1', { content: 'Nội dung', replyToCommentId: 'c1' });
+
+    expect(duongDan).toBe('p1');
+    expect(body).toEqual({ content: 'Nội dung', replyToCommentId: 'c1' });
+  });
+
+  it('xoá bình luận gửi DELETE tới đúng commentId', async () => {
+    let duongDan = '';
+    server.use(
+      http.delete(`${BASE}/api/forum/comments/:commentId`, ({ params }) => {
+        duongDan = String(params.commentId);
+        return HttpResponse.json(envelope({ commentId: 'c1' }));
+      }),
+    );
+
+    await forumRepo.deleteComment('c1');
+
+    expect(duongDan).toBe('c1');
+  });
+
+  it('gửi báo cáo vi phạm kèm nguyên vẹn lý do và mô tả', async () => {
+    let body: unknown = null;
+    server.use(
+      http.post(`${BASE}/api/forum/reports`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(envelope({ reportId: 'r1' }));
+      }),
+    );
+
+    await forumRepo.createReport({
+      targetType: 'COMMENT',
+      targetId: 'c1',
+      reasonType: 'SPAM',
+      description: 'Quảng cáo rác',
+    });
+
+    expect(body).toEqual({
+      targetType: 'COMMENT',
+      targetId: 'c1',
+      reasonType: 'SPAM',
+      description: 'Quảng cáo rác',
+    });
+  });
+});

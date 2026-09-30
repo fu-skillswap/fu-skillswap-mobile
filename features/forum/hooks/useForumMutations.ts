@@ -6,7 +6,7 @@
  * tác. Hoàn tác phải đúng — backend giới hạn 60 lượt like/bỏ like trong 10
  * phút, nên một số đếm sai sẽ khiến người dùng bấm lại và đốt thêm hạn mức.
  *
- * Ba luật mà mọi sửa đổi sau này phải giữ:
+ * Bốn luật mà mọi sửa đổi sau này phải giữ:
  *
  * 1. `cancelQueries` TRƯỚC khi ghi đè cache. Một lần tải lại đang bay sẽ trả về
  *    số đếm CŨ sau cú bấm và xoá sạch kết quả lạc quan nếu không huỷ nó.
@@ -42,8 +42,10 @@ import { forumRepo } from '@/features/forum/forumRepo';
 import { forumKeys } from '@/features/forum/queryKeys';
 import type {
   ForumCommentResponse,
+  ForumCommentUpsertRequest,
   ForumPostResponse,
   ForumPostUpsertRequest,
+  ForumReportCreateRequest,
 } from '@/features/forum/types';
 
 type PostPages = InfiniteData<CursorPageResponse<ForumPostResponse>>;
@@ -305,5 +307,80 @@ export function useDeletePost() {
       queryClient.setQueryData(forumKeys.post(baiDaXoa.postId), baiDaXoa);
       lamMoiDanhSachBai(queryClient);
     },
+  });
+}
+
+/**
+ * Đánh dấu cả bình luận, bài viết và mọi danh sách bài là cũ.
+ *
+ * Gửi hay xoá một bình luận đổi ba thứ cùng lúc: danh sách bình luận, dòng
+ * "N bình luận" của bài đang mở, và `commentCount` của chính bài đó trong mọi
+ * danh sách (`PostCard` có testID `so-binh-luan`). Bỏ nhánh nào thì nhánh đó
+ * hiện số cũ suốt `staleTime` và người dùng gửi lại vì tưởng chưa gửi được.
+ */
+function lamMoiBinhLuanCuaBai(queryClient: QueryClient, postId: string) {
+  void queryClient.invalidateQueries({ queryKey: forumKeys.comments(postId) });
+  void queryClient.invalidateQueries({ queryKey: forumKeys.post(postId) });
+  lamMoiDanhSachBai(queryClient);
+}
+
+/**
+ * Gửi bình luận mới, hoặc trả lời một bình luận gốc.
+ *
+ * KHÔNG cập nhật lạc quan, cùng lý do với `useCreatePost`: backend kiểm duyệt từ
+ * cấm (`FORUM_4201`), chặn nội dung trùng trong cùng bài trong 5 phút và giới
+ * hạn 20 bình luận/10 phút. Vẽ trước bình luận rồi rút lại là cách chắc chắn
+ * nhất để người dùng tưởng đã gửi xong.
+ *
+ * `replyToCommentId` trong `input` phải do `resolveReplyTarget` quy về bình luận
+ * GỐC; hook không tự đoán để chỉ có MỘT nơi biết luật 1 cấp.
+ */
+export function useCreateComment(postId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // Xem luật 4 ở đầu file: mặc định 'online' hoãn request, nút Gửi quay mãi.
+    networkMode: 'always',
+    mutationFn: (input: ForumCommentUpsertRequest) => forumRepo.createComment(postId, input),
+    onSuccess: () => {
+      lamMoiBinhLuanCuaBai(queryClient, postId);
+    },
+  });
+}
+
+/**
+ * Xoá bình luận của chính mình.
+ *
+ * Số bình luận mới phải LẤY LẠI TỪ MÁY CHỦ chứ không trừ đi 1 tại chỗ: xoá một
+ * bình luận gốc kéo theo mọi reply của nó (forum.md §4.5), nên con số tự tính ở
+ * đây gần như luôn sai.
+ *
+ * Chưa có màn hình nào gọi hook này — xem báo cáo Task 11.
+ */
+export function useDeleteComment(postId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: (commentId: string) => forumRepo.deleteComment(commentId),
+    onSuccess: () => {
+      lamMoiBinhLuanCuaBai(queryClient, postId);
+    },
+  });
+}
+
+/**
+ * Gửi báo cáo vi phạm cho một bài viết hoặc bình luận.
+ *
+ * Không đụng tới cache: `reportCount` là con số của người kiểm duyệt, giao diện
+ * người dùng thường không hiện nó, nên tải lại cả bài chỉ để tăng một số không
+ * ai thấy là tốn băng thông vô ích.
+ */
+export function useReport() {
+  return useMutation({
+    // Hạn mức 10 báo cáo/30 phút. Hoãn request thì hộp báo cáo đứng im với nút
+    // đang quay và người dùng đóng đi, tưởng đã gửi xong.
+    networkMode: 'always',
+    mutationFn: (input: ForumReportCreateRequest) => forumRepo.createReport(input),
   });
 }
