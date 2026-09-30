@@ -25,6 +25,10 @@ App dùng **development build**, không chạy trên Expo Go: nó cần các nat
 (`@preeternal/react-native-cookie-manager`, `@react-native-google-signin/google-signin`)
 mà Expo Go không có sẵn.
 
+Để đưa app lên máy Android thật — kèm việc lấy SHA-1, đăng ký OAuth client và
+danh sách còn thiếu để lên Google Play — xem
+[`docs/runbook-build-android.md`](docs/runbook-build-android.md).
+
 ## Lệnh thường dùng
 
 | Lệnh | Việc |
@@ -32,7 +36,9 @@ mà Expo Go không có sẵn.
 | `npm test` | Chạy toàn bộ test (Jest + React Native Testing Library + MSW) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npx expo start` | Metro dev server |
-| `npx expo run:android` | Build và cài development build lên máy Android |
+| `npm run doctor` | `expo-doctor` — phải ra 21/21 trước khi build |
+| `npm run build:preview` | EAS build ra APK độc lập để cài lên máy thật |
+| `npm run build:prod` | EAS build ra AAB để nộp Google Play |
 
 ### Lần typecheck đầu tiên sau khi clone sẽ chậm hơn
 
@@ -69,3 +75,9 @@ commit vào repo này).
 
 Cho tới khi endpoint đó lên, spike R1/R2 trong `docs/spike/` chưa kết luận được — xem mục
 "Bị chặn" trong chính runbook đó.
+
+### App chưa từng chạy trên thiết bị
+
+Toàn bộ bằng chứng hiện có là test và typecheck. Hai native module ở trên **chưa
+được biên dịch lần nào** — bản EAS build đầu tiên là lần đầu biết chúng có compile
+được trên New Architecture hay không.
