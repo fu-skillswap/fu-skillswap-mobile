@@ -16,6 +16,8 @@ export interface AppEnv {
   googleWebClientId: string;
   /** true khi đã có aiUrl, dùng để bật/tắt các màn hình phụ thuộc AI */
   isAiConfigured: boolean;
+  /** userId của tài khoản bot "SkillSwap AI"; rỗng nghĩa là không gắn badge AI cho bình luận nào */
+  forumBotUserId: string;
 }
 
 /** Nguồn biến môi trường thô, tách riêng để test được mà không đụng process.env */
@@ -23,6 +25,7 @@ export interface RawEnvSource {
   EXPO_PUBLIC_API_URL?: string;
   EXPO_PUBLIC_AI_URL?: string;
   EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?: string;
+  EXPO_PUBLIC_FORUM_BOT_USER_ID?: string;
 }
 
 /** Bỏ khoảng trắng, dấu nháy thừa và dấu "/" ở cuối chuỗi URL */
@@ -43,6 +46,7 @@ export function readEnv(source: RawEnvSource): AppEnv {
   const apiUrl = normalizeUrl(source.EXPO_PUBLIC_API_URL);
   const aiUrl = normalizeUrl(source.EXPO_PUBLIC_AI_URL);
   const googleWebClientId = (source.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '').trim();
+  const forumBotUserId = (source.EXPO_PUBLIC_FORUM_BOT_USER_ID ?? '').trim();
 
   if (!apiUrl) {
     throw new Error('Thiếu EXPO_PUBLIC_API_URL trong cấu hình môi trường');
@@ -51,7 +55,13 @@ export function readEnv(source: RawEnvSource): AppEnv {
     throw new Error('Thiếu EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID trong cấu hình môi trường');
   }
 
-  return { apiUrl, aiUrl, googleWebClientId, isAiConfigured: aiUrl.length > 0 };
+  return {
+    apiUrl,
+    aiUrl,
+    googleWebClientId,
+    isAiConfigured: aiUrl.length > 0,
+    forumBotUserId,
+  };
 }
 
 let cached: AppEnv | null = null;
@@ -63,6 +73,7 @@ export function getEnv(): AppEnv {
       EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
       EXPO_PUBLIC_AI_URL: process.env.EXPO_PUBLIC_AI_URL,
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      EXPO_PUBLIC_FORUM_BOT_USER_ID: process.env.EXPO_PUBLIC_FORUM_BOT_USER_ID,
     });
   }
   return cached;
