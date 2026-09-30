@@ -2,11 +2,13 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 import {
   GoogleSignInCancelledError,
+  MOCK_ID_TOKEN,
   __resetGoogleSignInConfiguredForTests,
   configureGoogleSignIn,
   getGoogleIdToken,
   signOutGoogle,
 } from '@/core/auth/googleSignIn';
+import { resetEnvCache } from '@/core/config/env';
 
 /**
  * Mock được tạo hoàn toàn bên trong factory của `jest.mock` (không tham chiếu
@@ -117,5 +119,62 @@ describe('googleSignIn', () => {
     mockSignIn.mockResolvedValue({ type: 'success', data: {} });
 
     await expect(getGoogleIdToken()).rejects.toThrow('Không lấy được Google ID token');
+  });
+});
+
+/** `__DEV__` là `const` trong typings RN, phải gán qua `globalThis` */
+function datDev(value: boolean): void {
+  (globalThis as unknown as { __DEV__: boolean }).__DEV__ = value;
+}
+
+describe('getGoogleIdToken trong chế độ mock', () => {
+  const devGoc = __DEV__;
+  const coGoc = process.env.EXPO_PUBLIC_MOCK_MODE;
+
+  afterEach(() => {
+    datDev(devGoc);
+    process.env.EXPO_PUBLIC_MOCK_MODE = coGoc;
+    resetEnvCache();
+  });
+
+  it('mock mode bật thì trả token giả và KHÔNG gọi thư viện native', async () => {
+    // Máy chưa có Android OAuth client nên lời gọi native chắc chắn ném lỗi.
+    // Đây là lý do seam này tồn tại.
+    datDev(true);
+    process.env.EXPO_PUBLIC_MOCK_MODE = '1';
+    resetEnvCache();
+
+    const token = await getGoogleIdToken();
+
+    expect(token).toBe(MOCK_ID_TOKEN);
+    expect(mockSignIn).not.toHaveBeenCalled();
+    // Cũng không được cấu hình thư viện: `configureGoogleSignIn()` đọc
+    // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID và ném nếu thiếu, mà chế độ mock tồn tại
+    // đúng để chạy được khi chưa có biến đó.
+    expect(mockGoogleSignin.configure).not.toHaveBeenCalled();
+  });
+
+  it('mock mode TẮT thì vẫn đi qua thư viện native như cũ', async () => {
+    datDev(true);
+    process.env.EXPO_PUBLIC_MOCK_MODE = '';
+    resetEnvCache();
+    mockSignIn.mockResolvedValue({ type: 'success', data: { idToken: 'token-that' } });
+
+    await expect(getGoogleIdToken()).resolves.toBe('token-that');
+
+    expect(mockSignIn).toHaveBeenCalled();
+  });
+
+  it('BẢN PHÁT HÀNH thì đi đường native kể cả khi cờ mock bật', async () => {
+    // Vế `__DEV__` của `isMockMode()` phải chặn được ở đây, nếu không bản lên
+    // Google Play sẽ tự nhận một token giả và coi như đã đăng nhập.
+    datDev(false);
+    process.env.EXPO_PUBLIC_MOCK_MODE = '1';
+    resetEnvCache();
+    mockSignIn.mockResolvedValue({ type: 'success', data: { idToken: 'token-that' } });
+
+    await expect(getGoogleIdToken()).resolves.toBe('token-that');
+
+    expect(mockSignIn).toHaveBeenCalled();
   });
 });

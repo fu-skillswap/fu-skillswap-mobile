@@ -24,7 +24,20 @@
 
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 
-import { getEnv } from '@/core/config/env';
+import { getEnv, isMockMode } from '@/core/config/env';
+
+/**
+ * ID Token giả dùng trong chế độ mock.
+ *
+ * Có đủ ba phần ngăn bởi dấu chấm để `decodeIdTokenClaims()` không ném lỗi khi
+ * `AuthProvider` soi token trong nhánh `__DEV__` của `signInWithGoogle`. Payload
+ * là base64url của
+ * `{"sub":"mock-user-0001","aud":"mock","email":"sinhvien@fpt.edu.vn"}`.
+ */
+export const MOCK_ID_TOKEN =
+  'eyJhbGciOiJub25lIn0.' +
+  'eyJzdWIiOiJtb2NrLXVzZXItMDAwMSIsImF1ZCI6Im1vY2siLCJlbWFpbCI6InNpbmh2aWVuQGZwdC5lZHUudm4ifQ.' +
+  'mock-signature';
 
 /** Người dùng chủ động huỷ hộp thoại đăng nhập — không phải lỗi hệ thống */
 export class GoogleSignInCancelledError extends Error {
@@ -87,6 +100,17 @@ function isCancellation(value: unknown): boolean {
  * @throws Error nếu không lấy được ID Token
  */
 export async function getGoogleIdToken(): Promise<string> {
+  // Chế độ mock: máy chưa có Android OAuth client nên lời gọi native chắc chắn
+  // ném lỗi, và `ensureGoogleSignInConfigured()` cũng ném nếu thiếu
+  // EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID. Phải thoát TRƯỚC cả hai.
+  //
+  // Đây là một trong hai seam duy nhất chế độ mock được phép chạm vào (seam kia
+  // là tầng HTTP). `isMockMode()` yêu cầu `__DEV__`, nên nhánh này chết hẳn
+  // trong bản phát hành — xem `core/config/env.ts`.
+  if (isMockMode()) {
+    return MOCK_ID_TOKEN;
+  }
+
   ensureGoogleSignInConfigured();
 
   let response: unknown;
