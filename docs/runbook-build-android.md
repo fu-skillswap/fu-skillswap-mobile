@@ -103,18 +103,43 @@ eas credentials    # → Android → keystore → Download
 
 Ba profile trong `eas.json`:
 
-| Profile | Lệnh | Ra cái gì | Dùng khi |
-|---|---|---|---|
-| `development` | `npm run build:dev` | APK + development client | Vừa chạy Metro vừa sửa code, reload nóng |
-| `preview` | `npm run build:preview` | APK độc lập | Đưa người khác cài thử, không cần Metro |
-| `production` | `npm run build:prod` | AAB | Nộp Play Store (Play chỉ nhận AAB) |
+| Profile | Lệnh | Ra cái gì | `__DEV__` | Chế độ mock chạy được? |
+|---|---|---|---|---|
+| `development` | `npm run build:dev` | APK debug + development client | `true` | **Có** |
+| `preview` | `npm run build:preview` | APK release độc lập | `false` | Không |
+| `production` | `npm run build:prod` | AAB (Play chỉ nhận AAB) | `false` | Không |
 
-Lần đầu nên dùng **`preview`**: một file APK, cài là chạy, không cần Metro — đủ để
-trả lời câu "app có chạy trên máy thật không".
+### Lần đầu dùng profile nào — tuỳ ông muốn thấy gì
+
+**Muốn XEM GIAO DIỆN (diễn đàn, hồ sơ...) khi backend chưa xong → `development`.**
+
+```bash
+npm run build:dev     # build một lần, ~10-20 phút
+npx expo start        # rồi mở Metro mỗi khi muốn chạy
+```
+
+Chỉ `development` mới bật được chế độ mock. Lý do: `developmentClient: true` làm
+EAS build bằng `:app:assembleDebug` (xem
+https://docs.expo.dev/eas/json/), nên `__DEV__` là `true` — và `isMockMode()` yêu
+cầu `__DEV__` để bản phát hành không thể đi đường vòng qua đăng nhập. `eas.json`
+đã cắm sẵn `EXPO_PUBLIC_MOCK_MODE=1` cho riêng profile này.
+
+Đánh đổi: bản `development` cần Metro đang chạy trên máy tính cùng mạng Wi-Fi mới
+mở được app.
+
+**Muốn biết app có compile và chạy độc lập được không → `preview`.**
 
 ```bash
 npm run build:preview
 ```
+
+Một file APK, cài là chạy, không cần Metro. Nhưng nó là bản **release** nên
+`__DEV__` là `false`: chế độ mock tắt, app đi vào backend thật, và **sẽ dừng ở màn
+hình đăng nhập** cho tới khi backend có `/api/auth/google/mobile` (mục 5).
+
+Giá trị riêng của `preview`: nó vẫn trả lời được câu hỏi lớn nhất hiện nay — hai
+native module (`@preeternal/react-native-cookie-manager`, google-signin) có compile
+được trên New Architecture hay không.
 
 Build chạy trên máy của EAS, khoảng 10–20 phút. Xong thì nó in một link; mở link
 đó trên điện thoại rồi tải APK, hoặc quét QR. Android sẽ hỏi cho phép cài từ
