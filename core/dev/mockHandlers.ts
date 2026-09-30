@@ -12,5 +12,6 @@
  */
 
 import { authMockHandlers } from '@/core/auth/mocks/handlers';
+import { forumMockHandlers } from '@/features/forum/mocks/handlers';
 
-export const mockHandlers = [...authMockHandlers];
+export const mockHandlers = [...authMockHandlers, ...forumMockHandlers];
