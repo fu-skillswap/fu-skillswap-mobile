@@ -349,27 +349,6 @@ export function useCreateComment(postId: string) {
 }
 
 /**
- * Xoá bình luận của chính mình.
- *
- * Số bình luận mới phải LẤY LẠI TỪ MÁY CHỦ chứ không trừ đi 1 tại chỗ: xoá một
- * bình luận gốc kéo theo mọi reply của nó (forum.md §4.5), nên con số tự tính ở
- * đây gần như luôn sai.
- *
- * Chưa có màn hình nào gọi hook này — xem báo cáo Task 11.
- */
-export function useDeleteComment(postId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    networkMode: 'always',
-    mutationFn: (commentId: string) => forumRepo.deleteComment(commentId),
-    onSuccess: () => {
-      lamMoiBinhLuanCuaBai(queryClient, postId);
-    },
-  });
-}
-
-/**
  * Gửi báo cáo vi phạm cho một bài viết hoặc bình luận.
  *
  * Không đụng tới cache: `reportCount` là con số của người kiểm duyệt, giao diện

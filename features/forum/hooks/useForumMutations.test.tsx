@@ -10,7 +10,6 @@ import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryC
 import {
   useCreateComment,
   useCreatePost,
-  useDeleteComment,
   useDeletePost,
   useReport,
   useToggleCommentLike,
@@ -999,7 +998,6 @@ function renderHookGhiBinhLuan() {
       chiTiet: useForumPost('p1'),
       binhLuan: useForumComments('p1'),
       taoBinhLuan: useCreateComment('p1'),
-      xoaBinhLuan: useDeleteComment('p1'),
       baoCao: useReport(),
     }),
     { wrapper },
@@ -1099,33 +1097,6 @@ describe('useCreateComment', () => {
         onlineManager.setOnline(true);
       });
     }
-    await nhuongMotNhip();
-  });
-});
-
-describe('useDeleteComment', () => {
-  it('xoá xong thì bình luận biến khỏi danh sách và số bình luận của bài giảm', async () => {
-    // Backend xoá theo kiểu cascade (gốc kéo theo mọi reply), nên số bình luận
-    // mới phải LẤY TỪ MÁY CHỦ chứ không trừ đi 1 tại chỗ.
-    server.use(
-      feedOk([post()]),
-      http.get(`${BASE}/api/forum/posts/p1`, traBaiLanLuot([post({ commentCount: 2 }), post({ commentCount: 0 })])),
-      http.get(`${BASE}/api/forum/posts/p1/comments`, traLanLuot([[comment('c1'), comment('r1', { replyToCommentId: 'c1' })], []])),
-      http.delete(`${BASE}/api/forum/comments/c1`, () =>
-        HttpResponse.json(envelope(comment('c1', { status: 'DELETED' }))),
-      ),
-    );
-
-    const { result } = await renderHookGhiBinhLuan();
-    await waitFor(() => expect(result.current.binhLuan.comments).toHaveLength(1));
-    await waitFor(() => expect(result.current.chiTiet.data?.commentCount).toBe(2));
-
-    await act(async () => {
-      await result.current.xoaBinhLuan.mutateAsync('c1');
-    });
-
-    await waitFor(() => expect(result.current.binhLuan.comments).toHaveLength(0));
-    await waitFor(() => expect(result.current.chiTiet.data?.commentCount).toBe(0));
     await nhuongMotNhip();
   });
 });

@@ -158,8 +158,13 @@ beforeEach(() => {
   mockReplace.mockClear();
   mockCanGoBack.mockReturnValue(true);
   mockBack.mockClear();
-  // Mặc định: khách vãng lai, không phải tác giả — mọi test cũ giữ nguyên hành vi.
-  mockNguoiDungHienTai = null;
+  // Mặc định: ĐÃ đăng nhập nhưng KHÔNG phải tác giả bài viết.
+  //
+  // Trước đây mặc định là `null` ("khách vãng lai"), nhưng kể từ khi
+  // `app/forum/_layout.tsx` có gate đăng nhập thì khách không thể tới được màn
+  // hình này — 27 test mô tả một trạng thái không tồn tại, và chính điều đó che
+  // mất việc nhánh /forum/* đang hở. Giữ mặc định khớp với thực tế.
+  mockNguoiDungHienTai = { publicId: 'u-khac' };
 });
 afterEach(() => {
   // `clear()` một mình bỏ sót bộ hẹn giờ gcTime của mutation và Jest treo sau
@@ -869,6 +874,46 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(tabs)'));
     expect(mockBack).not.toHaveBeenCalled();
+    await donHangDoiDanhSach();
+  });
+
+  it('nội dung dài quá 2000 ký tự thì nút Gửi bị khoá', async () => {
+    // `TextInput maxLength` chặn được ở máy thật, nhưng `fireEvent.changeText`
+    // KHÔNG tôn trọng maxLength — nên đây là cách duy nhất chạm tới nửa sau của
+    // guard `draft.length <= COMMENT_MAX`. Trước đây bỏ hẳn nửa đó mà toàn bộ
+    // 300 test vẫn xanh, tức là giới hạn của backend (forum.md §4.3) không được
+    // gì canh.
+    mockNguoiDungHienTai = { publicId: 'u-khac' };
+    server.use(postOk(), commentsOk([]));
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByLabelText('Nội dung bình luận')).toBeTruthy());
+
+    await fireEvent.changeText(screen.getByLabelText('Nội dung bình luận'), 'a'.repeat(2001));
+
+    expect(screen.getByTestId('nut-gui-binh-luan')).toBeDisabled();
+    await donHangDoiDanhSach();
+  });
+
+  it('ô nhập được bọc trong lớp tránh bàn phím', async () => {
+    // Đây là một chốt CẤU TRÚC rất hẹp: nó chỉ chứng minh lớp tránh bàn phím
+    // CÒN Ở ĐÓ, không chứng minh được nó hoạt động. Hai giới hạn, đều đã kiểm:
+    // jest không có layout engine nên không cách nào biết bàn phím có che ô nhập
+    // hay không; và `KeyboardAvoidingView` tiêu thụ prop `behavior` nên phần tử
+    // render ra không mang nó (`props.behavior` là `undefined`), vì vậy cả giá
+    // trị 'padding' cho iOS cũng không assert được. Đúng đắn của nó chỉ xác minh
+    // được trên thiết bị thật.
+    //
+    // Vì sao cần: bàn phím iOS là một cửa sổ PHỦ LÊN app, hệ điều hành không co
+    // view lại. Không có lớp này thì thanh nhập dính đáy cùng nút "Gửi" nằm
+    // dưới bàn phím. Android thì `adjustResize` mặc định của Expo đã tự co, nên
+    // `behavior` để `undefined` ở đó.
+    server.use(postOk(), commentsOk([]));
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByLabelText('Nội dung bình luận')).toBeTruthy());
+
+    expect(screen.getByTestId('vung-tranh-ban-phim')).toBeTruthy();
     await donHangDoiDanhSach();
   });
 });

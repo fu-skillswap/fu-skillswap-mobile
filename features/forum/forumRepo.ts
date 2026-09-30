@@ -141,17 +141,6 @@ export const forumRepo = {
   },
 
   /**
-   * Xoá bình luận của chính mình (forum.md §4.5); backend từ chối bình luận của
-   * người khác bằng 403. Xoá bình luận gốc thì backend xoá luôn mọi reply của nó
-   * và trừ đúng số đó vào `commentCount` của bài.
-   */
-  deleteComment(commentId: string) {
-    return apiClient<ForumCommentResponse>(`/api/forum/comments/${commentId}`, {
-      method: 'DELETE',
-    });
-  },
-
-  /**
    * Báo cáo một bài viết hoặc bình luận (forum.md §6.1).
    *
    * Trả về `unknown`: `forum.md` chỉ nói phản hồi là `ForumReportResponse` mà

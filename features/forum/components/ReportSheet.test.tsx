@@ -78,8 +78,10 @@ describe('ReportSheet', () => {
 
   it('gửi HỎNG thì hiện nguyên văn câu của backend và KHÔNG có nút Thử lại', async () => {
     // Hạn mức 10 báo cáo/30 phút. Bày nút "Thử lại" ở đây là mời người dùng vào
-    // một vòng lặp chắc chắn hỏng tiếp, và mỗi lần vẫn tính vào hạn mức — đúng
-    // luật mà `core/ui/ErrorView.tsx` áp cho hành động không nên thử lại.
+    // một vòng lặp chắc chắn hỏng tiếp, và mỗi lần vẫn tính vào hạn mức.
+    //
+    // Đây là lý do KHÔNG dùng `ErrorView`: `core/api/errors.ts` map 429 sang
+    // `action: 'RETRY'` và `ErrorView` SẼ vẽ nút "Thử lại" cho nó.
     await render(
       <ReportSheet
         visible
@@ -133,5 +135,23 @@ describe('ReportSheet', () => {
     (hop.props.onRequestClose as () => void)();
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('hộp báo cáo được bọc trong lớp tránh bàn phím', async () => {
+    // Chốt cấu trúc rất hẹp, xem chú thích cùng loại ở `post-detail.test.tsx`:
+    // chỉ chứng minh lớp này còn ở đó, không chứng minh nó hoạt động. Ở đây còn
+    // quan trọng hơn: ô "Mô tả chi tiết" nằm TRÊN cả nút "Gửi báo cáo" lẫn nút
+    // "Đóng", mà đây là `Modal` nên không cuộn được — bàn phím che là mất luôn
+    // đường thoát nhìn thấy được.
+    await render(
+      <ReportSheet
+        visible
+        target={{ targetType: 'COMMENT', targetId: 'c1' }}
+        onClose={jest.fn()}
+        onSubmit={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('vung-tranh-ban-phim-bao-cao')).toBeTruthy();
   });
 });

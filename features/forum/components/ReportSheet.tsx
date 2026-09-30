@@ -16,7 +16,15 @@
  */
 
 import { useState } from 'react';
-import { Modal, Pressable, Text, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
 import { Button } from '@/core/ui/Button';
@@ -96,7 +104,18 @@ export function ReportSheet({
       // dùng bị kẹt trong một hộp không có đường thoát.
       onRequestClose={onClose}
     >
-      <View className="flex-1 justify-end bg-black/40">
+      {/*
+        Hộp này có ô "Mô tả chi tiết" và nút "Gửi báo cáo" NẰM DƯỚI nó, dính đáy
+        màn hình. Trên iOS bàn phím phủ lên app chứ không co view, nên không có
+        lớp này thì gõ mô tả xong cả nút Gửi lẫn nút Đóng đều nằm dưới bàn phím —
+        và vì đây là `Modal` nên không cuộn được để lấy lại. Tệ hơn ô bình luận
+        ở màn chi tiết, vì mất luôn đường thoát nhìn thấy được.
+      */}
+      <KeyboardAvoidingView
+        testID="vung-tranh-ban-phim-bao-cao"
+        className="flex-1 justify-end bg-black/40"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View testID="hop-bao-cao" className="gap-3 rounded-t-lg bg-surface p-4">
           <Text className="text-base font-semibold text-text-main">
             {target.targetType === 'POST' ? 'Báo cáo bài viết' : 'Báo cáo bình luận'}
@@ -162,7 +181,7 @@ export function ReportSheet({
 
           <Button label="Đóng" onPress={onClose} variant="secondary" testID="nut-dong-bao-cao" />
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

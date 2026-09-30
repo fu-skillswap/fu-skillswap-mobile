@@ -100,4 +100,19 @@ describe('resolveReplyTarget', () => {
     // biết cách quy về gốc, để màn hình không phải tự nhớ luật.
     expect(resolveReplyTarget(comment('r1', { replyToCommentId: 'c1' }))).toBe('c1');
   });
+
+  it('payload VẮNG HẲN field replyToCommentId cũng được coi là bình luận gốc', () => {
+    // `ForumCommentResponse` khai `replyToCommentId?: string | null` (optional),
+    // và `forum.md` §4.1 cũng vậy — backend Java bỏ hẳn field khi giá trị null
+    // là chuyện thường. Mọi factory test đều đặt `replyToCommentId: null`, nên
+    // trước đây đổi `??` thành `=== null ? ... :` mà toàn bộ 300 test vẫn xanh:
+    // `undefined` rơi qua và app gửi `undefined` lên làm replyToCommentId.
+    //
+    // Phải dựng object KHÔNG CÓ KEY, không phải `{ replyToCommentId: undefined }`
+    // — spread của factory vẫn tạo key cho cách thứ hai.
+    const khongCoKey = { ...comment('c9') } as Record<string, unknown>;
+    delete khongCoKey.replyToCommentId;
+
+    expect(resolveReplyTarget(khongCoKey as unknown as ForumCommentResponse)).toBe('c9');
+  });
 });

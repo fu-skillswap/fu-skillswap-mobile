@@ -1,14 +1,55 @@
-import { Stack } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
+
+import { useAuth } from '@/core/auth/AuthProvider';
+import { resolveAuthRoute } from '@/core/auth/authRoute';
+import { colors } from '@/core/ui/theme';
 
 /**
- * Stack riêng cho nhánh `/forum/*`.
+ * Stack riêng cho nhánh `/forum/*`, kèm gate đăng nhập.
  *
- * `app/_layout.tsx` đặt `headerShown: false` cho toàn app vì các tab tự vẽ
- * header của mình. Nhưng đây là nhánh màn hình ĐẦU TIÊN rời khỏi tab bar, và
- * nếu thừa kế thiết lập đó thì người dùng không còn một chỗ nào nhìn thấy được
- * để quay lại: Android còn nút back cứng, iOS chỉ còn cử chỉ vuốt.
+ * Gate ở đây là BẮT BUỘC, không phải phòng xa. `app/(tabs)/_layout.tsx` có gate
+ * của nó, nhưng nhánh này KHÔNG nằm dưới `(tabs)`: `app.json` khai
+ * `"scheme": "skillswap"`, nên `skillswap://forum/<id>` và `/forum/compose` là
+ * điểm vào trực tiếp — một thông báo đẩy hoặc một link dán tay đưa người chưa
+ * đăng nhập vào thẳng đây, bỏ qua mọi gate khác.
+ *
+ * Và `GET /api/forum/posts/{id}` cùng `GET .../comments` là endpoint CÔNG KHAI
+ * (`forum.md` §1.2), nên không có gate thì màn hình render đầy đủ, hiện cả ô
+ * nhập bình luận lẫn nút Báo cáo — mọi thao tác ghi sau đó nhận 401 mà người
+ * dùng không có đường nào để đăng nhập.
+ *
+ * Gate phải nằm ở `_layout` chứ không phải ở từng màn hình: `Redirect` của
+ * expo-router gọi `router.replace()` bên trong `useFocusEffect`
+ * (`node_modules/expo-router/build/link/Redirect.js`), nên nó chỉ chạy khi màn
+ * đang focus. `_layout` của nhánh luôn focus khi một route con đang mở, nên đây
+ * là chỗ duy nhất bắt được cả deep link nguội lẫn trường hợp phiên chết giữa
+ * lúc người dùng đang đọc bài.
  */
 export default function ForumLayout() {
+  const { status, user } = useAuth();
+  const route = resolveAuthRoute(status, user);
+
+  // 'loading' KHÔNG phải là chưa đăng nhập — chỉ chờ, giống `app/index.tsx` và
+  // `app/(tabs)/_layout.tsx`. Đẩy về login ở trạng thái này thì một deep link
+  // lúc khởi động sẽ bị bật ra ngoài rồi kẹt lại đó.
+  if (route.kind === 'loading') {
+    return (
+      <View className="flex-1 items-center justify-center bg-bg">
+        <ActivityIndicator testID="forum-loading-indicator" color={colors.primary} />
+      </View>
+    );
+  }
+
+  // Tài khoản ADMIN/SYSTEM_ADMIN đi tới trạng thái cuối, KHÔNG về login — về
+  // login sẽ tạo vòng lặp đẩy nhau vô hạn, xem `core/auth/authRoute.ts`.
+  if (route.kind === 'unsupported') {
+    return <Redirect href="/(auth)/unsupported-account" />;
+  }
+  if (route.kind !== 'tabs' || !user) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   return (
     <Stack screenOptions={{ headerShown: true, headerBackTitle: 'Quay lại' }}>
       <Stack.Screen name="[postId]" options={{ headerTitle: 'Bài viết' }} />

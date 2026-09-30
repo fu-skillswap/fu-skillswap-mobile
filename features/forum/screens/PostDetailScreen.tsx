@@ -19,7 +19,9 @@ import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   Text,
   TextInput,
@@ -209,6 +211,19 @@ export function PostDetailScreen({ postId }: { postId: string }) {
   return (
     <Screen testID="man-hinh-chi-tiet-bai-viet">
       <OfflineBanner />
+      {/*
+        Bàn phím iOS là một cửa sổ PHỦ LÊN app — hệ điều hành không co view lại.
+        Không có lớp này thì thanh nhập dính đáy cùng nút "Gửi" nằm dưới bàn
+        phím: người dùng gõ mà không thấy chữ mình gõ và không bấm được Gửi.
+        Android thì `windowSoftInputMode: adjustResize` mặc định của Expo đã tự
+        co view, nên `behavior` để `undefined` — theo đúng khuyến nghị ở
+        https://docs.expo.dev/guides/keyboard-handling/
+      */}
+      <KeyboardAvoidingView
+        testID="vung-tranh-ban-phim"
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <FlatList
         testID="danh-sach-binh-luan"
         data={comments.comments}
@@ -373,8 +388,11 @@ export function PostDetailScreen({ postId }: { postId: string }) {
           // Khối đứng yên ngay trên ô nhập, KHÔNG kèm nút thử lại: hai lỗi hay
           // gặp nhất ở đây là `FORUM_4201` (từ ngữ vi phạm) và 429 (quá 20 bình
           // luận/10 phút, hoặc trùng nội dung trong 5 phút). Gửi lại y nguyên
-          // nội dung đó chắc chắn hỏng tiếp và vẫn tiêu một lượt — đúng luật mà
-          // `core/ui/ErrorView.tsx` áp cho `action: 'NONE'`.
+          // nội dung đó chắc chắn hỏng tiếp và vẫn tiêu một lượt.
+          //
+          // Đây là lý do KHÔNG dùng `ErrorView` ở đây: `core/api/errors.ts` map
+          // 429 sang `action: 'RETRY'` và `ErrorView` sẽ vẽ nút "Thử lại" cho
+          // nó — đúng cho phần lớn màn hình, sai cho đúng chỗ này.
           <View testID="loi-gui-binh-luan" className="gap-1 rounded-md bg-danger-soft p-3">
             <Text className="font-semibold text-danger">
               {toUserMessage(guiBinhLuan.error).title}
@@ -407,6 +425,7 @@ export function PostDetailScreen({ postId }: { postId: string }) {
           />
         </View>
       </View>
+      </KeyboardAvoidingView>
 
       {reportTarget ? (
         <ReportSheet
