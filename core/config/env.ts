@@ -18,6 +18,8 @@ export interface AppEnv {
   isAiConfigured: boolean;
   /** userId của tài khoản bot "SkillSwap AI"; rỗng nghĩa là không gắn badge AI cho bình luận nào */
   forumBotUserId: string;
+  /** Biến môi trường có YÊU CẦU chế độ mock hay không — CHƯA tính tới `__DEV__` */
+  mockModeRequested: boolean;
 }
 
 /** Nguồn biến môi trường thô, tách riêng để test được mà không đụng process.env */
@@ -26,6 +28,7 @@ export interface RawEnvSource {
   EXPO_PUBLIC_AI_URL?: string;
   EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?: string;
   EXPO_PUBLIC_FORUM_BOT_USER_ID?: string;
+  EXPO_PUBLIC_MOCK_MODE?: string;
 }
 
 /** Bỏ khoảng trắng, dấu nháy thừa và dấu "/" ở cuối chuỗi URL */
@@ -61,6 +64,7 @@ export function readEnv(source: RawEnvSource): AppEnv {
     googleWebClientId,
     isAiConfigured: aiUrl.length > 0,
     forumBotUserId,
+    mockModeRequested: (source.EXPO_PUBLIC_MOCK_MODE ?? '').trim() === '1',
   };
 }
 
@@ -74,6 +78,7 @@ export function getEnv(): AppEnv {
       EXPO_PUBLIC_AI_URL: process.env.EXPO_PUBLIC_AI_URL,
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
       EXPO_PUBLIC_FORUM_BOT_USER_ID: process.env.EXPO_PUBLIC_FORUM_BOT_USER_ID,
+      EXPO_PUBLIC_MOCK_MODE: process.env.EXPO_PUBLIC_MOCK_MODE,
     });
   }
   return cached;
@@ -82,4 +87,17 @@ export function getEnv(): AppEnv {
 /** Xoá cache cấu hình — chỉ dùng trong test */
 export function resetEnvCache(): void {
   cached = null;
+}
+
+/**
+ * Chế độ mock có đang bật hay không.
+ *
+ * Bật thì MSW chạy ngay trong app chặn mọi `/api/*`, và `getGoogleIdToken()`
+ * trả token giả — dùng để xem giao diện trên máy thật khi backend chưa sẵn sàng.
+ *
+ * `__DEV__` là vế BẮT BUỘC, không phải để cho đẹp: nó khiến bản build phát hành
+ * không thể bật chế độ này bằng bất cứ biến môi trường nào. Đừng rút nó ra.
+ */
+export function isMockMode(): boolean {
+  return __DEV__ && getEnv().mockModeRequested;
 }
