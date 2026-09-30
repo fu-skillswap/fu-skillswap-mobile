@@ -13,5 +13,10 @@
 
 import { authMockHandlers } from '@/core/auth/mocks/handlers';
 import { forumMockHandlers } from '@/features/forum/mocks/handlers';
+import { profileMockHandlers } from '@/features/profile/mocks/handlers';
 
-export const mockHandlers = [...authMockHandlers, ...forumMockHandlers];
+export const mockHandlers = [
+  ...authMockHandlers,
+  ...forumMockHandlers,
+  ...profileMockHandlers,
+];

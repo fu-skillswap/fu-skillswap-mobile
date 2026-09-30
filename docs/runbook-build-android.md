@@ -195,6 +195,56 @@ trên máy thật hay giả lập lần nào**. Bản build này là lần đầ
 
 ---
 
+---
+
+## 5b. Chế độ mock — xem giao diện khi backend chưa sẵn sàng
+
+Đăng nhập thật đang bị chặn (mục 5). Chế độ mock bỏ qua chỗ đó để xem mọi màn
+hình đã dựng, với dữ liệu giả.
+
+### Bật thế nào
+
+**Với bản `development` build từ EAS: đã bật sẵn.** `eas.json` cắm
+`EXPO_PUBLIC_MOCK_MODE=1` cho riêng profile đó, không cần làm gì thêm.
+
+**Với Metro chạy từ máy tính**, thêm vào `.env`:
+
+```
+EXPO_PUBLIC_MOCK_MODE=1
+EXPO_PUBLIC_FORUM_BOT_USER_ID=bot-user-id
+```
+
+Biến thứ hai không phải tuỳ chọn cho vui: `isBotComment` **cố ý** trả `false` khi
+nó rỗng (gắn nhầm badge "AI" cho một sinh viên thật là quy sai tác giả, tệ hơn
+thiếu badge). Không có nó thì bình luận của bot không có badge và không có gì báo
+cho ông biết vì sao.
+
+### Khi bật, chuyện gì xảy ra
+
+- MSW chạy **ngay trong app**, trả lời mọi `/api/*` bằng dữ liệu giả.
+- Bấm "Đăng nhập với Google" **không** mở hộp thoại Google — app nhận token giả và
+  vào thẳng các tab. Màn hình đăng nhập **vẫn xem được** trước đó, vì lần refresh
+  đầu cố ý trả 401 như một máy chưa có phiên.
+- Dòng `[mock] MSW đã bật` xuất hiện trong Metro để biết chắc nó đang chạy.
+- Xem được: tab **Diễn đàn** (lướt, lọc chủ đề, tìm kiếm, mở bài, cây bình luận,
+  badge "AI") và tab **Hồ sơ** (mã sinh viên, cơ sở, ngành, chuyên ngành, đăng xuất).
+
+### Ba giới hạn, đều là chủ ý
+
+1. **Chỉ chạy trên bản dev.** `isMockMode()` yêu cầu cả `__DEV__`, nên bản
+   `preview` và `production` luôn tắt bất kể biến môi trường có giá trị gì. Đây là
+   thứ duy nhất ngăn một bản lên Play Store đi kèm đường vòng qua đăng nhập, và có
+   test khoá đúng điều đó (`core/config/env.test.ts`).
+2. **Mock không có trạng thái.** Thả tim, đăng bài, gửi bình luận đều phản hồi hợp
+   lệ nhưng không ghi lại: kéo xuống làm mới là mọi thứ về như cũ. Đủ để xem giao
+   diện phản ứng, không phải một backend thu nhỏ.
+3. **Endpoint chưa mock được cho đi thật** (`onUnhandledRequest: 'bypass'`), nên
+   màn hình chưa mock hiện lỗi mạng chứ không làm app chết. Ba tab Đặt lịch, Lịch,
+   Trợ lý AI vẫn là placeholder nên chưa gọi gì.
+
+Ảnh trong bài viết trỏ `picsum.photos` nên cần mạng mới hiện; không có mạng thì ô
+ảnh trống, phần còn lại vẫn chạy.
+
 ## 6. Còn lại gì để lên Google Play
 
 Chưa có gì trong danh sách này.
