@@ -77,7 +77,7 @@ Google Sign-In trên Android cần **hai** thứ tồn tại trong Google Cloud 
 
 1. **Web client** — client ID ở bước 2, dùng để lấy ID token cho backend kiểm.
 2. **Android client** — để Google chịu trả token cho chính app này. Cần:
-   - Package name: `asia.skillswap.mobile`
+   - Package name: `com.fptu.exe.skillswap`
    - SHA-1 của keystore ký bản build
 
 Lấy SHA-1 từ keystore mà EAS quản lý:

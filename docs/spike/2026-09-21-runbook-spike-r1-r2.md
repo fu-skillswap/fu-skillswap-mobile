@@ -83,7 +83,7 @@ Backend/Google chỉ chấp nhận request Google Sign-In từ app có khai báo
 1. Vào [Google Cloud Console](https://console.cloud.google.com/) → chọn đúng project mà backend đang dùng cho `GOOGLE_CLIENT_ID` (web client) — **phải cùng project**, không tạo project mới.
 2. **APIs & Services → Credentials → Create Credentials → OAuth client ID**.
 3. Application type: **Android**.
-4. Package name: `asia.skillswap.mobile` (đúng giá trị trong `app.json` → `expo.android.package`, đã cấu hình ở Task 11a).
+4. Package name: `com.fptu.exe.skillswap` (đúng giá trị trong `app.json` → `expo.android.package`, đã cấu hình ở Task 11a).
 5. SHA-1 certificate fingerprint: dán giá trị lấy được ở mục 2.1.
 6. Lưu lại.
 

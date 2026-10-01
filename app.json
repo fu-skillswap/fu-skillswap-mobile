@@ -9,11 +9,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "asia.skillswap.mobile",
+      "bundleIdentifier": "com.fptu.exe.skillswap",
       "supportsTablet": false
     },
     "android": {
-      "package": "asia.skillswap.mobile",
+      "package": "com.fptu.exe.skillswap",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
