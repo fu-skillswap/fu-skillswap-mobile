@@ -11,6 +11,12 @@
         "buildType": "apk"
       },
       "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.skillswap.asia"
+      }
+    },
+    "development-mock": {
+      "extends": "development",
+      "env": {
         "EXPO_PUBLIC_API_URL": "https://api.skillswap.asia",
         "EXPO_PUBLIC_MOCK_MODE": "1",
         "EXPO_PUBLIC_FORUM_BOT_USER_ID": "bot-user-id"

@@ -56,7 +56,8 @@
     "build:dev": "eas build --profile development --platform android",
     "build:preview": "eas build --profile preview --platform android",
     "build:prod": "eas build --profile production --platform android",
-    "doctor": "npx expo-doctor"
+    "doctor": "npx expo-doctor",
+    "build:dev-mock": "eas build --profile development-mock --platform android"
   },
   "jest": {
     "preset": "jest-expo",

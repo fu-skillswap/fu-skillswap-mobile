@@ -105,31 +105,46 @@ eas credentials    # → Android → keystore → Download
 
 ## 4. Build
 
-Ba profile trong `eas.json`:
+Bốn profile trong `eas.json`:
 
-| Profile | Lệnh | Ra cái gì | `__DEV__` | Chế độ mock chạy được? |
+| Profile | Lệnh | Ra cái gì | `__DEV__` | Chế độ mock |
 |---|---|---|---|---|
-| `development` | `npm run build:dev` | APK debug + development client | `true` | **Có** |
-| `preview` | `npm run build:preview` | APK release độc lập | `false` | Không |
-| `production` | `npm run build:prod` | AAB (Play chỉ nhận AAB) | `false` | Không |
+| `development` | `npm run build:dev` | APK debug + development client | `true` | **TẮT** — đi vào backend thật |
+| `development-mock` | `npm run build:dev-mock` | như trên | `true` | **BẬT** — dữ liệu giả, bỏ qua đăng nhập |
+| `preview` | `npm run build:preview` | APK release độc lập | `false` | Không bật được |
+| `production` | `npm run build:prod` | AAB (Play chỉ nhận AAB) | `false` | Không bật được |
 
-### Lần đầu dùng profile nào — tuỳ ông muốn thấy gì
+Hai profile dev khác nhau **đúng một biến môi trường**, nhưng khác nhau hoàn toàn
+về việc chúng trả lời được câu hỏi gì. Tách ra vì gộp lại là một cái bẫy: build
+`development` để thử đăng nhập thật mà chế độ mock vẫn bật thì nó bỏ qua đăng nhập
+và ta mất 20 phút để không kiểm được điều mình muốn kiểm.
 
-**Muốn XEM GIAO DIỆN (diễn đàn, hồ sơ...) khi backend chưa xong → `development`.**
+### Lần đầu dùng profile nào
+
+**Muốn kiểm ĐĂNG NHẬP THẬT và luồng đầu–cuối với backend → `development`.**
 
 ```bash
 npm run build:dev     # build một lần, ~10-20 phút
 npx expo start        # rồi mở Metro mỗi khi muốn chạy
 ```
 
-Chỉ `development` mới bật được chế độ mock. Lý do: `developmentClient: true` làm
-EAS build bằng `:app:assembleDebug` (xem
-https://docs.expo.dev/eas/json/), nên `__DEV__` là `true` — và `isMockMode()` yêu
-cầu `__DEV__` để bản phát hành không thể đi đường vòng qua đăng nhập. `eas.json`
-đã cắm sẵn `EXPO_PUBLIC_MOCK_MODE=1` cho riêng profile này.
+Cần đủ ba thứ ở mục 2 và 3: `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, keystore, và
+Android OAuth client đã đăng ký đúng package `com.fptu.exe.skillswap` + SHA-1.
 
-Đánh đổi: bản `development` cần Metro đang chạy trên máy tính cùng mạng Wi-Fi mới
-mở được app.
+**Muốn XEM GIAO DIỆN mà không cần backend → `development-mock`.**
+
+```bash
+npm run build:dev-mock
+npx expo start
+```
+
+Chỉ hai profile `development*` bật được chế độ mock. Lý do: `developmentClient:
+true` làm EAS build bằng `:app:assembleDebug` (xem https://docs.expo.dev/eas/json/),
+nên `__DEV__` là `true` — và `isMockMode()` đòi `__DEV__` để bản phát hành không
+thể đi đường vòng qua đăng nhập.
+
+Đánh đổi của cả hai: bản `development*` cần Metro đang chạy trên máy tính cùng
+mạng Wi-Fi mới mở được app.
 
 **Muốn biết app có compile và chạy độc lập được không → `preview`.**
 
