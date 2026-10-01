@@ -31,3 +31,37 @@ export function getNextCursor<T>(page: CursorPageResponse<T>): string | undefine
 export function flattenPages<T>(pages: CursorPageResponse<T>[] | undefined): T[] {
   return (pages ?? []).flatMap((page) => page.items);
 }
+
+/**
+ * Một trang dữ liệu theo OFFSET, dùng cho nhánh mentor.
+ *
+ * Khác hẳn `CursorPageResponse` ở trên: nhánh mentor của backend phân trang bằng
+ * `page`/`size` chứ không bằng token cursor (`mentor-discovery.md` §2). Hai bộ
+ * kiểu tồn tại song song có chủ ý — đừng cố gộp chúng lại.
+ */
+export interface PageResponse<T> {
+  content: T[];
+  /** Số trang hiện tại, bắt đầu từ 0 */
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  /** Đã là trang cuối hay chưa — NGUỒN SỰ THẬT để quyết định còn trang nữa không */
+  last: boolean;
+}
+
+/**
+ * Lấy số trang kế tiếp cho `getNextPageParam` của TanStack Query.
+ *
+ * Dựa vào `last`, KHÔNG tự tính `page + 1 < totalPages`: backend giới hạn deep
+ * pagination ở 20 trang đầu, nên `totalPages` có thể lớn hơn số trang thật sự lấy
+ * được và phép tự tính sẽ xin một trang không tồn tại.
+ */
+export function getNextPageNumber<T>(page: PageResponse<T>): number | undefined {
+  return page.last ? undefined : page.page + 1;
+}
+
+/** Gộp các trang offset của một infinite query thành một mảng phẳng để render */
+export function flattenOffsetPages<T>(pages: PageResponse<T>[] | undefined): T[] {
+  return (pages ?? []).flatMap((page) => page.content);
+}
