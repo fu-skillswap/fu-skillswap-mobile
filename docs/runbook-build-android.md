@@ -12,17 +12,21 @@ bởi backend, biết trước để không mất thời gian nghi ngờ bản b
 
 | | |
 |---|---|
-| **Expo Go không dùng được** | App cần hai native module Expo Go không có sẵn: `@preeternal/react-native-cookie-manager` (phiên đăng nhập nằm trên cookie store native) và `@react-native-google-signin/google-signin`. |
+| **Expo Go không dùng được** | App cần native module `@react-native-google-signin/google-signin`, thứ Expo Go không có sẵn. (`expo-secure-store` thì Expo Go CÓ sẵn.) |
 | **Build cục bộ chưa được** | Máy hiện tại chưa có Android SDK, và đang chạy Java 8 — Gradle 9.3 của bản này cần JDK 17. Cài đủ bộ đó mất nhiều thời gian hơn là để EAS lo. |
 
-Kiểm rồi: cả hai module đều ship code Android kèm `codegenConfig`
-(`CookieManagerSpec`, `RNGoogleSignInCGen`), đúng chuẩn New Architecture mà app
-đang bật (`newArchEnabled=true`, `hermesEnabled=true`).
+Kiểm rồi: module này ship code Android kèm `codegenConfig` (`RNGoogleSignInCGen`),
+đúng chuẩn New Architecture mà app đang bật (`newArchEnabled=true`,
+`hermesEnabled=true`).
 
-**Nhưng chúng chưa từng được biên dịch lần nào.** `npx expo prebuild` sinh cấu
-hình native sạch, còn việc autolinking + Gradle compile hai module đó chỉ xảy ra
-lúc build thật. Bản EAS build đầu tiên là lần đầu ta biết chúng có compile được
-hay không — nếu nó hỏng, hỏng ở đây, không phải ở code TypeScript.
+**Nhưng nó chưa từng được biên dịch lần nào.** `npx expo prebuild` sinh cấu hình
+native sạch, còn việc autolinking + Gradle compile chỉ xảy ra lúc build thật. Bản
+EAS build đầu tiên là lần đầu ta biết nó có compile được hay không — nếu nó hỏng,
+hỏng ở đây, không phải ở code TypeScript.
+
+Trước đây danh sách này có hai module: cookie manager của bên thứ ba đã bị bỏ hẳn
+(app tự giữ refresh token qua `expo-secure-store`, một module của chính Expo).
+Đó là một ẩn số lớn được gỡ khỏi bản build đầu tiên.
 
 ---
 
@@ -137,9 +141,8 @@ Một file APK, cài là chạy, không cần Metro. Nhưng nó là bản **rele
 `__DEV__` là `false`: chế độ mock tắt, app đi vào backend thật, và **sẽ dừng ở màn
 hình đăng nhập** cho tới khi backend có `/api/auth/google/mobile` (mục 5).
 
-Giá trị riêng của `preview`: nó vẫn trả lời được câu hỏi lớn nhất hiện nay — hai
-native module (`@preeternal/react-native-cookie-manager`, google-signin) có compile
-được trên New Architecture hay không.
+Giá trị riêng của `preview`: nó vẫn trả lời được câu hỏi lớn nhất hiện nay —
+google-signin có compile được trên New Architecture hay không.
 
 Build chạy trên máy của EAS, khoảng 10–20 phút. Xong thì nó in một link; mở link
 đó trên điện thoại rồi tải APK, hoặc quét QR. Android sẽ hỏi cho phép cài từ
@@ -155,24 +158,32 @@ nguồn ngoài — đồng ý.
 
 Đây là phần cần đọc kỹ để không nghi oan cho bản build.
 
-### Đăng nhập: ĐANG BỊ CHẶN bởi backend
+### Đăng nhập: chặn phía backend ĐÃ ĐƯỢC THÁO
 
 Thư viện Google Sign-In miễn phí (`@react-native-google-signin/google-signin@16.1.5`)
 **không đưa được claim `nonce` vào ID token** — đã kiểm: kiểu `SignInParams` chỉ có
 `loginHint`, không có `nonce` ở bất kỳ đâu trong package.
 
-Backend hiện chỉ có `POST /api/auth/google`, và nó **so khớp claim `nonce`**. Nghĩa
-là mobile gọi vào sẽ bị từ chối ở bước xác minh, không phải lỗi app.
+Backend đã có đường riêng cho mobile, nên điều trên không còn là chặn:
 
-Bản đề nghị đổi backend nằm ở
-`docs/be-change-requests/2026-09-21-mobile-google-login-nonce.md` (thư mục
-workspace, không commit vào repo này): thêm `POST /api/auth/google/mobile` bỏ
-**đúng** bước so khớp claim nonce, giữ nguyên kiểm chữ ký / `aud` / `iss` /
-`email_verified`, và **bắt buộc** thêm chốt chống replay theo `(sub, iat)` — vì
-một khi đường mobile tồn tại thì kẻ tấn công nào cũng chọn được nó.
+- `POST /api/auth/google/mobile` — body chỉ `{ credential }`, KHÔNG có `nonce`.
+  `GoogleAuthService.verifyMobilePayload()` gọi `verifyPayload(payload, null, ...)`,
+  tức bỏ đúng bước so khớp claim nonce; chống replay do
+  `GoogleMobileTokenReplayService` đảm nhiệm. Endpoint trả `refreshToken` ngay
+  trong JSON body (ngoài việc vẫn set cookie).
+- `POST /api/auth/refresh` và `POST /api/auth/logout` — nhận refresh token qua
+  header `X-Refresh-Token` (`extractRefreshToken()` đọc header trước, rồi body,
+  rồi cookie).
+- App gắn `X-Client-Type: mobile` + `X-Client-Platform: android|ios` vào mọi
+  request, vì chỉ client mobile mới được backend trả `refreshToken` mới khi rotate.
 
-**Cho tới khi endpoint đó lên: bản build sẽ dừng ở màn đăng nhập.** Không phải app
-hỏng.
+**CẢNH BÁO Google Play:** backend chặn `POST /api/me/payment-orders/checkout` bằng
+403 `PAY_4031` khi thấy `X-Client-Platform: android` — bản mobile chỉ được TIÊU số
+dư, không được nạp tiền. **Đừng bỏ header đó để lách**; làm vậy là cách chắc chắn
+nhất để app bị từ chối khỏi Play. Hiện app chưa gọi endpoint thanh toán nào.
+
+**Việc chưa ai kiểm được:** chưa có lần đăng nhập thật nào trên thiết bị. Lần build
+tới là lần đầu.
 
 ### Chạy được (một khi đăng nhập thông)
 

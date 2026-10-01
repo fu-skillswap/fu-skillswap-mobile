@@ -21,9 +21,8 @@ cp .env.example .env    # rồi điền EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
 npx expo start
 ```
 
-App dùng **development build**, không chạy trên Expo Go: nó cần các native module
-(`@preeternal/react-native-cookie-manager`, `@react-native-google-signin/google-signin`)
-mà Expo Go không có sẵn.
+App dùng **development build**, không chạy trên Expo Go: nó cần native module
+`@react-native-google-signin/google-signin` mà Expo Go không có sẵn.
 
 Để đưa app lên máy Android thật — kèm việc lấy SHA-1, đăng ký OAuth client và
 danh sách còn thiếu để lên Google Play — xem
@@ -59,22 +58,21 @@ Giai đoạn 1 (nền tảng) — xem plan để biết chi tiết từng task:
 - `core/api` — HTTP client bóc envelope `ApiResponse<T>`, tự refresh khi `401`
   (promise singleton, retry đúng một lần), `ApiClientError` + `toUserMessage`,
   `Idempotency-Key` gắn theo payload.
-- `core/auth` — phiên đăng nhập trên cookie store native, Google Sign-In, `authRepo`,
-  `AuthProvider`.
+- `core/auth` — phiên đăng nhập tự giữ refresh token trong keystore
+  (`expo-secure-store`), Google Sign-In, `authRepo`, `AuthProvider`.
 - `core/config` — biến môi trường, bảng tab theo vai trò.
 - `core/ui` — design token port từ `styles/globals.css` của FE web.
 - `app/` — khung điều hướng expo-router: màn hình đăng nhập và 5 tab placeholder.
 
 ### Chưa chạy được đầu–cuối
 
-Luồng đăng nhập cần backend bổ sung endpoint `/api/auth/google/mobile`: thư viện Google
-Sign-In miễn phí không đưa được claim `nonce` vào ID token, nên backend phải bỏ bước so
-khớp claim đó cho riêng đường mobile. Nội dung đề nghị chi tiết nằm ở
-`docs/be-change-requests/2026-09-21-mobile-google-login-nonce.md` trong workspace (không
-commit vào repo này).
+Backend ĐÃ có `POST /api/auth/google/mobile` (body chỉ `{ credential }`, không nonce) và
+`POST /api/auth/refresh` nhận refresh token qua header `X-Refresh-Token`, nên chặn phía
+backend đã được tháo. App tự giữ refresh token trong keystore qua `expo-secure-store` và
+không còn dùng cookie store native.
 
-Cho tới khi endpoint đó lên, spike R1/R2 trong `docs/spike/` chưa kết luận được — xem mục
-"Bị chặn" trong chính runbook đó.
+Việc còn lại là chạy thật: spike R1/R2 trong `docs/spike/` chỉ kết luận được sau khi có
+một bản build và một lần đăng nhập thật trên thiết bị.
 
 ### App chưa từng chạy trên thiết bị
 

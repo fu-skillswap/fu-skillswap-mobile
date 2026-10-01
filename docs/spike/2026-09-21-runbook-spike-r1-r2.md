@@ -1,4 +1,14 @@
-# Runbook — Spike R1/R2 (đăng nhập Google + độ bền refresh cookie)
+# Runbook — Spike R1/R2 (đăng nhập Google + độ bền phiên)
+
+> **CẬP NHẬT (sau khi tháo chặn backend):** tầng phiên KHÔNG còn dùng cookie
+> native. App tự lưu refresh token vào keystore của hệ điều hành qua
+> `expo-secure-store` (`core/auth/session.ts`), gửi lên qua header
+> `X-Refresh-Token`, và module cookie manager của bên thứ ba đã bị bỏ hẳn khỏi
+> `package.json`. Các hàm `hasRefreshCookie()` / `persistSessionCookies()` /
+> `clearSessionCookies()` KHÔNG CÒN TỒN TẠI — thay bằng `docRefreshToken()` /
+> `luuRefreshToken()` / `xoaRefreshToken()`. Backend cũng đã có
+> `POST /api/auth/google/mobile`. Phần còn lại của tài liệu này giữ nguyên làm
+> hồ sơ lịch sử; mục 5 đã được viết lại theo tầng phiên mới.
 
 - **Ngày viết**: 2026-09-21
 - **Áp dụng cho**: `fu-skillswap-mobile`, nhánh `feat/gd1-nen-tang`
@@ -13,11 +23,11 @@ Tài liệu này để người chạy spike làm theo từng bước, không c�
 | Mục | Trạng thái | Ghi chú |
 |---|---|---|
 | **R1 — nửa mobile**: `aud` của ID token đúng bằng web client id? Có claim `nonce` không? | **Chạy được ngay**, kể cả khi chưa có backend | Nhờ log chẩn đoán `__DEV__` gắn sẵn ở `app/(auth)/login.tsx` (Task 11a). Chỉ cần app mở được màn hình đăng nhập và bấm nút — không cần gọi API nào thành công. |
-| **R1 — nửa backend**: `POST /api/auth/google/mobile` trả `200`? | **Bị chặn** | Endpoint này chưa tồn tại (404) cho tới khi BE làm xong [change request](../be-change-requests/2026-09-21-mobile-google-login-nonce.md). |
-| **R2**: kill app rồi mở lại — có tự vào thẳng tab bar không? `hasRefreshCookie()` trả gì? `POST /api/auth/refresh` trả gì? | **Bị chặn** | Cần đăng nhập thành công qua đường mobile trước (phụ thuộc R1 — nửa backend). |
-| **Refresh sau 15 phút**: đúng một lần refresh, request gốc chạy lại thành công? | **Bị chặn** | Cùng lý do R2. |
+| **R1 — nửa backend**: `POST /api/auth/google/mobile` trả `200`? | **Chạy được** (chưa ai chạy) | Endpoint đã tồn tại trên backend; body chỉ `{ credential }`, không nonce. |
+| **R2**: kill app rồi mở lại — có tự vào thẳng tab bar không? `docRefreshToken()` trả gì? `POST /api/auth/refresh` trả gì? | **Chạy được** (chưa ai chạy) | Cần đăng nhập thành công qua đường mobile trước. |
+| **Refresh sau 15 phút**: đúng một lần refresh, request gốc chạy lại thành công? | **Chạy được** (chưa ai chạy) | Cùng điều kiện R2. |
 
-→ Việc duy nhất làm được trong runbook này **trước khi** backend xong là mục R1 — nửa mobile. Ba mục còn lại thuộc **Task 11b**, chạy khi backend đã triển khai xong endpoint mobile.
+→ Cả bốn mục giờ đều chạy được; không mục nào còn bị backend chặn. Cái còn thiếu duy nhất là một bản build và một thiết bị thật.
 
 ---
 
@@ -127,7 +137,7 @@ Nếu build lại bằng EAS với keystore mới (ví dụ xoá và tạo lại
 
 ### R2 (chờ Task 11b)
 
-| Kill app rồi mở lại → vào thẳng tab bar? | `hasRefreshCookie()` trả gì | `POST /api/auth/refresh` trả gì | Ngày chạy | Người chạy |
+| Kill app rồi mở lại → vào thẳng tab bar? | `docRefreshToken()` trả gì | `POST /api/auth/refresh` trả gì | Ngày chạy | Người chạy |
 |---|---|---|---|---|
 | | | | | |
 
@@ -145,13 +155,13 @@ Nếu build lại bằng EAS với keystore mới (ví dụ xoá và tạo lại
 
 ---
 
-## 5. Nếu R2 không đạt (tham khảo, chờ Task 11b)
+## 5. Nếu R2 không đạt
 
-Kiểm theo thứ tự sau (theo brief Task 11b), vì "cookie mất" và "cookie còn nhưng BE từ chối" nhìn từ ngoài giống hệt nhau:
+Phân biệt ba nguyên nhân, vì nhìn từ ngoài chúng giống hệt nhau (app ra màn hình đăng nhập):
 
-1. `hasRefreshCookie()` có trả `true` không, ngay sau khi vừa đăng nhập xong (trước khi kill app)?
-2. `persistSessionCookies()` có thực sự chạy sau khi đăng nhập thành công, và sau mỗi lần refresh, hay không?
-3. Nếu đã xác nhận cả hai điều trên đúng mà cookie vẫn mất sau khi khởi động lại app, đó là dấu hiệu cần một thay đổi backend thứ hai: `AuthController.resolveRefreshToken` hiện chỉ đọc cookie, có thể cần nhận thêm refresh token qua header cho client mobile.
+1. **Không ghi được token.** `luuRefreshToken()` trả `false` khi keystore không khả dụng HOẶC khi giá trị bị nền tảng từ chối (doc Expo v57: iOS lịch sử từ chối giá trị lớn hơn khoảng 2048 byte). Kiểm bằng cách gọi `docRefreshToken()` NGAY SAU khi đăng nhập xong, trước khi kill app: `null` nghĩa là chưa bao giờ ghi được.
+2. **Ghi được nhưng backend từ chối.** `docRefreshToken()` trả đúng token mà `POST /api/auth/refresh` vẫn 401 — xem backend có đọc header `X-Refresh-Token` không, và app có gửi `X-Client-Type: mobile` không (thiếu header này thì backend không trả `refreshToken` mới khi rotate, và phiên chết sau đúng một vòng refresh).
+3. **Token mồ côi trên iOS.** Dữ liệu SecureStore sống qua lần CÀI LẠI app cùng bundle ID, nên có thể đang refresh bằng một token đã bị thu hồi từ bản cài trước. Biểu hiện: 401 ở lần refresh đầu rồi ra màn hình đăng nhập — đúng hành vi mong đợi (`refreshAccessToken()` xoá token sau 401), không phải lỗi.
 
 ---
 
