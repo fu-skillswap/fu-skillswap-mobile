@@ -1,8 +1,8 @@
 /**
  * @file AuthProvider.tsx
- * @description Context phiên đăng nhập. Khi mở app sẽ gọi thẳng
- * `POST /api/auth/refresh`: thành công thì vào app, thất bại thì ra màn hình
- * đăng nhập. Cũng là nơi nối HTTP client với tầng cookie native.
+ * @description Context phiên đăng nhập. Khi mở app sẽ thử làm mới phiên từ refresh
+ * token đã lưu trong keystore: thành công thì vào app, thất bại (hoặc máy chưa lưu
+ * token nào) thì ra màn hình đăng nhập.
  */
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -16,16 +16,11 @@ import React, {
   useState,
 } from 'react';
 
-import {
-  refreshSession,
-  setAccessToken,
-  setTokenRefreshedHandler,
-  setUnauthenticatedHandler,
-} from '@/core/api/client';
+import { refreshSession, setAccessToken, setUnauthenticatedHandler } from '@/core/api/client';
 import { authRepo } from '@/core/auth/authRepo';
 import { getGoogleIdToken, signOutGoogle } from '@/core/auth/googleSignIn';
 import { decodeIdTokenClaims, describeIdTokenForSpike } from '@/core/auth/idTokenClaims';
-import { clearSessionCookies, persistSessionCookies } from '@/core/auth/session';
+import { xoaRefreshToken } from '@/core/auth/session';
 import type { UserMeResponse } from '@/core/auth/types';
 import { getEnv } from '@/core/config/env';
 
@@ -37,7 +32,7 @@ export interface AuthContextValue {
   user: UserMeResponse | null;
   /** Mở hộp thoại Google, đổi ID Token lấy phiên và nạp hồ sơ */
   signInWithGoogle: () => Promise<void>;
-  /** Thu hồi phiên ở backend và xoá cookie trên máy */
+  /** Thu hồi phiên ở backend và xoá refresh token đã lưu trên máy */
   signOut: () => Promise<void>;
 }
 
@@ -77,9 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // nếu không xoá thì tài khoản B dùng chung máy sẽ thấy thoáng qua dữ liệu
       // cache của tài khoản A trước khi các query refetch xong.
       queryClient.clear();
+      // Phiên đã được tuyên là chết, nên refresh token trong keystore cũng phải
+      // đi theo. Đây là đường KHÔNG đi qua `authRepo.logout()` (401 không refresh
+      // được nữa, hoặc request bị retry vẫn 401), nên nếu không xoá ở đây thì
+      // lần mở app sau sẽ tự đăng nhập lại vào một phiên vừa bị tuyên chết.
+      // `xoaRefreshToken()` không bao giờ ném nên không cần await/catch — handler
+      // này có chữ ký đồng bộ `() => void`.
+      void xoaRefreshToken();
     });
-    // Sau mỗi lần refresh, ghi cookie vừa rotate xuống đĩa (quan trọng trên Android).
-    setTokenRefreshedHandler(persistSessionCookies);
 
     void (async () => {
       try {
@@ -101,14 +101,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted.current = false;
       setUnauthenticatedHandler(undefined);
-      setTokenRefreshedHandler(undefined);
     };
   }, [queryClient]);
 
   const signInWithGoogle = useCallback(async () => {
-    const { nonce } = await authRepo.getGoogleNonce();
-    // Thư viện Google Sign-In miễn phí không nhận nonce (không đưa được claim
-    // `nonce` vào ID Token) — chỉ authRepo.loginWithGoogle mới gửi nonce lên backend.
+    // KHÔNG xin nonce nữa: đường mobile `POST /api/auth/google/mobile` không so
+    // khớp claim `nonce` (backend chống replay bằng cơ chế riêng), nên lời gọi
+    // `GET /api/auth/google/nonce` chỉ là một round trip dư — và nó còn đốt một
+    // nonce dùng-một-lần cho mỗi lần đăng nhập mà không ai dùng tới.
     const credential = await getGoogleIdToken();
     if (__DEV__) {
       // Chỉ chạy trong bản dev, phục vụ spike R1: đọc claim đúng trên `credential` —
@@ -116,8 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // lần hai (vừa hiện hộp thoại Google hai lần, vừa soi nhầm token đã bị bỏ đi).
       console.log(describeIdTokenForSpike(decodeIdTokenClaims(credential), getEnv().googleWebClientId));
     }
-    await authRepo.loginWithGoogle({ credential, nonce });
-    await persistSessionCookies();
+    // `loginWithGoogle` tự lưu refresh token xuống keystore — xem `authRepo.ts`.
+    await authRepo.loginWithGoogle({ credential });
     const me = await authRepo.getMe();
     if (mounted.current) {
       setUser(me);
@@ -133,12 +133,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // ngược lại thứ tự cũ (setAccessToken → queryClient.clear() → 2 await →
       // setState). Thứ tự cũ có hai vấn đề:
       // 1) Màn hình vẫn coi phiên là 'authenticated' xuyên suốt hai lần await
-      //    (clearSessionCookies, signOutGoogle) — queryClient.clear() lúc đó
-      //    có thể kích observer đang mount refetch ngay, mà refresh cookie
+      //    (xoá refresh token, signOutGoogle) — queryClient.clear() lúc đó
+      //    có thể kích observer đang mount refetch ngay, mà refresh token
       //    chưa kịp xoá xong: request đó 401 → tự refresh (SAU epoch bump vì
       //    setAccessToken(null) đã chạy) → ghi token mới sống vào bộ nhớ cho
       //    một phiên đang đăng xuất, vô hiệu hoá cơ chế sessionEpoch.
-      // 2) Nếu clearSessionCookies() reject, khối dọn state (setUser/setStatus)
+      // 2) Nếu một bước dọn dẹp chậm reject, khối dọn state (setUser/setStatus)
       //    không bao giờ chạy — phiên bị bỏ dở nửa chừng, và vì profile.tsx
       //    nuốt lỗi của signOut() nên nút "Đăng xuất" trông như không làm gì.
       // Đặt setAccessToken/setUser/setStatus lên đầu khối finally khiến hai vấn
@@ -152,7 +152,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Xoá cache TanStack Query của tài khoản vừa đăng xuất — xem giải thích ở
       // setUnauthenticatedHandler phía trên.
       queryClient.clear();
-      await clearSessionCookies();
+      // Refresh token đã được `authRepo.logout()` xoá trong khối `finally` của
+      // chính nó, kể cả khi request logout lỗi mạng — xem `authRepo.ts`. Không
+      // gọi lại ở đây để tránh hai đường cùng xoá một thứ.
       await signOutGoogle().catch(() => undefined);
     }
   }, [queryClient]);

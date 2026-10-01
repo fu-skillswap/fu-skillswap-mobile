@@ -1,17 +1,37 @@
 import { delay, http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import { Platform } from 'react-native';
 
 import {
   __resetApiClientForTests,
   apiClient,
   getAccessToken,
+  refreshSession,
   setAccessToken,
   setUnauthenticatedHandler,
 } from '@/core/api/client';
-import { ApiClientError } from '@/core/api/errors';
+import { ApiClientError, toUserMessage } from '@/core/api/errors';
+import { docRefreshToken, luuRefreshToken, xoaRefreshToken } from '@/core/auth/session';
 import { resetEnvCache } from '@/core/config/env';
 
+/**
+ * Keystore giả giữ trong RAM. Cố ý KHÔNG mock `@/core/auth/session`: mock đúng ở
+ * biên native để `core/auth/session.ts` THẬT chạy trong các test này — nhờ vậy
+ * chuỗi "client đọc token đã lưu → gửi header → ghi lại token rotate" được kiểm
+ * end-to-end thay vì kiểm qua một seam do chính test dựng ra.
+ */
+jest.mock('expo-secure-store', () =>
+  require('@/core/auth/__testing__/khoBaoMatGiaLap').taoKhoBaoMatGiaLap(),
+);
+
 const BASE = 'https://api.skillswap.asia';
+
+/** Platform.OS là thuộc tính chỉ đọc theo typings của RN, phải ghi đè qua defineProperty */
+function datNenTang(os: typeof Platform.OS): void {
+  Object.defineProperty(Platform, 'OS', { value: os, configurable: true });
+}
+
+const NEN_TANG_GOC = Platform.OS;
 
 function envelope(data: unknown, overrides: Record<string, unknown> = {}) {
   return {
@@ -27,11 +47,22 @@ function envelope(data: unknown, overrides: Record<string, unknown> = {}) {
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => {
+beforeEach(async () => {
+  datNenTang(NEN_TANG_GOC);
+  // Mặc định: máy ĐÃ có refresh token lưu trong keystore. Không có nó thì
+  // `refreshAccessToken()` ném ngay mà không gọi API (đúng theo thiết kế), và
+  // mọi test về luồng 401 → refresh → retry bên dưới sẽ không còn kiểm được gì.
+  await luuRefreshToken('rt-da-luu');
+});
+afterEach(async () => {
   server.resetHandlers();
   __resetApiClientForTests();
+  await xoaRefreshToken();
 });
-afterAll(() => server.close());
+afterAll(() => {
+  datNenTang(NEN_TANG_GOC);
+  server.close();
+});
 
 describe('apiClient', () => {
   it('bóc envelope và trả thẳng payload', async () => {
@@ -346,5 +377,220 @@ describe('cấu hình môi trường', () => {
       process.env.EXPO_PUBLIC_API_URL = originalApiUrl;
       resetEnvCache();
     }
+  });
+});
+
+describe('header nhận diện client mobile', () => {
+  it('mọi request mang X-Client-Type: mobile và X-Client-Platform theo Platform.OS', async () => {
+    // Backend quyết định "đây là client mobile" qua `isMobileClient()`: có refresh
+    // token trong body/header, HOẶC `X-Client-Type: mobile`, HOẶC
+    // `X-Client-Platform: android|ios`. Chỉ khi là mobile thì `/api/auth/refresh`
+    // mới trả refreshToken mới trong body — không có header này thì cơ chế tự
+    // lưu token của app đứt ngay từ lần rotate đầu tiên.
+    datNenTang('android');
+    let clientType: string | null = null;
+    let clientPlatform: string | null = null;
+    server.use(
+      http.get(`${BASE}/api/auth/me`, ({ request }) => {
+        clientType = request.headers.get('X-Client-Type');
+        clientPlatform = request.headers.get('X-Client-Platform');
+        return HttpResponse.json(envelope({ ok: true }));
+      }),
+    );
+
+    await apiClient('/api/auth/me');
+
+    expect(clientType).toBe('mobile');
+    expect(clientPlatform).toBe('android');
+  });
+
+  it('trên iOS thì X-Client-Platform là ios, không phải android', async () => {
+    // Phải kiểm cả hai giá trị: nếu code hard-code 'android' thì test vẫn xanh,
+    // và app iOS sẽ bị backend đối xử như Android — nghĩa là bị chặn checkout
+    // bằng PAY_4031 ngay cả ở nền tảng không chịu ràng buộc của Google Play.
+    datNenTang('ios');
+    let clientPlatform: string | null = null;
+    server.use(
+      http.get(`${BASE}/api/auth/me`, ({ request }) => {
+        clientPlatform = request.headers.get('X-Client-Platform');
+        return HttpResponse.json(envelope({ ok: true }));
+      }),
+    );
+
+    await apiClient('/api/auth/me');
+
+    expect(clientPlatform).toBe('ios');
+  });
+
+  it('nền tảng không phải android/ios thì KHÔNG bịa X-Client-Platform', async () => {
+    // `react-native-web` có trong dependencies nên `Platform.OS === 'web'` là
+    // trạng thái đạt tới được. Backend chỉ hiểu `android|ios`; khai khống
+    // 'android' ở đây là tự nhận một lệnh chặn thanh toán (PAY_4031) mà nền tảng
+    // đó không hề bị ràng buộc. `X-Client-Type: mobile` vẫn đủ để backend trả
+    // refresh token trong body.
+    datNenTang('web');
+    let clientType: string | null = null;
+    let coHeaderNenTang = true;
+    server.use(
+      http.get(`${BASE}/api/auth/me`, ({ request }) => {
+        clientType = request.headers.get('X-Client-Type');
+        coHeaderNenTang = request.headers.has('X-Client-Platform');
+        return HttpResponse.json(envelope({ ok: true }));
+      }),
+    );
+
+    await apiClient('/api/auth/me');
+
+    expect(clientType).toBe('mobile');
+    expect(coHeaderNenTang).toBe(false);
+  });
+});
+
+describe('refresh token tự lưu (thay cookie native)', () => {
+  it('gửi refresh token đã lưu qua header X-Refresh-Token', async () => {
+    // `AuthController.extractRefreshToken()` đọc header TRƯỚC, rồi mới tới body
+    // JSON, rồi mới tới cookie. App không còn cookie nào nên header là đường duy nhất.
+    await luuRefreshToken('rt-cua-may-nay');
+    let headerThayDuoc: string | null = null;
+    server.use(
+      http.post(`${BASE}/api/auth/refresh`, ({ request }) => {
+        headerThayDuoc = request.headers.get('X-Refresh-Token');
+        return HttpResponse.json(envelope({ accessToken: 'at-moi', tokenType: 'Bearer' }));
+      }),
+    );
+
+    await expect(refreshSession()).resolves.toBe('at-moi');
+
+    expect(headerThayDuoc).toBe('rt-cua-may-nay');
+  });
+
+  it('chưa có refresh token nào thì KHÔNG gọi /api/auth/refresh, ném luôn', async () => {
+    // Gọi `/refresh` rỗng chỉ nhận về 401 và làm chậm lúc khởi động app (một
+    // round trip mạng trước khi vào được màn hình đăng nhập). `onUnhandledRequest:
+    // 'error'` không bắt được việc này vì handler vẫn tồn tại — phải tự đếm.
+    await xoaRefreshToken();
+    let soLanGoi = 0;
+    server.use(
+      http.post(`${BASE}/api/auth/refresh`, () => {
+        soLanGoi += 1;
+        return HttpResponse.json(envelope({ accessToken: 'at-moi', tokenType: 'Bearer' }));
+      }),
+    );
+
+    await expect(refreshSession()).rejects.toBeInstanceOf(ApiClientError);
+    await expect(refreshSession()).rejects.toMatchObject({ status: 401 });
+
+    expect(soLanGoi).toBe(0);
+  });
+
+  it('chưa có refresh token: lỗi vẫn phải là ApiClientError 401 để giao diện mời đăng nhập lại', async () => {
+    // `toUserMessage()` chỉ trả action 'LOGIN' cho `ApiClientError` có status 401;
+    // mọi lỗi khác thành "Đã có lỗi xảy ra / thử lại sau ít phút / RETRY" — lời
+    // khuyên sai hoàn toàn với một phiên không tồn tại. Kiểm qua đúng hàm quy đổi
+    // thật thay vì chỉ kiểm tên lớp lỗi.
+    await xoaRefreshToken();
+
+    const loi = await refreshSession().then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(toUserMessage(loi).action).toBe('LOGIN');
+  });
+
+  it('refresh trả refreshToken mới thì ghi đè token đã lưu (backend rotate token)', async () => {
+    await luuRefreshToken('rt-cu');
+    server.use(
+      http.post(`${BASE}/api/auth/refresh`, () =>
+        HttpResponse.json(
+          envelope({ accessToken: 'at-moi', refreshToken: 'rt-moi', tokenType: 'Bearer' }),
+        ),
+      ),
+    );
+
+    await refreshSession();
+
+    // Không ghi lại token mới nghĩa là lần refresh SAU vẫn gửi `rt-cu` đã bị
+    // backend thu hồi khi rotate — phiên chết sau đúng một vòng refresh.
+    await expect(docRefreshToken()).resolves.toBe('rt-moi');
+  });
+
+  it('refresh không trả refreshToken thì KHÔNG ghi gì vào keystore', async () => {
+    // `TokenResponse.refreshToken` là `null` với client web. Nếu client ghi đè vô
+    // điều kiện, một phản hồi hình dạng đó sẽ đè lên token đang dùng được.
+    //
+    // ĐÃ ĐO khi làm falsification: hành vi này được HAI guard độc lập bảo vệ —
+    // `if (tokenRes.refreshToken)` ở client.ts và `if (!token)` trong
+    // `luuRefreshToken()`. Phá đúng một trong hai thì test này VẪN xanh, vì guard
+    // còn lại đỡ. Nên test này cố ý khoá KẾT QUẢ (không ghi, token cũ còn nguyên)
+    // chứ không khoá một dòng cụ thể; muốn thấy nó đỏ phải bỏ cả hai guard. Guard
+    // bên trong `session.ts` có điểm phá riêng, một dòng, ở `session.test.ts`
+    // ("token rỗng thì không chạm vào keystore").
+    await luuRefreshToken('rt-con-dung-duoc');
+    const kho = jest.requireMock('expo-secure-store');
+    kho.setItemAsync.mockClear();
+    server.use(
+      http.post(`${BASE}/api/auth/refresh`, () =>
+        HttpResponse.json(
+          envelope({ accessToken: 'at-moi', refreshToken: null, tokenType: 'Bearer' }),
+        ),
+      ),
+    );
+
+    await refreshSession();
+
+    expect(kho.setItemAsync).not.toHaveBeenCalled();
+    await expect(docRefreshToken()).resolves.toBe('rt-con-dung-duoc');
+  });
+
+  it('refresh bị 401 thì xoá token đã lưu (token chết sau khi cài lại app trên iOS)', async () => {
+    // Trên iOS dữ liệu SecureStore sống qua lần cài lại app cùng bundle ID, nên
+    // một refresh token đã bị thu hồi có thể còn nằm đó. Không xoá thì mỗi lần
+    // mở app lại tốn một request 401 và không bao giờ tự thoát khỏi vòng đó.
+    await luuRefreshToken('rt-da-chet');
+    server.use(
+      http.post(`${BASE}/api/auth/refresh`, () =>
+        HttpResponse.json(envelope(null, { status: 401, code: 'AUTH_1003' }), { status: 401 }),
+      ),
+    );
+
+    await expect(refreshSession()).rejects.toBeInstanceOf(ApiClientError);
+
+    await expect(docRefreshToken()).resolves.toBeNull();
+  });
+
+  it('refresh thất bại vì MẤT MẠNG thì GIỮ token đã lưu', async () => {
+    // Phân biệt "backend từ chối token" với "không gọi tới được backend". Xoá
+    // token khi mất mạng sẽ bắt người dùng đăng nhập lại bằng Google chỉ vì mở
+    // app lúc đang offline — và họ cũng không đăng nhập lại được, vì offline.
+    await luuRefreshToken('rt-con-tot');
+    server.use(http.post(`${BASE}/api/auth/refresh`, () => HttpResponse.error()));
+
+    await expect(refreshSession()).rejects.toMatchObject({ status: 0 });
+
+    await expect(docRefreshToken()).resolves.toBe('rt-con-tot');
+  });
+
+  it('đăng xuất giữa lúc refresh đang chạy thì KHÔNG ghi refresh token mới vào keystore', async () => {
+    // Cùng cơ chế sessionEpoch đã bảo vệ access token: token mới nhận về sau khi
+    // người dùng đã đăng xuất là rác. Ghi nó xuống keystore sẽ hồi sinh phiên đã
+    // chết ở lần MỞ APP SAU — một lỗi còn khó thấy hơn vì nó không xảy ra ngay.
+    await luuRefreshToken('rt-truoc-khi-dang-xuat');
+    server.use(
+      http.post(`${BASE}/api/auth/refresh`, async () => {
+        await delay(50);
+        return HttpResponse.json(
+          envelope({ accessToken: 'at-moi', refreshToken: 'rt-rac', tokenType: 'Bearer' }),
+        );
+      }),
+    );
+
+    const pending = refreshSession();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    setAccessToken(null);
+    await pending.catch(() => undefined);
+
+    await expect(docRefreshToken()).resolves.toBe('rt-truoc-khi-dang-xuat');
+    expect(getAccessToken()).toBeNull();
   });
 });

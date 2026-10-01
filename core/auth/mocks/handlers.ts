@@ -7,18 +7,15 @@
  * được kiểm". Gộp hai thứ lại thì sửa fixture cho đẹp màn hình sẽ làm đổ test,
  * và siết fixture cho test sẽ làm màn hình trống.
  *
- * Luồng xác thực THẬT chạy nguyên vẹn qua đây: `AuthProvider` vẫn gọi refresh
- * khi mở app, vẫn xin nonce, vẫn đổi credential lấy phiên, vẫn gọi `/me`. Chế độ
- * mock không thêm một nhánh `if` nào vào `AuthProvider`.
+ * Luồng xác thực THẬT chạy nguyên vẹn qua đây: `AuthProvider` vẫn thử làm mới
+ * phiên từ refresh token trong keystore khi mở app, vẫn đổi credential lấy phiên,
+ * vẫn lưu refresh token, vẫn gọi `/me`. Chế độ mock không thêm một nhánh `if` nào
+ * vào `AuthProvider`.
  */
 
 import { http, HttpResponse } from 'msw';
 
-import type {
-  GoogleLoginNonceResponse,
-  TokenResponse,
-  UserMeResponse,
-} from '@/core/auth/types';
+import type { TokenResponse, UserMeResponse } from '@/core/auth/types';
 import { getEnv } from '@/core/config/env';
 
 /**
@@ -49,6 +46,16 @@ export const MOCK_USER: UserMeResponse = {
 /** Access token giả — chuỗi cố định, không phải JWT thật và không cần là JWT */
 const MOCK_ACCESS_TOKEN = 'mock-access-token';
 
+/**
+ * Refresh token giả.
+ *
+ * `/api/auth/refresh` và `/api/auth/logout` dưới đây SO KHỚP đúng giá trị này
+ * trong header `X-Refresh-Token` thay vì chấp nhận bất cứ gì. Nhờ vậy chế độ mock
+ * bắt được đúng lỗi nó cần bắt: app quên gửi header, hoặc gửi token rỗng/sai, sẽ
+ * hiện ra thành màn hình đăng nhập chứ không âm thầm đi tiếp.
+ */
+const MOCK_REFRESH_TOKEN = 'mock-refresh-token';
+
 /** Bọc dữ liệu vào envelope `ApiResponse<T>` đúng như backend trả về */
 function envelope(data: unknown) {
   return {
@@ -69,12 +76,12 @@ function loi(status: number, code: string, message: string) {
 }
 
 /**
- * `false` cho tới khi người dùng bấm đăng nhập.
+ * `false` cho tới khi người dùng bấm đăng nhập (hoặc tới khi một refresh token
+ * hợp lệ được xuất trình).
  *
- * Nhờ vậy lần `POST /api/auth/refresh` lúc mở app trả 401 như một máy chưa có
- * phiên, và app dừng ở màn hình đăng nhập thật — đúng trạng thái người dùng mới
- * gặp. Trả 200 ngay từ đầu thì màn hình đăng nhập không bao giờ xem được trong
- * chế độ mock, và cũng không ai bấm thử được nút đăng nhập.
+ * Nhờ vậy máy chưa có phiên sẽ dừng ở màn hình đăng nhập thật — đúng trạng thái
+ * người dùng mới gặp. Cho `/me` trả 200 ngay từ đầu thì màn hình đăng nhập không
+ * bao giờ xem được trong chế độ mock, và cũng không ai bấm thử được nút đăng nhập.
  */
 let daDangNhap = false;
 
@@ -85,34 +92,36 @@ export function __resetMockAuthForTests(): void {
 
 const base = getEnv().apiUrl;
 
-const nonceGia: GoogleLoginNonceResponse = {
-  nonce: 'mock-nonce-0001',
-  // Mốc thời gian thật parse được, không phải chuỗi rỗng: `GoogleLoginNonceResponse`
-  // khai `expiresAt: string` và backend trả ISO-8601.
-  expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
-};
-
 const tokenGia: TokenResponse = {
   accessToken: MOCK_ACCESS_TOKEN,
-  // `TokenResponse` có HAI field. Bỏ `tokenType` là mock bịa một hình dạng hẹp
-  // hơn kiểu thật — đúng lớp lỗi repo này đã dính nhiều lần.
+  // `TokenResponse` có BA field với client mobile. Bỏ `tokenType` — hay bỏ
+  // `refreshToken`, thứ backend chỉ điền cho mobile — là mock bịa một hình dạng
+  // hẹp hơn kiểu thật, đúng lớp lỗi repo này đã dính nhiều lần. Thiếu
+  // `refreshToken` ở đây thì chế độ mock mất phiên sau mỗi lần tắt app, trong khi
+  // bản thật thì không.
+  refreshToken: MOCK_REFRESH_TOKEN,
   tokenType: 'Bearer',
 };
 
 export const authMockHandlers = [
-  http.get(`${base}/api/auth/google/nonce`, () => HttpResponse.json(envelope(nonceGia))),
-
   // Mobile gọi `/api/auth/google/mobile`, KHÔNG phải `/api/auth/google` của web
-  // — xem JSDoc của `authRepo.loginWithGoogle`.
+  // — xem JSDoc của `authRepo.loginWithGoogle`. Body chỉ có `{ credential }`.
   http.post(`${base}/api/auth/google/mobile`, () => {
     daDangNhap = true;
     return HttpResponse.json(envelope(tokenGia));
   }),
 
-  http.post(`${base}/api/auth/refresh`, () => {
-    if (!daDangNhap) {
-      return loi(401, 'AUTH_1003', 'Chưa có phiên đăng nhập trên máy này');
+  http.post(`${base}/api/auth/refresh`, ({ request }) => {
+    // Backend thật đọc refresh token qua `extractRefreshToken()`: header
+    // `X-Refresh-Token` trước, rồi body, rồi cookie. App mobile chỉ dùng header.
+    if (request.headers.get('X-Refresh-Token') !== MOCK_REFRESH_TOKEN) {
+      return loi(401, 'AUTH_1003', 'Refresh token không hợp lệ hoặc đã bị thu hồi');
     }
+    // Xuất trình được token hợp lệ thì phiên đang tồn tại — kể cả khi tiến trình
+    // vừa khởi động lại và biến `daDangNhap` mới được khởi tạo lại thành false.
+    // Thiếu dòng này thì chế độ mock refresh được nhưng `/me` lại 401, và app
+    // kẹt ở một trạng thái bản thật không có.
+    daDangNhap = true;
     return HttpResponse.json(envelope(tokenGia));
   }),
 

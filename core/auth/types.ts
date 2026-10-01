@@ -7,27 +7,31 @@
 /** Vai trò do backend cấp */
 export type BackendRole = 'MENTEE' | 'MENTOR' | 'ADMIN' | 'SYSTEM_ADMIN';
 
-/** Phản hồi của `GET /api/auth/google/nonce` */
-export interface GoogleLoginNonceResponse {
-  nonce: string;
-  expiresAt: string;
-}
-
 /**
- * Payload đăng nhập Google.
- * Web gửi payload này tới `POST /api/auth/google`; mobile gửi cùng payload tới
- * `POST /api/auth/google/mobile` (xem `authRepo.ts`) — DTO backend không đổi.
+ * Payload đăng nhập Google của ĐƯỜNG MOBILE (`POST /api/auth/google/mobile`).
+ *
+ * Chỉ có `credential`, KHÔNG có `nonce`: `GoogleAuthService.verifyMobilePayload()`
+ * gọi `verifyPayload(payload, null, ...)`, tức bỏ hẳn bước so khớp claim `nonce`
+ * — thư viện Google Sign-In miễn phí không đưa được claim đó vào ID Token. Chống
+ * replay là việc của `GoogleMobileTokenReplayService` ở phía backend, nên mobile
+ * không còn xin nonce nữa (đường web `POST /api/auth/google` thì vẫn dùng nonce).
  */
 export interface GoogleLoginRequest {
   /** Google ID Token */
   credential: string;
-  /** Đúng nonce đã dùng khi lấy ID Token */
-  nonce: string;
 }
 
 /** Phản hồi chứa access token */
 export interface TokenResponse {
   accessToken: string;
+  /**
+   * Refresh token ở dạng thô, CHỈ có giá trị với client mobile.
+   * Backend trả `null` cho client web (web dùng cookie HttpOnly) và chỉ điền giá
+   * trị khi `isMobileClient()` đúng — tức là khi request mang refresh token trong
+   * header/body, hoặc mang `X-Client-Type: mobile`, hoặc `X-Client-Platform:
+   * android|ios` (các header này do `core/api/client.ts` gắn vào mọi request).
+   */
+  refreshToken?: string | null;
   tokenType: string;
 }
 

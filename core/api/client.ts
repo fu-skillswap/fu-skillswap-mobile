@@ -3,7 +3,11 @@
  * @description HTTP client trung tâm của app mobile, port từ `models/apiClient.ts`
  * của FE web. Giữ access token trong RAM, bóc envelope ApiResponse, tự làm mới
  * token khi gặp 401 theo cơ chế promise singleton và chuẩn hoá lỗi về ApiClientError.
- * Refresh token do tầng native giữ trong cookie store, JavaScript không đọc được.
+ *
+ * Refresh token do CHÍNH APP giữ trong keystore (`core/auth/session.ts`), không
+ * còn nằm trong cookie native nữa — xem JSDoc của file đó để biết vì sao đổi.
+ * Module này gửi nó lên qua header `X-Refresh-Token` và ghi lại token mới mỗi
+ * lần backend rotate.
  */
 
 import axios, {
@@ -12,14 +16,45 @@ import axios, {
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig,
 } from 'axios';
+import { Platform } from 'react-native';
 
 import { ApiClientError, type ApiResponse, type ValidationError } from '@/core/api/errors';
+import { docRefreshToken, luuRefreshToken, xoaRefreshToken } from '@/core/auth/session';
 import { getEnv } from '@/core/config/env';
 
-/** Phản hồi của `POST /api/auth/refresh` (khai báo tại chỗ để core/api không phụ thuộc core/auth) */
+/**
+ * Phản hồi của `POST /api/auth/refresh`, khai báo tại chỗ để `core/api` không
+ * phụ thuộc vào kiểu của `core/auth`. (Phụ thuộc duy nhất theo chiều đó là
+ * `core/auth/session.ts` — module đó chỉ import `expo-secure-store`, nên không
+ * có vòng import nào.)
+ *
+ * `refreshToken` là `null` với client web và CÓ GIÁ TRỊ với client mobile:
+ * backend chỉ trả nó khi `isMobileClient()` đúng, tức là khi request mang refresh
+ * token trong header/body hoặc mang `X-Client-Type`/`X-Client-Platform` — đó là
+ * lý do các header dưới đây là bắt buộc, không phải để cho đẹp.
+ */
 interface RefreshTokenResponse {
   accessToken: string;
+  refreshToken?: string | null;
   tokenType: string;
+}
+
+/** Header backend đọc refresh token từ đó (`AuthController.extractRefreshToken` đọc header TRƯỚC body) */
+const HEADER_REFRESH_TOKEN = 'X-Refresh-Token';
+
+/**
+ * Nền tảng để khai trong `X-Client-Platform`, hoặc `null` nếu không phải máy di
+ * động (backend chỉ hiểu `android|ios`).
+ *
+ * CẢNH BÁO — ĐỪNG BỎ HEADER NÀY ĐỂ LÁCH: backend chặn
+ * `POST /api/me/payment-orders/checkout` bằng 403 `PAY_4031` khi thấy
+ * `X-Client-Platform: android`, theo đúng yêu cầu của Google Play (bản mobile chỉ
+ * được TIÊU số dư, không được nạp tiền). Bỏ header để gọi được endpoint đó là
+ * cách chắc chắn nhất để app bị từ chối khỏi Play. Hiện app chưa gọi endpoint
+ * thanh toán nào nên quy tắc này chưa ảnh hưởng tới màn hình nào cả.
+ */
+function nenTangClient(): 'android' | 'ios' | null {
+  return Platform.OS === 'android' || Platform.OS === 'ios' ? Platform.OS : null;
 }
 
 /** Access token chỉ nằm trong bộ nhớ tiến trình, không ghi xuống đĩa */
@@ -37,7 +72,6 @@ let refreshPromise: Promise<string> | null = null;
 let sessionEpoch = 0;
 
 let unauthenticatedHandler: (() => void) | undefined;
-let tokenRefreshedHandler: ((token: string) => void | Promise<void>) | undefined;
 
 /** Cập nhật access token trong bộ nhớ; truyền null để xoá khi đăng xuất */
 export const setAccessToken = (token: string | null): void => {
@@ -53,16 +87,6 @@ export const getAccessToken = (): string | null => memoryToken;
 /** Đăng ký hàm chạy khi phiên hết hạn hoàn toàn (không refresh được nữa) */
 export const setUnauthenticatedHandler = (handler?: () => void): void => {
   unauthenticatedHandler = handler;
-};
-
-/**
- * Đăng ký hàm chạy sau mỗi lần refresh thành công.
- * `core/auth` dùng chỗ này để ghi cookie xuống đĩa trên Android.
- */
-export const setTokenRefreshedHandler = (
-  handler?: (token: string) => void | Promise<void>,
-): void => {
-  tokenRefreshedHandler = handler;
 };
 
 /** Các path không được tự refresh khi gặp 401, tránh vòng lặp vô hạn */
@@ -91,7 +115,9 @@ function getAxiosInstance(): AxiosInstance {
 
   const instance = axios.create({
     baseURL: getEnv().apiUrl,
-    // React Native tự quản lý cookie ở tầng native; cờ này giữ cho hành vi giống FE web.
+    // Backend vẫn set cookie phiên cho mọi client; app không đọc cookie nào nữa
+    // (xem core/auth/session.ts) nhưng cờ này giữ hành vi giống FE web và không
+    // gây hại.
     withCredentials: true,
     timeout: 20_000,
     headers: { 'Content-Type': 'application/json' },
@@ -101,6 +127,14 @@ function getAxiosInstance(): AxiosInstance {
     (config: InternalAxiosRequestConfig) => {
       if (memoryToken && !config.headers.has('Authorization')) {
         config.headers.set('Authorization', `Bearer ${memoryToken}`);
+      }
+      // Hai header này phải đi kèm MỌI request, không chỉ `/api/auth/refresh`:
+      // `isMobileClient()` của backend đọc chúng để biết đây là client mobile, và
+      // chỉ client mobile mới được trả refreshToken mới trong body khi rotate.
+      config.headers.set('X-Client-Type', 'mobile');
+      const nenTang = nenTangClient();
+      if (nenTang) {
+        config.headers.set('X-Client-Platform', nenTang);
       }
       return config;
     },
@@ -173,22 +207,72 @@ function getAxiosInstance(): AxiosInstance {
 async function refreshAccessToken(): Promise<string> {
   if (!refreshPromise) {
     const epochAtStart = sessionEpoch;
-    refreshPromise = apiClient<RefreshTokenResponse>('/api/auth/refresh', { method: 'POST' })
-      .then(async (tokenRes) => {
-        if (sessionEpoch !== epochAtStart) {
-          // Người dùng đã đăng xuất (setAccessToken(null)) trong lúc refresh này
-          // đang chạy ngầm. Token mới vừa nhận về giờ là rác — không được ghi vào
-          // bộ nhớ, không được coi là "đã refresh xong", nếu không sẽ hồi sinh một
-          // phiên đã chết ngay sau khi AuthProvider báo cáo unauthenticated.
-          throw new Error('Phiên đã đăng xuất trong lúc đang làm mới access token');
+    // IIFE async thay cho `.then()` vì thân hàm giờ có bước `await` đọc keystore
+    // TRƯỚC khi gọi API. Promise vẫn được gán vào `refreshPromise` ngay trong
+    // cùng một lượt đồng bộ, nên cơ chế singleton (nhiều request 401 song song
+    // chỉ refresh một lần) không đổi.
+    refreshPromise = (async () => {
+      const refreshTokenDaLuu = await docRefreshToken();
+      if (!refreshTokenDaLuu) {
+        // Máy này chưa có phiên nào lưu được. KHÔNG gọi API: `/api/auth/refresh`
+        // rỗng chỉ trả về 401, và cái giá là một round trip mạng chèn vào đúng
+        // lúc khởi động app, trước khi màn hình đăng nhập kịp hiện ra.
+        //
+        // Phải là ApiClientError(401), KHÔNG phải Error thường: `toUserMessage()`
+        // quy mọi lỗi không-phải-ApiClientError về "Đã có lỗi xảy ra / thử lại
+        // sau ít phút / action RETRY". Với một phiên đã chết thì lời khuyên đó
+        // sai — hành động đúng là LOGIN, và chỉ nhánh `status === 401` mới trả về
+        // nó. Giữ đúng lớp lỗi cũng giữ nguyên hợp đồng cho mọi repository đang
+        // phân biệt lỗi theo `status` (ví dụ `profileRepo` coi 404 là "chưa có").
+        throw new ApiClientError(
+          401,
+          'AUTH_1003',
+          'Phiên đăng nhập đã kết thúc. Vui lòng đăng nhập lại.',
+        );
+      }
+
+      let tokenRes: RefreshTokenResponse;
+      try {
+        tokenRes = await apiClient<RefreshTokenResponse>('/api/auth/refresh', {
+          method: 'POST',
+          headers: { [HEADER_REFRESH_TOKEN]: refreshTokenDaLuu },
+        });
+      } catch (error) {
+        // CHỈ 401 mới nghĩa là backend đã từ chối chính refresh token này (hết
+        // hạn, bị thu hồi, hoặc là token mồ côi còn sót trong Keychain sau khi
+        // cài lại app trên iOS). Xoá nó để lần mở app sau đi thẳng ra màn hình
+        // đăng nhập thay vì lặp lại một request chắc chắn thất bại.
+        //
+        // Mất mạng (status 0), 500, 429 thì KHÔNG xoá: token vẫn có thể còn tốt,
+        // và xoá nó sẽ bắt người dùng đăng nhập lại bằng Google đúng lúc họ đang
+        // offline — việc họ không làm được.
+        if (error instanceof ApiClientError && error.status === 401) {
+          await xoaRefreshToken();
         }
-        setAccessToken(tokenRes.accessToken);
-        await tokenRefreshedHandler?.(tokenRes.accessToken);
-        return tokenRes.accessToken;
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
+        throw error;
+      }
+
+      if (sessionEpoch !== epochAtStart) {
+        // Người dùng đã đăng xuất (setAccessToken(null)) trong lúc refresh này
+        // đang chạy ngầm. Cả access token LẪN refresh token vừa nhận về giờ là
+        // rác — không được ghi vào bộ nhớ, không được ghi xuống keystore, không
+        // được coi là "đã refresh xong". Nếu không, phiên đã chết sẽ sống lại:
+        // access token ngay sau khi AuthProvider báo unauthenticated, và refresh
+        // token ở lần MỞ APP SAU.
+        throw new Error('Phiên đã đăng xuất trong lúc đang làm mới access token');
+      }
+      setAccessToken(tokenRes.accessToken);
+      if (tokenRes.refreshToken) {
+        // Backend rotate refresh token mỗi lần refresh: không ghi lại token mới
+        // thì lần refresh kế tiếp vẫn gửi token cũ đã bị thu hồi, và phiên chết
+        // sau đúng một vòng. Phản hồi KHÔNG có `refreshToken` (null — hình dạng
+        // của client web) thì giữ nguyên token đang lưu, không ghi rỗng lên nó.
+        await luuRefreshToken(tokenRes.refreshToken);
+      }
+      return tokenRes.accessToken;
+    })().finally(() => {
+      refreshPromise = null;
+    });
   }
   return refreshPromise;
 }
@@ -219,7 +303,7 @@ export const apiClient = async <T>(
   return result as unknown as T;
 };
 
-/** Chủ động làm mới phiên từ refresh cookie — dùng khi khởi động app */
+/** Chủ động làm mới phiên từ refresh token đã lưu trong keystore — dùng khi khởi động app */
 export const refreshSession = (): Promise<string> => refreshAccessToken();
 
 /** Đưa client về trạng thái sạch — chỉ dùng trong test */
@@ -228,7 +312,6 @@ export function __resetApiClientForTests(): void {
   refreshPromise = null;
   sessionEpoch = 0;
   unauthenticatedHandler = undefined;
-  tokenRefreshedHandler = undefined;
   // Instance axios cũng phải bị xoá: nó nhớ `baseURL` chốt tại lúc tạo (đọc từ
   // getEnv() ở đúng một lần gọi getAxiosInstance() đầu tiên). Nếu test đổi
   // EXPO_PUBLIC_API_URL rồi resetEnvCache() mà không xoá instance này, request
