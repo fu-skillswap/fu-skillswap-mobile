@@ -19,5 +19,9 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],
-  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
+  // `test-utils/` chỉ dùng trong test (nó import `@testing-library/react-native`),
+  // nên nó bị loại khỏi project của app giống như các file `*.test.ts(x)`. Nó vẫn
+  // được typecheck: tsconfig.test.json kéo nó vào theo đường import từ các file
+  // test (kiểm chứng: đặt một lỗi kiểu trong đó thì `npm run typecheck` đỏ).
+  "exclude": ["**/*.test.ts", "**/*.test.tsx", "test-utils"]
 }

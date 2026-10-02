@@ -9,6 +9,7 @@ import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
 import { ComposeScreen } from '@/features/forum';
 import { forumKeys } from '@/features/forum/queryKeys';
+import { donHangDoiDanhSach } from '@/test-utils/nhuongNhip';
 
 const BASE = 'https://api.skillswap.asia';
 
@@ -55,7 +56,6 @@ jest.mock('@/core/auth/AuthProvider', () => ({
     signOut: jest.fn(),
   }),
 }));
-
 
 const {
   __mockBack: mockBack,
@@ -132,32 +132,6 @@ afterEach(() => {
   __resetApiClientForTests();
 });
 afterAll(() => server.close());
-
-/**
- * Nhường một nhịp macrotask BÊN TRONG act: `notifyManager` của TanStack đẩy
- * thông báo re-render qua `setTimeout(0)`, nổ SAU khi act scope đóng nếu không
- * chờ. Cảnh báo act() sinh ra từ đó chập chờn, chỉ bẩn ở vài lần chạy.
- */
-/**
- * Nhường một nhịp cho `VirtualizedList` dọn hàng đợi của nó, gọi ở CUỐI mỗi test
- * có render danh sách.
- *
- * FlatList gom việc render ô vào `_updateCellsToRenderBatcher` — một bộ hẹn giờ
- * ~50ms. Nếu nó nổ trong khoảng giữa lúc thân test kết thúc và lúc RNTL gỡ cây,
- * React cập nhật ngoài phạm vi act và in cảnh báo; chạy 6 lần mới bẩn 1 lần nên
- * rất dễ bị kết luận nhầm là đã hết.
- *
- * Phải gọi trong THÂN test chứ không đặt được vào `afterEach`: auto-cleanup của
- * RNTL đăng ký `afterEach` ngay lúc import và jest-circus chạy hook theo đúng
- * thứ tự khai báo, nên nó luôn gỡ cây trước mọi `afterEach` viết ở đây (kiểm
- * chứng: gọi `screen.unmount()` trong afterEach ném "`render` function has not
- * been called").
- */
-async function donHangDoiDanhSach() {
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 60));
-  });
-}
 
 /** `render` của RNTL 14 là hàm ASYNC — phải await, nếu không lần render đầu nằm ngoài act(). */
 async function renderScreen(postId?: string) {

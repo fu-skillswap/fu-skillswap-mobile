@@ -8,6 +8,8 @@ import React from 'react';
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
 import { ForumFeedScreen } from '@/features/forum';
+import { DO_TRE_TIM_KIEM_MS } from '@/features/forum/screens/ForumFeedScreen';
+import { donHangDoiDanhSach, nhuongChoDebounce } from '@/test-utils/nhuongNhip';
 
 const BASE = 'https://api.skillswap.asia';
 
@@ -42,8 +44,6 @@ jest.mock('@/core/auth/AuthProvider', () => ({
     signOut: jest.fn(),
   }),
 }));
-
-
 
 const { __mockPush: mockPush } = jest.requireMock<{ __mockPush: jest.Mock }>('expo-router');
 
@@ -116,37 +116,6 @@ afterEach(() => {
   __resetApiClientForTests();
 });
 afterAll(() => server.close());
-
-/**
- * Để FlatList dọn xong hàng đợi của nó TRƯỚC khi test kết thúc.
- *
- * `VirtualizedList` gom việc render ô vào `_updateCellsToRenderBatcher`, một bộ
- * hẹn giờ ~50ms. Nếu test kết thúc trước khi nó nổ, React cập nhật ngoài phạm vi
- * act và in "An update to VirtualizedList inside a test was not wrapped in
- * act(...)". Cảnh báo này CHẬP CHỜN — chạy 6 lần chỉ bẩn 1–2 lần — nên rất dễ
- * bị kết luận nhầm là đã hết chỉ vì lần chạy gần nhất sạch.
- */
-/**
- * Nhường một nhịp cho `VirtualizedList` dọn hàng đợi của nó, gọi ở CUỐI mỗi test
- * có render danh sách.
- *
- * FlatList gom việc render ô vào `_updateCellsToRenderBatcher` — một bộ hẹn giờ
- * ~50ms. Nếu nó nổ trong khoảng giữa lúc thân test kết thúc và lúc RNTL gỡ cây,
- * React cập nhật ngoài phạm vi act và in cảnh báo; chạy 6 lần mới bẩn 1 lần nên
- * rất dễ bị kết luận nhầm là đã hết.
- *
- * Phải gọi trong THÂN test chứ không đặt được vào `afterEach`: auto-cleanup của
- * RNTL đăng ký `afterEach` ngay lúc import và jest-circus chạy hook theo đúng
- * thứ tự khai báo, nên nó luôn gỡ cây trước mọi `afterEach` viết ở đây (kiểm
- * chứng: gọi `screen.unmount()` trong afterEach ném "`render` function has not
- * been called").
- */
-async function donHangDoiDanhSach() {
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 60));
-  });
-}
-
 
 /**
  * `render` của @testing-library/react-native@14 là HÀM ASYNC — phải await.
@@ -259,6 +228,10 @@ describe('ForumFeedScreen', () => {
     await fireEvent.changeText(o, 's');
     await fireEvent.changeText(o, 'sp');
     await fireEvent.changeText(o, 'spring');
+    // Hạn debounce phải tới khi còn ở TRONG act; nếu để nó rơi vào khe giữa thân
+    // test và afterEach gỡ cây thì React in cảnh báo act() — xem
+    // `nhuongChoDebounce`.
+    await nhuongChoDebounce(DO_TRE_TIM_KIEM_MS);
 
     await waitFor(() => expect(screen.getByText('Kết quả tìm kiếm')).toBeTruthy(), {
       timeout: 3_000,

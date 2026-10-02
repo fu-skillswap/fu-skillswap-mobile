@@ -27,8 +27,13 @@ import { useForumList, useForumTopics } from '@/features/forum/hooks/useForumQue
 /**
  * Từ khoá phải đứng yên bấy nhiêu mili giây mới được đưa vào query key.
  * Thấp hơn thì gõ nhanh vẫn sinh request thừa; cao hơn thì người dùng thấy chậm.
+ *
+ * Export ra để test nhường đúng khoảng này cho debounce (`nhuongChoDebounce`)
+ * thay vì chép lại con số — chép lại thì sửa ở đây là test âm thầm sai nhịp.
+ * KHÔNG re-export qua barrel `@/features/forum`: barrel là API công khai cho
+ * feature khác, còn đây chỉ là chi tiết test cần biết.
  */
-const DO_TRE_TIM_KIEM_MS = 350;
+export const DO_TRE_TIM_KIEM_MS = 350;
 
 export function ForumFeedScreen() {
   const router = useRouter();
