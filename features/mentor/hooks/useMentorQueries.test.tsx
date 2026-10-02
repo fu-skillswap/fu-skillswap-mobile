@@ -1,0 +1,194 @@
+import { QueryClientProvider } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import React from 'react';
+
+import { __resetApiClientForTests } from '@/core/api/client';
+import { createQueryClient } from '@/core/api/queryClient';
+import {
+  useMentor,
+  useMentorRecommendations,
+  useMentorReviews,
+  useMentorSearch,
+} from '@/features/mentor/hooks/useMentorQueries';
+
+const BASE = 'https://api.skillswap.asia';
+
+function envelope(data: unknown) {
+  return { timestamp: '2026-10-01T00:00:00Z', status: 200, code: 'SUCCESS', message: 'OK', data };
+}
+
+/** Một `PageResponse<T>` tối giản — chỉ đủ field để hook đọc được */
+function trang(content: unknown[], page: number, last: boolean) {
+  return { content, page, size: 2, totalElements: 4, totalPages: 2, last };
+}
+
+const server = setupServer();
+
+/** Một QueryClient cho mỗi test — xem Global Constraints. */
+let queryClient: QueryClient;
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeEach(() => {
+  queryClient = createQueryClient();
+});
+afterEach(() => {
+  queryClient.clear();
+  server.resetHandlers();
+  __resetApiClientForTests();
+});
+afterAll(() => server.close());
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+
+describe('useMentorSearch', () => {
+  it('gộp nhiều trang offset thành một mảng phẳng', async () => {
+    const trangDaGui: (string | null)[] = [];
+    server.use(
+      http.get(`${BASE}/api/mentors`, ({ request }) => {
+        const p = new URL(request.url).searchParams.get('page');
+        trangDaGui.push(p);
+        return HttpResponse.json(
+          envelope(
+            p === '1' ? trang([{ id: 3 }, { id: 4 }], 1, true) : trang([{ id: 1 }, { id: 2 }], 0, false),
+          ),
+        );
+      }),
+    );
+
+    const { result } = await renderHook(() => useMentorSearch({}), { wrapper });
+    await waitFor(() => expect(result.current.mentors).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.fetchNextPage();
+    });
+
+    await waitFor(() => expect(result.current.mentors).toHaveLength(4));
+    // Trang kế tiếp phải là SỐ TRANG, không phải cursor. Trang đầu gửi `page=0`
+    // tường minh: `cleanParams` của repo lọc theo `undefined`/chuỗi rỗng chứ
+    // không theo tính truthy, nên số 0 vẫn rời máy.
+    expect(trangDaGui).toEqual(['0', '1']);
+    expect(result.current.hasNextPage).toBe(false);
+  });
+});
+
+describe('useMentorRecommendations', () => {
+  it('trả về mảng gợi ý, không bọc trong trang', async () => {
+    server.use(
+      http.get(`${BASE}/api/mentors/recommendations`, () =>
+        HttpResponse.json(
+          envelope([
+            {
+              mentor: { identity: { mentorUserId: 'm1' } },
+              matchScore: 90,
+              matchReasons: ['Cùng chuyên ngành'],
+            },
+          ]),
+        ),
+      ),
+    );
+
+    const { result } = await renderHook(() => useMentorRecommendations(), { wrapper });
+
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+    expect(result.current.data?.[0]?.matchReasons).toEqual(['Cùng chuyên ngành']);
+  });
+});
+
+describe('useMentorSearch — enabled', () => {
+  it('`enabled` false thì KHÔNG có request nào rời máy', async () => {
+    // Màn hình tắt truy vấn này khi người dùng chưa gõ gì. MSW đang bật
+    // `onUnhandledRequest: 'error'`, nhưng handler có đăng ký nên không bắt được
+    // bằng cách đó — phải đếm.
+    let soGoi = 0;
+    server.use(
+      http.get(`${BASE}/api/mentors`, () => {
+        soGoi += 1;
+        return HttpResponse.json(envelope(trang([], 0, true)));
+      }),
+    );
+
+    const { result } = await renderHook(() => useMentorSearch({ keyword: '' }, false), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(result.current.mentors).toEqual([]));
+    expect(soGoi).toBe(0);
+  });
+});
+
+describe('useMentor', () => {
+  it('tải hồ sơ mentor đầy đủ', async () => {
+    server.use(
+      http.get(`${BASE}/api/mentors/m1`, () =>
+        HttpResponse.json(envelope({ identity: { mentorUserId: 'm1', displayName: 'Mentor Một' } })),
+      ),
+    );
+
+    const { result } = await renderHook(() => useMentor('m1'), { wrapper });
+
+    await waitFor(() => expect(result.current.data?.identity.mentorUserId).toBe('m1'));
+  });
+
+  it('id rỗng thì KHÔNG gọi đường dẫn cụt', async () => {
+    // Thiếu chốt này thì mỗi lần route chưa có tham số sẽ có một
+    // `GET /api/mentors/` rời máy — xem `useForumPost` của nhánh diễn đàn.
+    let soGoi = 0;
+    server.use(
+      http.get(`${BASE}/api/mentors`, () => {
+        soGoi += 1;
+        return HttpResponse.json(envelope({}));
+      }),
+      http.get(`${BASE}/api/mentors/`, () => {
+        soGoi += 1;
+        return HttpResponse.json(envelope({}));
+      }),
+    );
+
+    const { result } = await renderHook(() => useMentor(''), { wrapper });
+
+    await waitFor(() => expect(result.current.fetchStatus).toBe('idle'));
+    expect(result.current.data).toBeUndefined();
+    expect(soGoi).toBe(0);
+  });
+});
+
+describe('useMentorReviews', () => {
+  it('gộp các trang đánh giá', async () => {
+    server.use(
+      http.get(`${BASE}/api/mentors/m1/reviews`, () =>
+        HttpResponse.json(envelope(trang([{ reviewId: 'r1' }], 0, true))),
+      ),
+    );
+
+    const { result } = await renderHook(() => useMentorReviews('m1'), { wrapper });
+
+    await waitFor(() => expect(result.current.reviews).toHaveLength(1));
+  });
+
+  it('id rỗng thì KHÔNG gọi đường dẫn cụt', async () => {
+    // Đối xứng với `useMentor('')`: đường dẫn `/api/mentors//reviews` là rác.
+    // Phải ĐẾM chứ không dựa vào `onUnhandledRequest: 'error'` — một query lỗi
+    // cũng để lại `reviews` rỗng y như một query bị tắt.
+    let soGoi = 0;
+    server.use(
+      http.get(`${BASE}/api/mentors/:mentorUserId/reviews`, () => {
+        soGoi += 1;
+        return HttpResponse.json(envelope(trang([], 0, true)));
+      }),
+      http.get(`${BASE}/api/mentors//reviews`, () => {
+        soGoi += 1;
+        return HttpResponse.json(envelope(trang([], 0, true)));
+      }),
+    );
+
+    const { result } = await renderHook(() => useMentorReviews(''), { wrapper });
+
+    await waitFor(() => expect(result.current.fetchStatus).toBe('idle'));
+    expect(soGoi).toBe(0);
+  });
+});
