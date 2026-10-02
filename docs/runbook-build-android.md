@@ -131,6 +131,12 @@ npx expo start        # rồi mở Metro mỗi khi muốn chạy
 Cần đủ ba thứ ở mục 2 và 3: `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, keystore, và
 Android OAuth client đã đăng ký đúng package `com.fptu.exe.skillswap` + SHA-1.
 
+> [!NOTE]
+> **Không có thiết bị Android thật?** Xem
+> [`runbook-gia-lap-android.md`](runbook-gia-lap-android.md) — dựng giả lập qua
+> Android Studio. Lưu ý quan trọng nhất ở đó: system image **phải có Google Play**,
+> ảnh AOSP trơn không có Play Services nên Google Sign-In sẽ hỏng.
+
 **Muốn XEM GIAO DIỆN mà không cần backend → `development-mock`.**
 
 ```bash
