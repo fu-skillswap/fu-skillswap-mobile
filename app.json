@@ -42,6 +42,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9bb8ebfc-a932-45d2-8fab-436eb056a677"
+      }
+    },
+    "owner": "eocivs-team"
   }
 }
