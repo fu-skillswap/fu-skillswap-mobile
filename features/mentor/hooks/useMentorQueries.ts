@@ -8,14 +8,62 @@
  */
 
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 import { flattenOffsetPages, getNextPageNumber } from '@/core/api/pagination';
 import { mentorRepo } from '@/features/mentor/mentorRepo';
 import type { MentorSearchFilters } from '@/features/mentor/mentorRepo';
 import { mentorKeys } from '@/features/mentor/queryKeys';
 
-/** Gợi ý mentor theo ngành học (cần đăng nhập) */
+/**
+ * Bộ lọc mà MÀN HÌNH được phép truyền cho `useMentorSearch`.
+ *
+ * `page` bị loại khỏi kiểu có chủ ý: số trang do chính hook quản (qua
+ * `pageParam` của `useInfiniteQuery`), nên một `page` lọt vào bộ lọc chỉ có thể
+ * là rác — nó vừa nhiễm vào khoá cache vừa có nguy cơ ghi đè `pageParam` và làm
+ * MỌI trang xin đúng một số trang. Lưới test không bắt được lớp lỗi này, nên nó
+ * bị biến thành lỗi BIÊN DỊCH. `size` thì giữ lại: đó là bộ lọc hợp lệ, vào
+ * khoá và vào request đều đúng.
+ */
+export type BoLocTimMentor = Omit<MentorSearchFilters, 'page'>;
+
+/**
+ * Chốt chặn ĐỒNG BỘ cho việc tải trang kế, dùng chung cho mọi infinite query
+ * của nhánh mentor.
+ *
+ * FlatList bắn `onEndReached` nhiều lần liên tiếp trong cùng một frame. Nếu chỉ
+ * dựa vào `isFetchingNextPage`, cả hai lần gọi đều đọc cùng một giá trị `false`
+ * của lần render cũ — React chưa kịp render lại — và cùng một số trang được gửi
+ * đi hai lần: trang đó bị nối vào danh sách hai lượt và người dùng thấy bản ghi
+ * trùng. Ref đổi ngay lập tức nên lần gọi thứ hai bị chặn.
+ *
+ * Chốt chặn nằm TRONG hook chứ không ở màn hình: diễn đàn đã sinh ra hai bản
+ * `useRef` y hệt nhau (`ForumFeedScreen`, `PostDetailScreen`) vì để màn hình tự
+ * dựng. Nhánh mentor có hai danh sách nữa, và mỗi bản sao là một chỗ để quên.
+ */
+function useChotChanTrangKe(query: {
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => Promise<unknown>;
+}) {
+  const dangTaiTrangKe = useRef(false);
+
+  return () => {
+    if (dangTaiTrangKe.current || !query.hasNextPage || query.isFetchingNextPage) return;
+    dangTaiTrangKe.current = true;
+    void query.fetchNextPage().finally(() => {
+      dangTaiTrangKe.current = false;
+    });
+  };
+}
+
+/**
+ * Gợi ý mentor theo ngành học (cần đăng nhập).
+ *
+ * `limit` phải vào CẢ khoá query lẫn request: thiếu ở khoá thì `limit=3` và
+ * `limit=10` dùng chung một ô cache và màn hình thứ hai nhận đúng số bản ghi của
+ * màn hình thứ nhất; thiếu ở request thì backend trả về số mặc định.
+ */
 export function useMentorRecommendations(limit?: number) {
   return useQuery({
     queryKey: mentorKeys.recommendations(limit),
@@ -31,8 +79,14 @@ export function useMentorRecommendations(limit?: number) {
  * `enabled` là tham số TƯỜNG MINH chứ không suy ra từ `filters`: màn hình là nơi
  * biết người dùng đang xem gợi ý hay đang tìm kiếm, và `useMentorSearch({})` là
  * một truy vấn hợp lệ (xem toàn bộ mentor) nên hook không thể tự đoán.
+ *
+ * `filters` không nhận `page` — xem JSDoc của `BoLocTimMentor`. Thứ tự spread
+ * trong `queryFn` cũng cố ý đặt `page: pageParam` SAU `...filters`.
+ *
+ * Trả thêm `taiTrangKe()` đã bọc chốt chặn chống bấm trùng — màn hình nối thẳng
+ * vào `onEndReached` của FlatList, KHÔNG tự dựng `useRef` lần nữa.
  */
-export function useMentorSearch(filters: MentorSearchFilters, enabled = true) {
+export function useMentorSearch(filters: BoLocTimMentor, enabled = true) {
   const query = useInfiniteQuery({
     queryKey: mentorKeys.search(filters),
     initialPageParam: 0,
@@ -42,8 +96,9 @@ export function useMentorSearch(filters: MentorSearchFilters, enabled = true) {
   });
 
   const mentors = useMemo(() => flattenOffsetPages(query.data?.pages), [query.data]);
+  const taiTrangKe = useChotChanTrangKe(query);
 
-  return { ...query, mentors };
+  return { ...query, mentors, taiTrangKe };
 }
 
 /** Hồ sơ mentor đầy đủ */
@@ -57,7 +112,15 @@ export function useMentor(mentorUserId: string) {
   });
 }
 
-/** Đánh giá của một mentor */
+/**
+ * Đánh giá của một mentor.
+ *
+ * Khoá phải là `mentorKeys.reviews(id)` chứ KHÔNG phải `detail(id)`: màn hồ sơ
+ * chạy hook này cùng lúc với `useMentor(id)`, trùng khoá là hai truy vấn khác
+ * hình dạng cùng ghi vào một ô cache.
+ *
+ * Trả thêm `taiTrangKe()` đã bọc chốt chặn — lý do ở `useChotChanTrangKe`.
+ */
 export function useMentorReviews(mentorUserId: string) {
   const query = useInfiniteQuery({
     queryKey: mentorKeys.reviews(mentorUserId),
@@ -68,6 +131,7 @@ export function useMentorReviews(mentorUserId: string) {
   });
 
   const reviews = useMemo(() => flattenOffsetPages(query.data?.pages), [query.data]);
+  const taiTrangKe = useChotChanTrangKe(query);
 
-  return { ...query, reviews };
+  return { ...query, reviews, taiTrangKe };
 }
