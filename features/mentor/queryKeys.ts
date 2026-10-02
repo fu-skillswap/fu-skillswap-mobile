@@ -3,7 +3,7 @@
  * @description Khoá query nhánh mentor, gom một chỗ để invalidate không bị lệch.
  */
 
-import type { MentorSearchFilters } from '@/features/mentor/mentorRepo';
+import type { BoLocTimMentor } from '@/features/mentor/mentorRepo';
 
 export const mentorKeys = {
   all: ['mentor'] as const,
@@ -15,10 +15,10 @@ export const mentorKeys = {
    *
    * KHÔNG nhận `page`: số trang do `useInfiniteQuery` quản qua `pageParam`, nên
    * một `page` trong bộ lọc chỉ làm nhiễu khoá. Xem `BoLocTimMentor` ở
-   * `hooks/useMentorQueries.ts`. `size` thì vẫn vào khoá — hai kích thước trang
-   * khác nhau là hai danh sách khác nhau.
+   * `mentorRepo.ts`. `size` thì vẫn vào khoá — hai kích thước trang khác nhau là
+   * hai danh sách khác nhau.
    */
-  search: (filters: Omit<MentorSearchFilters, 'page'>) =>
+  search: (filters: BoLocTimMentor) =>
     [...mentorKeys.searchAll(), filters] as const,
   detail: (mentorUserId: string) => [...mentorKeys.all, 'detail', mentorUserId] as const,
   reviews: (mentorUserId: string) => [...mentorKeys.all, 'reviews', mentorUserId] as const,

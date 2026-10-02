@@ -12,20 +12,8 @@ import { useMemo, useRef } from 'react';
 
 import { flattenOffsetPages, getNextPageNumber } from '@/core/api/pagination';
 import { mentorRepo } from '@/features/mentor/mentorRepo';
-import type { MentorSearchFilters } from '@/features/mentor/mentorRepo';
+import type { BoLocTimMentor } from '@/features/mentor/mentorRepo';
 import { mentorKeys } from '@/features/mentor/queryKeys';
-
-/**
- * Bộ lọc mà MÀN HÌNH được phép truyền cho `useMentorSearch`.
- *
- * `page` bị loại khỏi kiểu có chủ ý: số trang do chính hook quản (qua
- * `pageParam` của `useInfiniteQuery`), nên một `page` lọt vào bộ lọc chỉ có thể
- * là rác — nó vừa nhiễm vào khoá cache vừa có nguy cơ ghi đè `pageParam` và làm
- * MỌI trang xin đúng một số trang. Lưới test không bắt được lớp lỗi này, nên nó
- * bị biến thành lỗi BIÊN DỊCH. `size` thì giữ lại: đó là bộ lọc hợp lệ, vào
- * khoá và vào request đều đúng.
- */
-export type BoLocTimMentor = Omit<MentorSearchFilters, 'page'>;
 
 /**
  * Chốt chặn ĐỒNG BỘ cho việc tải trang kế, dùng chung cho mọi infinite query

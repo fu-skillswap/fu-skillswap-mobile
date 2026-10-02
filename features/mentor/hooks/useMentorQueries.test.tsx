@@ -13,7 +13,7 @@ import {
   useMentorReviews,
   useMentorSearch,
 } from '@/features/mentor/hooks/useMentorQueries';
-import type { BoLocTimMentor } from '@/features/mentor/hooks/useMentorQueries';
+import type { BoLocTimMentor } from '@/features/mentor/mentorRepo';
 
 const BASE = 'https://api.skillswap.asia';
 

@@ -28,6 +28,22 @@ export interface MentorSearchFilters {
   direction?: 'ASC' | 'DESC';
 }
 
+/**
+ * Bộ lọc mà MÀN HÌNH được phép truyền cho `useMentorSearch`.
+ *
+ * `page` bị loại khỏi kiểu có chủ ý: số trang do chính hook quản (qua
+ * `pageParam` của `useInfiniteQuery`), nên một `page` lọt vào bộ lọc chỉ có thể
+ * là rác — nó vừa nhiễm vào khoá cache vừa có nguy cơ ghi đè `pageParam` và làm
+ * MỌI trang xin đúng một số trang. Lưới test không bắt được lớp lỗi này, nên nó
+ * bị biến thành lỗi BIÊN DỊCH. `size` thì giữ lại: đó là bộ lọc hợp lệ, vào
+ * khoá và vào request đều đúng.
+ *
+ * Kiểu này sống ở đây — cạnh `MentorSearchFilters` — chứ không ở `hooks/` hay
+ * `queryKeys.ts`: cả hai file đó import từ file này, nên đặt ngược lại sẽ tạo
+ * vòng import, và viết lại `Omit<...>` ở từng nơi là trùng lặp chờ lệch nhau.
+ */
+export type BoLocTimMentor = Omit<MentorSearchFilters, 'page'>;
+
 export interface ReviewPageParams {
   page?: number;
   size?: number;
