@@ -12,21 +12,77 @@
  * start, export, run:*, prebuild, install, customize, config, serve, login...).
  * Đã thử `expo export`: nó bundle xong nhưng KHÔNG sinh `router.d.ts`. Chỉ dev
  * server mới sinh, nên script này bật Metro lên, chờ đúng tới lúc file xuất
- * hiện rồi tắt ngay. Chỉ chạy khi file thật sự thiếu, để `npm run typecheck`
- * hằng ngày vẫn chạy tức thì.
+ * hiện rồi tắt ngay.
+ *
+ * QUAN TRỌNG — vì sao không chỉ kiểm "file có tồn tại không":
+ *
+ * Bản đầu `exit(0)` ngay khi thấy file. Hậu quả lộ ra lúc đổi tên ba route
+ * (`booking→mentors`, `schedule→bookings`, `assistant→messages`) ngày
+ * 04/10/2026: file cũ ở lại, và vì nó là một UNION chứa CẢ tên cũ lẫn tên mới
+ * nên `tsc` xanh trên cả hai — typecheck nói dối về việc route cũ đã hết. Nó
+ * còn tích luỹ rác (`/../core/ui/IconButton`) do một Metro treo từ phiên khác
+ * ghi đè bằng module graph của nó.
+ *
+ * Nên script lưu kèm DANH SÁCH FILE ROUTE lúc sinh (`route-files.json`) và sinh
+ * lại khi danh sách đổi. Chỉ so danh sách file chứ không so nội dung: thêm/xoá/
+ * đổi tên route là đúng lúc union phải đổi, còn sửa ruột một màn thì không.
+ * Danh sách khớp thì vẫn thoát ngay, nên `npm run typecheck` hằng ngày không
+ * chậm đi.
  */
 
 const { spawn, execFileSync } = require('node:child_process');
-const { existsSync } = require('node:fs');
-const { join } = require('node:path');
+const {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} = require('node:fs');
+const { dirname, join } = require('node:path');
 
 const projectRoot = join(__dirname, '..');
 const routerTypes = join(projectRoot, '.expo', 'types', 'router.d.ts');
+const appDir = join(projectRoot, 'app');
+/** Danh sach file route luc router.d.ts duoc sinh - de biet khi nao phai sinh lai */
+const routeStamp = join(projectRoot, '.expo', 'types', 'route-files.json');
 const TIMEOUT_MS = 120_000;
 const POLL_MS = 500;
 
-if (existsSync(routerTypes)) {
+/** Moi file trong `app/`, sap xep - `app/` chi chua route (xem app-route-tree.test.ts) */
+function listRouteFiles(dir, prefix = '') {
+  return readdirSync(dir)
+    .flatMap((entry) => {
+      const full = join(dir, entry);
+      const relative = prefix ? `${prefix}/${entry}` : entry;
+      return statSync(full).isDirectory() ? listRouteFiles(full, relative) : [relative];
+    })
+    .sort();
+}
+
+const routeFiles = listRouteFiles(appDir);
+
+/** File type con dung khi no ton tai VA cay route khong doi tu luc sinh */
+function conDung() {
+  if (!existsSync(routerTypes) || !existsSync(routeStamp)) {
+    return false;
+  }
+  try {
+    return JSON.stringify(JSON.parse(readFileSync(routeStamp, 'utf8'))) === JSON.stringify(routeFiles);
+  } catch {
+    return false;
+  }
+}
+
+if (conDung()) {
   process.exit(0);
+}
+
+// Xoa file cu TRUOC khi sinh lai: neu khong, vong cho ben duoi thay ngay file
+// cu va ket luan "da sinh xong" ma chua co gi moi duoc ghi.
+if (existsSync(routerTypes)) {
+  rmSync(routerTypes, { force: true });
 }
 
 console.log(
@@ -78,6 +134,8 @@ async function main() {
 
 main().then((ok) => {
   if (ok) {
+    mkdirSync(dirname(routeStamp), { recursive: true });
+    writeFileSync(routeStamp, JSON.stringify(routeFiles, null, 2));
     console.log('Đã sinh xong .expo/types/router.d.ts.');
     process.exit(0);
   }
