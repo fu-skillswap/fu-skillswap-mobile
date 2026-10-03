@@ -47,6 +47,8 @@ const routerTypes = join(projectRoot, '.expo', 'types', 'router.d.ts');
 const appDir = join(projectRoot, 'app');
 /** Danh sach file route luc router.d.ts duoc sinh - de biet khi nao phai sinh lai */
 const routeStamp = join(projectRoot, '.expo', 'types', 'route-files.json');
+/** Port rieng cho Metro cua script — tranh dung do voi dev server o 8081 */
+const PORT_RIENG = 8099;
 const TIMEOUT_MS = 120_000;
 const POLL_MS = 500;
 
@@ -110,10 +112,20 @@ async function main() {
   // Gọi thẳng CLI của expo bằng chính node đang chạy script này, không qua `npx`:
   // trong Git Bash trên Windows, PATH là dạng POSIX (`/c/Program Files/nodejs`)
   // nên Node không tìm thấy `npx.cmd` và lệnh sẽ thất bại một cách khó hiểu.
-  const child = spawn(process.execPath, [require.resolve('expo/bin/cli'), 'start'], {
-    cwd: projectRoot,
-    stdio: 'ignore',
-  });
+  // Port RIENG, khong phai 8081: dev server cua nguoi dung thuong giu 8081, va
+  // khi do Metro cua script khong bat len duoc ("Input is required, but
+  // 'npx expo' is in non-interactive mode") nen khong sinh duoc type. Te hon
+  // nua, dev server dang chay se tu ghi de `router.d.ts` bang module graph cua
+  // no — da xay ra hai lan ngay 04/10/2026, mot lan lam bien mat
+  // `/mentor/[mentorUserId]` va them `/../core/ui/IconButton` nhu mot route.
+  const child = spawn(
+    process.execPath,
+    [require.resolve('expo/bin/cli'), 'start', '--port', String(PORT_RIENG)],
+    {
+      cwd: projectRoot,
+      stdio: 'ignore',
+    },
+  );
 
   const startedAt = Date.now();
   try {
