@@ -13,7 +13,9 @@
  * vào `AuthProvider`.
  */
 
-import { http, HttpResponse } from 'msw';
+import { http } from 'msw';
+
+import { jsonMock } from '@/core/dev/jsonMock';
 
 import type { TokenResponse, UserMeResponse } from '@/core/auth/types';
 import { getEnv } from '@/core/config/env';
@@ -69,7 +71,7 @@ function envelope(data: unknown) {
 
 /** Phản hồi lỗi theo đúng khuôn envelope của backend */
 function loi(status: number, code: string, message: string) {
-  return HttpResponse.json(
+  return jsonMock(
     { timestamp: new Date().toISOString(), status, code, message, data: null },
     { status },
   );
@@ -108,7 +110,7 @@ export const authMockHandlers = [
   // — xem JSDoc của `authRepo.loginWithGoogle`. Body chỉ có `{ credential }`.
   http.post(`${base}/api/auth/google/mobile`, () => {
     daDangNhap = true;
-    return HttpResponse.json(envelope(tokenGia));
+    return jsonMock(envelope(tokenGia));
   }),
 
   http.post(`${base}/api/auth/refresh`, ({ request }) => {
@@ -122,18 +124,18 @@ export const authMockHandlers = [
     // Thiếu dòng này thì chế độ mock refresh được nhưng `/me` lại 401, và app
     // kẹt ở một trạng thái bản thật không có.
     daDangNhap = true;
-    return HttpResponse.json(envelope(tokenGia));
+    return jsonMock(envelope(tokenGia));
   }),
 
   http.get(`${base}/api/auth/me`, () => {
     if (!daDangNhap) {
       return loi(401, 'AUTH_1003', 'Phiên đăng nhập đã kết thúc');
     }
-    return HttpResponse.json(envelope(MOCK_USER));
+    return jsonMock(envelope(MOCK_USER));
   }),
 
   http.post(`${base}/api/auth/logout`, () => {
     daDangNhap = false;
-    return HttpResponse.json(envelope(null));
+    return jsonMock(envelope(null));
   }),
 ];

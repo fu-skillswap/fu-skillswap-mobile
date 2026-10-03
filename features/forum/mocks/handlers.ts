@@ -25,7 +25,9 @@
  *    mình sẽ tạo đúng thứ "nút chết" mà repo này đã phải phá bỏ hai lần.
  */
 
-import { http, HttpResponse } from 'msw';
+import { http } from 'msw';
+
+import { jsonMock } from '@/core/dev/jsonMock';
 
 import type { CursorPageResponse } from '@/core/api/pagination';
 import { MOCK_USER } from '@/core/auth/mocks/handlers';
@@ -49,7 +51,7 @@ function envelope(data: unknown) {
 
 /** Phản hồi lỗi theo đúng khuôn envelope của backend */
 function loi(status: number, code: string, message: string) {
-  return HttpResponse.json(
+  return jsonMock(
     { timestamp: new Date().toISOString(), status, code, message, data: null },
     { status },
   );
@@ -310,9 +312,9 @@ function timBinhLuan(commentId: string): ForumCommentResponse | undefined {
 const base = getEnv().apiUrl;
 
 export const forumMockHandlers = [
-  http.get(`${base}/api/forum/topics`, () => HttpResponse.json(envelope(MOCK_TOPICS))),
+  http.get(`${base}/api/forum/topics`, () => jsonMock(envelope(MOCK_TOPICS))),
 
-  http.get(`${base}/api/forum/feed`, () => HttpResponse.json(envelope(motTrang(MOCK_POSTS)))),
+  http.get(`${base}/api/forum/feed`, () => jsonMock(envelope(motTrang(MOCK_POSTS)))),
 
   http.get(`${base}/api/forum/posts`, ({ request }) => {
     const params = new URL(request.url).searchParams;
@@ -335,7 +337,7 @@ export const forumMockHandlers = [
       return khopChuDe && khopTuKhoa;
     });
 
-    return HttpResponse.json(envelope(motTrang(items)));
+    return jsonMock(envelope(motTrang(items)));
   }),
 
   http.post(`${base}/api/forum/posts`, async ({ request }) => {
@@ -344,7 +346,7 @@ export const forumMockHandlers = [
       content: string;
       forumTopicId: string;
     };
-    return HttpResponse.json(
+    return jsonMock(
       envelope(
         baiViet({
           postId: `mp-moi-${Date.now()}`,
@@ -368,11 +370,11 @@ export const forumMockHandlers = [
       // của diễn đàn: `ErrorView` đọc `status`/`code` để chọn thông điệp.
       return loi(404, 'SYS_0003', 'Không tìm thấy bài viết');
     }
-    return HttpResponse.json(envelope(post));
+    return jsonMock(envelope(post));
   }),
 
   http.get(`${base}/api/forum/posts/:postId/comments`, ({ params }) =>
-    HttpResponse.json(envelope(motTrang(MOCK_COMMENTS[String(params.postId)] ?? []))),
+    jsonMock(envelope(motTrang(MOCK_COMMENTS[String(params.postId)] ?? []))),
   ),
 
   http.post(`${base}/api/forum/posts/:postId/comments`, async ({ params, request }) => {
@@ -382,7 +384,7 @@ export const forumMockHandlers = [
     };
     const goc = body.replyToCommentId ? timBinhLuan(body.replyToCommentId) : undefined;
 
-    return HttpResponse.json(
+    return jsonMock(
       envelope(
         binhLuan({
           commentId: `mc-moi-${Date.now()}`,
@@ -408,7 +410,7 @@ export const forumMockHandlers = [
     if (!post) {
       return loi(404, 'SYS_0003', 'Không tìm thấy bài viết');
     }
-    return HttpResponse.json(
+    return jsonMock(
       envelope({
         ...post,
         reactedByCurrentUser: true,
@@ -423,7 +425,7 @@ export const forumMockHandlers = [
     if (!post) {
       return loi(404, 'SYS_0003', 'Không tìm thấy bài viết');
     }
-    return HttpResponse.json(
+    return jsonMock(
       envelope({
         ...post,
         reactedByCurrentUser: false,
@@ -438,7 +440,7 @@ export const forumMockHandlers = [
     if (!comment) {
       return loi(404, 'SYS_0003', 'Không tìm thấy bình luận');
     }
-    return HttpResponse.json(
+    return jsonMock(
       envelope({
         ...comment,
         reactedByCurrentUser: true,
@@ -454,7 +456,7 @@ export const forumMockHandlers = [
     if (!comment) {
       return loi(404, 'SYS_0003', 'Không tìm thấy bình luận');
     }
-    return HttpResponse.json(
+    return jsonMock(
       envelope({
         ...comment,
         reactedByCurrentUser: false,
@@ -473,5 +475,5 @@ export const forumMockHandlers = [
    * `unknown` vì không chỗ nào trên mobile đọc nó. Bịa ra vài trường cho đẹp ở
    * đây là dựng một DTO không ai kiểm được với backend thật.
    */
-  http.post(`${base}/api/forum/reports`, () => HttpResponse.json(envelope(null))),
+  http.post(`${base}/api/forum/reports`, () => jsonMock(envelope(null))),
 ];

@@ -21,7 +21,9 @@
  * chưa có màn hình nào gọi; mock nó bây giờ chỉ tạo code chết.
  */
 
-import { http, HttpResponse } from 'msw';
+import { http } from 'msw';
+
+import { jsonMock } from '@/core/dev/jsonMock';
 
 import { MOCK_USER } from '@/core/auth/mocks/handlers';
 import { getEnv } from '@/core/config/env';
@@ -74,6 +76,6 @@ const base = getEnv().apiUrl;
 
 export const profileMockHandlers = [
   http.get(`${base}/api/me/student-profile`, () =>
-    HttpResponse.json(envelope(MOCK_STUDENT_PROFILE)),
+    jsonMock(envelope(MOCK_STUDENT_PROFILE)),
   ),
 ];

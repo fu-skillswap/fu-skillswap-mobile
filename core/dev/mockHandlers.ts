@@ -14,6 +14,12 @@
  * trừ `core/dev/` và ghi rõ lý do — không nới luật cho cả `core/`.
  */
 
+// PHẢI đứng trước `msw/native`: MSW chạm tới `MessageEvent` và các global web
+// khác ngay lúc module được đánh giá, mà Hermes không có chúng. Xem
+// `core/dev/mswPolyfills.ts` — thiếu dòng này thì app chết trắng khi mở ở chế
+// độ mock, dù toàn bộ test Jest vẫn xanh (Jest chạy trên Node, có sẵn hết).
+import '@/core/dev/mswPolyfills';
+
 import { setupServer } from 'msw/native';
 
 import { authMockHandlers } from '@/core/auth/mocks/handlers';
