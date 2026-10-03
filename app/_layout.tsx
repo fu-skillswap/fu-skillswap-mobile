@@ -12,6 +12,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { createQueryClient } from '@/core/api/queryClient';
 import { AuthProvider } from '@/core/auth/AuthProvider';
@@ -55,10 +56,25 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </AuthProvider>
-    </QueryClientProvider>
+    /**
+     * `SafeAreaProvider` PHẢI có, và phải ở ngoài cùng.
+     *
+     * `SafeAreaView` cùng `useSafeAreaInsets()` của `react-native-safe-area-context`
+     * lấy số đo từ context này. Không có provider thì inset về 0 **trong im lặng**:
+     * không lỗi, không cảnh báo, chỉ là mọi `Screen` mất phần chừa cho thanh
+     * trạng thái. Gặp thật trên máy ảo 04/10/2026 — tiêu đề "Bảng tin"/"Hồ sơ"
+     * nằm đè lên đồng hồ và icon pin.
+     *
+     * Trước đây app mượn vùng an toàn của native stack nên trông "gần đúng", và
+     * `useSafeAreaInsets()` thì NÉM lỗi khi thiếu provider — hai dấu hiệu dễ bị
+     * đọc nhầm thành "thư viện hỏng" thay vì "thiếu provider".
+     */
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </AuthProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }

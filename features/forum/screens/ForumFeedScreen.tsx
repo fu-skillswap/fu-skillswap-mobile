@@ -187,7 +187,7 @@ export function ForumFeedScreen() {
           // contentContainer co lại vừa nội dung và khối rỗng dính lên đầu.
           // Lề hai bên 20 và gap 14 giữa các thẻ đặt ở contentContainer chứ không
           // ở `Screen`: lề ở khung ngoài sẽ cắt luôn vùng cuộn.
-          contentContainerClassName="grow gap-3.5 px-gutter pb-28 pt-1"
+          contentContainerClassName="grow gap-3.5 px-gutter pb-28 pt-5"
           ListHeaderComponent={
             <View className="gap-3">
               {list.isError ? (
