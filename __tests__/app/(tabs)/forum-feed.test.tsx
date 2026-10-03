@@ -8,7 +8,7 @@ import React from 'react';
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
 import { ForumFeedScreen } from '@/features/forum';
-import { DO_TRE_TIM_KIEM_MS } from '@/features/forum/screens/ForumFeedScreen';
+import { DO_TRE_TIM_KIEM_MS, loiChao } from '@/features/forum/screens/ForumFeedScreen';
 import { donHangDoiDanhSach, nhuongChoDebounce } from '@/test-utils/nhuongNhip';
 
 const BASE = 'https://api.skillswap.asia';
@@ -390,6 +390,37 @@ describe('ForumFeedScreen', () => {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
     });
+    await donHangDoiDanhSach();
+  });
+});
+
+describe('loiChao', () => {
+  it('đổi theo ba mốc trong ngày, kể cả hai đầu mút', async () => {
+    // Mốc 12 và 18 là RANH GIỚI, nên phải kiểm cả hai phía: viết `gio <= 12` thì
+    // 12 giờ trưa vẫn là "buổi sáng" mà không test nào chạm tới.
+    expect(loiChao(0)).toBe('Chào buổi sáng,');
+    expect(loiChao(11)).toBe('Chào buổi sáng,');
+    expect(loiChao(12)).toBe('Chào buổi chiều,');
+    expect(loiChao(17)).toBe('Chào buổi chiều,');
+    expect(loiChao(18)).toBe('Chào buổi tối,');
+    expect(loiChao(23)).toBe('Chào buổi tối,');
+  });
+});
+
+describe('ForumFeedScreen — lời chào', () => {
+  it('KHÔNG vẽ lời chào khi chưa biết người dùng là ai', async () => {
+    // `useAuth` của file này mock `user: null` (khách vãng lai). Vẽ lời chào
+    // trong trạng thái đó sẽ ra một dòng "Chào buổi tối," treo lơ lửng không có
+    // tên ai cả.
+    server.use(
+      topicsOk(),
+      http.get(`${BASE}/api/forum/feed`, () => HttpResponse.json(envelope(cursorPage([POST])))),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy());
+
+    expect(screen.queryByText(/Chào buổi/)).toBeNull();
     await donHangDoiDanhSach();
   });
 });

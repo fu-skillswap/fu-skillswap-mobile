@@ -1,24 +1,31 @@
 /**
  * @file ForumFeedScreen.tsx
- * @description Màn hình diễn đàn: newsfeed theo ngành, lọc theo chủ đề, tìm kiếm.
+ * @description Tab "Bảng tin": lời chào, ô tìm kiếm, chip chủ đề, danh sách bài.
  *
  * Bốn trạng thái được phân biệt rõ và không gộp: đang tải, lỗi khi chưa có gì
  * (ErrorView chiếm màn hình), lỗi khi ĐÃ có dữ liệu (banner, giữ nguyên danh
  * sách), và rỗng (EmptyState — gọi API thành công nhưng không có bài nào).
+ *
+ * `Main.dc.html` vẽ màn này thành một dashboard: lời chào + ô tìm mentor + card
+ * Koko + carousel "Mentor nổi bật" + danh sách bài. Lần này CHỈ dựng phần có dữ
+ * liệu thật — lời chào (tên từ `useAuth()`) và danh sách bài theo đúng kiểu thẻ
+ * của thiết kế. Ba khối còn lại bị bỏ qua có chủ ý, lý do ghi ngay tại chỗ.
  */
 
 import { useRouter } from 'expo-router';
+import { Plus, Search } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 
 import { trangThaiTai } from '@/core/api/queryState';
+import { useAuth } from '@/core/auth/AuthProvider';
 import { useDebouncedValue } from '@/core/hooks/useDebouncedValue';
-import { Button } from '@/core/ui/Button';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
+import { IconButton } from '@/core/ui/IconButton';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
-import { colors } from '@/core/ui/theme';
+import { colors, controlHeight, fonts, spacing } from '@/core/ui/theme';
 import { PostCard } from '@/features/forum/components/PostCard';
 import { TopicChips } from '@/features/forum/components/TopicChips';
 import { useTogglePostLike } from '@/features/forum/hooks/useForumMutations';
@@ -35,8 +42,23 @@ import { useForumList, useForumTopics } from '@/features/forum/hooks/useForumQue
  */
 export const DO_TRE_TIM_KIEM_MS = 350;
 
+/**
+ * Lời chào theo giờ trong ngày, đúng ba mốc mà `Main.dc.html` ngụ ý
+ * ("Chào buổi tối," trong bản chụp).
+ *
+ * Dùng giờ của THIẾT BỊ là đúng ở đây: đây là lời chào cho người đang cầm máy,
+ * không phải một mốc thời gian của backend — nên cái bẫy `LocalDateTime` không
+ * có offset ở mục 5 của `docs/quy-uoc-dung-giao-dien.md` không áp vào chỗ này.
+ */
+export function loiChao(gio: number): string {
+  if (gio < 12) return 'Chào buổi sáng,';
+  if (gio < 18) return 'Chào buổi chiều,';
+  return 'Chào buổi tối,';
+}
+
 export function ForumFeedScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [keyword, setKeyword] = useState('');
   const [topicId, setTopicId] = useState<string | null>(null);
 
@@ -87,15 +109,53 @@ export function ForumFeedScreen() {
     <Screen testID="man-hinh-dien-dan">
       <OfflineBanner />
 
-      <View className="px-4 pt-2">
-        <TextInput
-          accessibilityLabel="Tìm kiếm bài viết"
-          placeholder="Tìm bài viết"
-          value={keyword}
-          onChangeText={setKeyword}
-          returnKeyType="search"
-          className="h-control-lg rounded-md border border-border-color bg-surface px-3 text-text-main"
-        />
+      <View className="gap-4 px-gutter pb-3 pt-2">
+        {/*
+          Lời chào chỉ hiện khi đã biết người dùng là ai. Thiết kế còn có logo 40
+          bên trái và chuông thông báo bên phải; logo bỏ vì repo mobile chưa có
+          file ảnh nào của bộ nhận diện SkillSwap, còn chuông bỏ vì màn
+          `Notifications` chưa dựng — xem mục (c) của báo cáo.
+        */}
+        {user ? (
+          <View>
+            <Text
+              className="text-caption-lg text-ink-muted"
+              style={{ fontFamily: fonts.regular }}
+            >
+              {loiChao(new Date().getHours())}
+            </Text>
+            <Text
+              className="text-ink"
+              style={{ fontFamily: fonts.bold, fontSize: 20, lineHeight: 26 }}
+            >
+              {user.fullName}
+            </Text>
+          </View>
+        ) : null}
+
+        {/*
+          Ô tìm kiếm GIỮ LẠI vì nó đang hoạt động thật (tìm bài viết qua
+          `/api/forum/posts`). Thiết kế vẽ chỗ này là một nút dẫn sang màn tìm
+          mentor với chữ "Tìm mentor, kỹ năng, môn học…" — đổi sang chữ đó sẽ nói
+          dối về việc ô này làm gì, nên chỉ lấy DÁNG: cao 52, bo tròn, nền trắng
+          viền `line`, icon kính lúp màu `accent`.
+        */}
+        <View
+          className="flex-row items-center gap-2.5 rounded-full border border-line bg-surface px-4"
+          style={{ height: controlHeight.lg }}
+        >
+          <Search size={20} color={colors.accent} strokeWidth={2} />
+          <TextInput
+            accessibilityLabel="Tìm kiếm bài viết"
+            placeholder="Tìm bài viết"
+            placeholderTextColor={colors.inkMuted}
+            value={keyword}
+            onChangeText={setKeyword}
+            returnKeyType="search"
+            className="min-w-0 flex-1 text-ink"
+            style={{ fontFamily: fonts.medium, fontSize: 14 }}
+          />
+        </View>
       </View>
 
       <TopicChips
@@ -106,7 +166,7 @@ export function ForumFeedScreen() {
 
       {trangThai === 'dang-tai' ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator testID="dang-tai-dien-dan" color={colors.primary} />
+          <ActivityIndicator testID="dang-tai-dien-dan" color={colors.accent} />
         </View>
       ) : trangThai === 'mat-ket-noi' ? (
         <EmptyState
@@ -125,20 +185,34 @@ export function ForumFeedScreen() {
           )}
           // `grow` để EmptyState (flex-1) căn giữa được theo chiều dọc: nếu thiếu,
           // contentContainer co lại vừa nội dung và khối rỗng dính lên đầu.
-          contentContainerClassName="grow"
+          // Lề hai bên 20 và gap 14 giữa các thẻ đặt ở contentContainer chứ không
+          // ở `Screen`: lề ở khung ngoài sẽ cắt luôn vùng cuộn.
+          contentContainerClassName="grow gap-3.5 px-gutter pb-28 pt-1"
           ListHeaderComponent={
-            list.isError ? (
-              <Pressable
-                testID="loi-tai-lai-nen"
-                accessibilityRole="button"
-                onPress={() => void list.refetch()}
-                className="mx-4 mt-2 rounded-md bg-danger-soft px-3 py-2"
-              >
-                <Text className="text-sm text-danger">
-                  Không tải được bài mới. Chạm để thử lại.
+            <View className="gap-3">
+              {list.isError ? (
+                <Pressable
+                  testID="loi-tai-lai-nen"
+                  accessibilityRole="button"
+                  onPress={() => void list.refetch()}
+                  className="rounded-md bg-neutral-soft px-3 py-2"
+                >
+                  <Text
+                    className="text-caption-lg text-danger"
+                    style={{ fontFamily: fonts.medium }}
+                  >
+                    Không tải được bài mới. Chạm để thử lại.
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              {/* Tiêu đề section 18/700, đúng `<h2>` của thiết kế. */}
+              {list.posts.length > 0 ? (
+                <Text className="text-section-title text-ink" style={{ fontFamily: fonts.bold }}>
+                  Bảng tin cộng đồng
                 </Text>
-              </Pressable>
-            ) : null
+              ) : null}
+            </View>
           }
           onEndReachedThreshold={0.5}
           onEndReached={taiTrangKe}
@@ -147,7 +221,7 @@ export function ForumFeedScreen() {
           ListFooterComponent={
             list.isFetchingNextPage ? (
               <View className="py-4">
-                <ActivityIndicator testID="dang-tai-trang-ke" color={colors.primary} />
+                <ActivityIndicator testID="dang-tai-trang-ke" color={colors.accent} />
               </View>
             ) : null
           }
@@ -161,13 +235,19 @@ export function ForumFeedScreen() {
       )}
 
       {/*
-        Nút nổi nằm NGOÀI nhánh điều kiện ở trên, không nằm trong `FlatList`:
-        lúc feed rỗng, lỗi hay mất mạng mới là lúc người dùng cần chỗ để bắt đầu
-        một bài viết, mà đó đúng là những lúc danh sách không được render.
+        Nút nổi 56 bo tròn, gradient, nằm cách mép phải 20 — đúng thiết kế (thiết
+        kế đặt `bottom: 104` vì thanh tab 84 nằm trong cùng một khối; ở đây thanh
+        tab là của react-navigation nên chỉ cần lề so với đáy vùng an toàn).
+
+        Nút nằm NGOÀI nhánh điều kiện ở trên, không nằm trong `FlatList`: lúc feed
+        rỗng, lỗi hay mất mạng mới là lúc người dùng cần chỗ để bắt đầu một bài
+        viết, mà đó đúng là những lúc danh sách không được render.
       */}
-      <View className="absolute bottom-6 right-4">
-        <Button
-          label="Đăng bài"
+      <View className="absolute bottom-6" style={{ right: spacing.gutter }}>
+        <IconButton
+          label="Tạo bài viết"
+          variant="gradient"
+          icon={<Plus size={24} color={colors.onAccent} strokeWidth={2.4} />}
           onPress={() => router.push('/forum/compose')}
           testID="nut-mo-soan-bai"
         />

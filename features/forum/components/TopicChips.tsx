@@ -3,10 +3,15 @@
  * @description Hàng chip chọn chủ đề. `null` nghĩa là không lọc theo chủ đề —
  * màn hình chỉ quay về newsfeed cá nhân hoá khi KHÔNG còn bộ lọc nào khác; nếu
  * ô tìm kiếm vẫn có chữ thì danh sách vẫn đi qua endpoint tra cứu.
+ *
+ * Chip lấy từ `core/ui/Chip` dáng `filter` (cao 40, chọn thì nền `accent` chữ
+ * trắng). Trước đây file này có một bản `Chip` RIÊNG dựng tay — đúng thứ mà
+ * `core/ui/` đã có, chỉ khác vài px và thiếu `hitSlop` bù vùng chạm 44.
  */
 
-import { Pressable, ScrollView, Text } from 'react-native';
+import { ScrollView } from 'react-native';
 
+import { Chip } from '@/core/ui/Chip';
 import type { ForumTopicResponse } from '@/features/forum/types';
 
 export interface TopicChipsProps {
@@ -23,33 +28,6 @@ export interface TopicChipsProps {
   choPhepBoChon?: boolean;
 }
 
-function Chip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      // Trạng thái chọn phải nằm trong cây trợ năng, không chỉ trong màu nền:
-      // trình đọc màn hình không thấy được `className`.
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      className={`h-control-md items-center justify-center rounded-full px-4 ${
-        active ? 'bg-primary' : 'bg-surface border border-border-color'
-      }`}
-    >
-      <Text className={active ? 'text-sm font-semibold text-white' : 'text-sm text-text-secondary'}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 export function TopicChips({
   topics,
   selectedTopicId,
@@ -60,16 +38,22 @@ export function TopicChips({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerClassName="gap-2 px-4 py-2"
+      contentContainerClassName="gap-2 px-gutter py-2"
     >
       {choPhepBoChon ? (
-        <Chip label="Tất cả" active={selectedTopicId === null} onPress={() => onSelect(null)} />
+        <Chip
+          label="Tất cả"
+          variant="filter"
+          selected={selectedTopicId === null}
+          onPress={() => onSelect(null)}
+        />
       ) : null}
       {topics.map((topic) => (
         <Chip
           key={topic.id}
           label={topic.nameVi}
-          active={selectedTopicId === topic.id}
+          variant="filter"
+          selected={selectedTopicId === topic.id}
           onPress={() => onSelect(topic.id)}
         />
       ))}

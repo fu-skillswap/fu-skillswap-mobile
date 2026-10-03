@@ -124,6 +124,14 @@ describe('CommentItem', () => {
   it('bình luận của bot có nền khác bình luận của người thật', async () => {
     // JSDoc của component hứa "nền nhạt" cho bot. Chỉ badge "AI" được kiểm, nên
     // lời hứa về nền là một câu mô tả hành vi không ai bảo vệ.
+    //
+    // Nền nằm trên BONG BÓNG (`-bong`), không phải khung ngoài: theo
+    // `PostDetail.dc.html`, khung ngoài trong suốt trên nền `surface-page` của
+    // màn hình và chỉ bong bóng mới có nền + viền.
+    //
+    // Và phải khẳng định theo kiểu LOẠI TRỪ: nền bot là `bg-surface-tint`, một
+    // chuỗi CHỨA `bg-surface`. Chỉ viết `toContain('bg-surface')` cho cả hai thì
+    // gán cùng một nền cho bot lẫn người thật vẫn xanh.
     await render(
       <>
         <CommentItem comment={comment({ commentId: 'c1' })} testID="nguoi" />
@@ -134,7 +142,11 @@ describe('CommentItem', () => {
       </>,
     );
 
-    expect(String(screen.getByTestId('nguoi').props.className)).toContain('bg-surface');
-    expect(String(screen.getByTestId('bot').props.className)).toContain('bg-primary-light');
+    const nenNguoi = String(screen.getByTestId('nguoi-bong').props.className);
+    const nenBot = String(screen.getByTestId('bot-bong').props.className);
+
+    expect(nenNguoi).toContain('bg-surface');
+    expect(nenNguoi).not.toContain('bg-surface-tint');
+    expect(nenBot).toContain('bg-surface-tint');
   });
 });

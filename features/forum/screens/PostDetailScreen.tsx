@@ -1,6 +1,6 @@
 /**
  * @file PostDetailScreen.tsx
- * @description Chi tiết bài viết kèm cây bình luận 1 cấp.
+ * @description Chi tiết bài viết kèm cây bình luận 1 cấp, theo `PostDetail.dc.html`.
  *
  * Bài viết và bình luận là HAI query độc lập, nên mỗi bên tự quyết trạng thái
  * hiển thị của mình: bình luận hỏng không được phép xoá bài viết khỏi màn hình,
@@ -12,9 +12,14 @@
  * Ô nhập bình luận nằm ở đây, nhưng luật 1 cấp thì KHÔNG: màn hình chỉ nhớ người
  * dùng đang trả lời bình luận nào, còn việc quy về bình luận GỐC là của
  * `resolveReplyTarget`. Gửi thẳng id của một reply thì backend trả `400`.
+ *
+ * Thanh trên cùng (nút back + tiêu đề "Bài viết") là header của `Stack` ở
+ * `app/forum/_layout.tsx`, không phải của màn hình này — tự vẽ thêm một thanh
+ * nữa ở đây sẽ thành hai thanh chồng nhau.
  */
 
 import { useRouter } from 'expo-router';
+import { Heart, MessageCircle, SendHorizontal } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -31,12 +36,15 @@ import {
 import { toUserMessage } from '@/core/api/errors';
 import { trangThaiTai } from '@/core/api/queryState';
 import { useAuth } from '@/core/auth/AuthProvider';
+import { Avatar } from '@/core/ui/Avatar';
 import { Button } from '@/core/ui/Button';
+import { Chip } from '@/core/ui/Chip';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
+import { IconButton } from '@/core/ui/IconButton';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
-import { colors } from '@/core/ui/theme';
+import { colors, fonts, spacing } from '@/core/ui/theme';
 import { resolveReplyTarget } from '@/features/forum/commentTree';
 import { CommentItem } from '@/features/forum/components/CommentItem';
 import { ReportSheet } from '@/features/forum/components/ReportSheet';
@@ -175,7 +183,7 @@ export function PostDetailScreen({ postId }: { postId: string }) {
     return (
       <Screen testID="man-hinh-chi-tiet-bai-viet">
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator testID="dang-tai-bai-viet" color={colors.primary} />
+          <ActivityIndicator testID="dang-tai-bai-viet" color={colors.accent} />
         </View>
       </Screen>
     );
@@ -230,41 +238,112 @@ export function PostDetailScreen({ postId }: { postId: string }) {
         keyExtractor={(comment) => comment.commentId}
         // `grow` để EmptyState/ErrorView (flex-1) căn giữa được phần còn lại của
         // màn hình thay vì dính ngay dưới bài viết.
-        contentContainerClassName="grow"
+        contentContainerClassName="grow gap-3 pb-4 pt-4"
         ListHeaderComponent={
-          <View>
+          <View className="gap-3">
             {post.isError ? (
               <Pressable
                 testID="loi-tai-lai-nen"
                 accessibilityRole="button"
                 onPress={taiLai}
-                className="mx-4 mt-2 rounded-md bg-danger-soft px-3 py-2"
+                className="mx-4 rounded-md bg-neutral-soft px-3 py-2"
               >
-                <Text className="text-sm text-danger">
+                <Text
+                  className="text-caption-lg text-danger"
+                  style={{ fontFamily: fonts.medium }}
+                >
                   Không tải lại được bài viết. Chạm để thử lại.
                 </Text>
               </Pressable>
             ) : null}
 
-            <View className="gap-2 bg-surface px-4 py-4">
-              <Text className="text-xs text-text-muted">{post.data?.forumTopic.nameVi}</Text>
-              <Text className="text-lg font-bold text-text-main">{post.data?.title}</Text>
-              <Text className="text-text-secondary">{post.data?.content}</Text>
-              <Text className="pt-2 text-xs text-text-muted">
-                {post.data?.commentCount} bình luận
+            {/* Card bài viết: bo 24, nền trắng, viền `line`, padding 16, gap 12. */}
+            <View
+              className="mx-4 gap-3 rounded-lg border border-line bg-surface"
+              style={{ padding: spacing.card }}
+            >
+              <View className="flex-row items-center gap-2.5">
+                <Avatar name={post.data?.authorFullName ?? ''} size={44} />
+                <View className="min-w-0 flex-1">
+                  <Text className="text-body-lg text-ink" style={{ fontFamily: fonts.bold }}>
+                    {post.data?.authorFullName}
+                  </Text>
+                  {/*
+                    Thiết kế viết "3 giờ trước · Công khai" ở dòng này. Phần mốc
+                    thời gian CHƯA dựng (lý do ở `PostCard`: `LocalDateTime` của
+                    BE không có offset), nên chỉ còn phần trạng thái hiển thị —
+                    thứ suy ra được từ `status` thật của bài.
+                  */}
+                  <Text
+                    className="text-caption text-ink-muted"
+                    style={{ fontFamily: fonts.regular }}
+                  >
+                    {post.data?.status === 'PUBLISHED' ? 'Công khai' : 'Đã ẩn'}
+                  </Text>
+                </View>
+              </View>
+
+              <Text className="text-section-title text-ink" style={{ fontFamily: fonts.bold }}>
+                {post.data?.title}
+              </Text>
+              <Text
+                className="text-ink-body"
+                style={{ fontFamily: fonts.regular, fontSize: 15, lineHeight: 24 }}
+              >
+                {post.data?.content}
               </Text>
 
+              {post.data ? (
+                <View className="flex-row flex-wrap gap-2">
+                  <Chip label={post.data.forumTopic.nameVi} variant="tag" />
+                </View>
+              ) : null}
+
+              {/*
+                Thanh số liệu có viền trên, đúng thiết kế. Đây là hai ô HIỂN THỊ,
+                không phải nút: thả tim cho bài viết ở màn này chưa được nối, và
+                một `Pressable` không làm gì vẫn bị trình đọc màn hình đọc ra là
+                nút — cùng cái bẫy đã ghi ở `PostCard`.
+              */}
+              <View className="flex-row items-center gap-1 border-t border-line pt-1">
+                <View className="h-control-md flex-row items-center gap-1.5 px-2.5">
+                  <Heart
+                    size={20}
+                    color={post.data?.reactedByCurrentUser ? colors.accent : colors.inkMuted}
+                    fill={post.data?.reactedByCurrentUser ? colors.accent : 'transparent'}
+                    strokeWidth={2}
+                  />
+                  <Text
+                    className="text-caption-lg text-ink-muted"
+                    style={{ fontFamily: fonts.semibold }}
+                  >
+                    {post.data?.reactionCount}
+                  </Text>
+                </View>
+                <View className="h-control-md flex-row items-center gap-1.5 px-2.5">
+                  <MessageCircle size={20} color={colors.inkMuted} strokeWidth={2} />
+                  <Text
+                    className="text-caption-lg text-ink-muted"
+                    style={{ fontFamily: fonts.semibold }}
+                  >
+                    {post.data?.commentCount} bình luận
+                  </Text>
+                </View>
+              </View>
+
               {laTacGia ? (
-                <View className="flex-row gap-2 pt-2">
+                <View className="flex-row gap-2">
                   <Button
                     label="Sửa bài"
                     variant="secondary"
+                    size="sm"
                     onPress={() => router.push({ pathname: '/forum/compose', params: { postId } })}
                     testID="nut-sua-bai"
                   />
                   <Button
                     label="Xoá bài"
                     variant="danger"
+                    size="sm"
                     onPress={() => setDangHoiXoa(true)}
                     testID="nut-xoa-bai"
                   />
@@ -272,16 +351,27 @@ export function PostDetailScreen({ postId }: { postId: string }) {
               ) : (
                 // Báo cáo bài của CHÍNH MÌNH là vô nghĩa, nên nút chỉ hiện với
                 // người khác — và nó nằm đúng chỗ của nút Sửa/Xoá.
-                <View className="flex-row pt-2">
+                <View className="flex-row">
                   <Button
                     label="Báo cáo bài viết"
                     variant="secondary"
+                    size="sm"
                     onPress={() => setReportTarget({ targetType: 'POST', targetId: postId })}
                     testID="nut-bao-cao-bai"
                   />
                 </View>
               )}
             </View>
+
+            {/* Tiêu đề khối bình luận, 15/700 — `<h2>` của thiết kế. */}
+            {comments.comments.length > 0 ? (
+              <Text
+                className="px-5 text-body-lg text-ink"
+                style={{ fontFamily: fonts.bold }}
+              >
+                Bình luận
+              </Text>
+            ) : null}
           </View>
         }
         renderItem={({ item }) => (
@@ -322,7 +412,7 @@ export function PostDetailScreen({ postId }: { postId: string }) {
         ListFooterComponent={
           comments.isFetchingNextPage ? (
             <View className="py-4">
-              <ActivityIndicator testID="dang-tai-binh-luan-ke" color={colors.primary} />
+              <ActivityIndicator testID="dang-tai-binh-luan-ke" color={colors.accent} />
             </View>
           ) : comments.isError && comments.comments.length > 0 ? (
             // Trang bình luận KẾ hỏng: danh sách đã có nội dung nên ListEmptyComponent
@@ -331,9 +421,12 @@ export function PostDetailScreen({ postId }: { postId: string }) {
               testID="loi-tai-them-binh-luan"
               accessibilityRole="button"
               onPress={() => void comments.fetchNextPage()}
-              className="mx-4 my-3 rounded-md bg-danger-soft px-3 py-2"
+              className="mx-4 my-3 rounded-md bg-neutral-soft px-3 py-2"
             >
-              <Text className="text-sm text-danger">
+              <Text
+                className="text-caption-lg text-danger"
+                style={{ fontFamily: fonts.medium }}
+              >
                 Không tải được thêm bình luận. Chạm để thử lại.
               </Text>
             </Pressable>
@@ -344,7 +437,7 @@ export function PostDetailScreen({ postId }: { postId: string }) {
           // đều thành nói dối người dùng là "bài này chưa ai bình luận".
           trangThaiBinhLuan === 'dang-tai' ? (
             <View className="flex-1 items-center justify-center py-8">
-              <ActivityIndicator testID="dang-tai-binh-luan" color={colors.primary} />
+              <ActivityIndicator testID="dang-tai-binh-luan" color={colors.accent} />
             </View>
           ) : trangThaiBinhLuan === 'mat-ket-noi' ? (
             <EmptyState
@@ -367,10 +460,10 @@ export function PostDetailScreen({ postId }: { postId: string }) {
         `ListFooterComponent` thì nó trôi theo danh sách và biến mất khỏi tầm mắt
         ngay khi bài có vài bình luận.
       */}
-      <View className="gap-2 border-t border-border-color bg-surface p-3">
+      <View className="gap-2 border-t border-line bg-surface px-4 py-3">
         {replyTo ? (
           <View testID="dang-tra-loi" className="flex-row items-center justify-between">
-            <Text className="text-xs text-text-muted">
+            <Text className="text-caption text-ink-muted" style={{ fontFamily: fonts.medium }}>
               Đang trả lời {replyTo.authorFullName}
             </Text>
             <Pressable
@@ -378,8 +471,11 @@ export function PostDetailScreen({ postId }: { postId: string }) {
               accessibilityLabel="Huỷ trả lời"
               testID="nut-huy-tra-loi"
               onPress={() => setReplyTo(null)}
+              hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
             >
-              <Text className="text-xs text-primary">Huỷ</Text>
+              <Text className="text-caption text-accent" style={{ fontFamily: fonts.semibold }}>
+                Huỷ
+              </Text>
             </Pressable>
           </View>
         ) : null}
@@ -393,31 +489,53 @@ export function PostDetailScreen({ postId }: { postId: string }) {
           // Đây là lý do KHÔNG dùng `ErrorView` ở đây: `core/api/errors.ts` map
           // 429 sang `action: 'RETRY'` và `ErrorView` sẽ vẽ nút "Thử lại" cho
           // nó — đúng cho phần lớn màn hình, sai cho đúng chỗ này.
-          <View testID="loi-gui-binh-luan" className="gap-1 rounded-md bg-danger-soft p-3">
-            <Text className="font-semibold text-danger">
+          //
+          // Nền là `neutral-soft`: thiết kế chỉ khai màu CHỮ cho lỗi (#B42318),
+          // không có token nền danger nào.
+          <View testID="loi-gui-binh-luan" className="gap-1 rounded-md bg-neutral-soft p-3">
+            <Text className="text-body text-danger" style={{ fontFamily: fonts.semibold }}>
               {toUserMessage(guiBinhLuan.error).title}
             </Text>
-            <Text className="text-danger">{toUserMessage(guiBinhLuan.error).description}</Text>
+            <Text
+              className="text-caption-lg text-danger"
+              style={{ fontFamily: fonts.regular }}
+            >
+              {toUserMessage(guiBinhLuan.error).description}
+            </Text>
             {toUserMessage(guiBinhLuan.error).retryAfterSeconds ? (
-              <Text className="text-danger">
+              <Text
+                className="text-caption-lg text-danger"
+                style={{ fontFamily: fonts.regular }}
+              >
                 Vui lòng thử lại sau {toUserMessage(guiBinhLuan.error).retryAfterSeconds} giây.
               </Text>
             ) : null}
           </View>
         ) : null}
 
-        <View className="flex-row items-end gap-2">
-          <TextInput
-            accessibilityLabel="Nội dung bình luận"
-            placeholder={replyTo ? 'Viết câu trả lời' : 'Viết bình luận'}
-            value={draft}
-            onChangeText={setDraft}
-            maxLength={COMMENT_MAX}
-            multiline
-            className="min-h-11 flex-1 rounded-md border border-border-color px-3 py-2 text-text-main"
-          />
-          <Button
-            label="Gửi"
+        {/* Avatar 40 + ô nhập viên thuốc 46 + nút Gửi tròn 46, đúng thiết kế. */}
+        <View className="flex-row items-end gap-2.5">
+          {user ? <Avatar name={user.fullName} size={40} tone="accent" /> : null}
+          <View
+            className="min-w-0 flex-1 justify-center rounded-full border border-line bg-surface-page px-4"
+            style={{ minHeight: 46 }}
+          >
+            <TextInput
+              accessibilityLabel="Nội dung bình luận"
+              placeholder={replyTo ? 'Viết câu trả lời' : 'Viết bình luận của bạn…'}
+              placeholderTextColor={colors.inkMuted}
+              value={draft}
+              onChangeText={setDraft}
+              maxLength={COMMENT_MAX}
+              multiline
+              className="text-ink"
+              style={{ fontFamily: fonts.medium, fontSize: 14, paddingVertical: 12 }}
+            />
+          </View>
+          <IconButton
+            label="Gửi bình luận"
+            variant="tint"
+            icon={<SendHorizontal size={20} color={colors.accent} strokeWidth={2} />}
             onPress={gui}
             busy={guiBinhLuan.isPending}
             disabled={!guiBinhLuanDuoc}
@@ -449,9 +567,18 @@ export function PostDetailScreen({ postId }: { postId: string }) {
         onRequestClose={() => setDangHoiXoa(false)}
       >
         <View className="flex-1 items-center justify-center bg-black/40 px-8">
-          <View testID="hop-xac-nhan-xoa" className="w-full gap-3 rounded-lg bg-surface p-4">
-            <Text className="text-base font-semibold text-text-main">Xoá bài viết này?</Text>
-            <Text className="text-text-secondary">
+          <View
+            testID="hop-xac-nhan-xoa"
+            className="w-full gap-3 rounded-lg bg-surface"
+            style={{ padding: spacing.card }}
+          >
+            <Text className="text-section-title text-ink" style={{ fontFamily: fonts.bold }}>
+              Xoá bài viết này?
+            </Text>
+            <Text
+              className="text-ink-body"
+              style={{ fontFamily: fonts.regular, fontSize: 14, lineHeight: 22 }}
+            >
               Bài viết và toàn bộ bình luận sẽ biến mất. Thao tác này không hoàn tác được.
             </Text>
 
@@ -460,23 +587,30 @@ export function PostDetailScreen({ postId }: { postId: string }) {
               // quay, và người dùng không biết bài đã xoá được hay chưa — họ sẽ
               // bấm lại. Thông điệp lấy nguyên văn của backend (403 khi không
               // phải tác giả, 404 khi bài đã bị xoá sẵn).
-              <View testID="loi-xoa-bai" className="gap-1 rounded-md bg-danger-soft p-3">
-                <Text className="font-semibold text-danger">
+              <View testID="loi-xoa-bai" className="gap-1 rounded-md bg-neutral-soft p-3">
+                <Text className="text-body text-danger" style={{ fontFamily: fonts.semibold }}>
                   {toUserMessage(xoaBai.error).title}
                 </Text>
-                <Text className="text-danger">{toUserMessage(xoaBai.error).description}</Text>
+                <Text
+                  className="text-caption-lg text-danger"
+                  style={{ fontFamily: fonts.regular }}
+                >
+                  {toUserMessage(xoaBai.error).description}
+                </Text>
               </View>
             ) : null}
             <View className="flex-row justify-end gap-2">
               <Button
                 label="Không xoá"
                 variant="secondary"
+                size="sm"
                 onPress={() => setDangHoiXoa(false)}
                 testID="nut-huy-xoa"
               />
               <Button
                 label="Xoá hẳn"
                 variant="danger"
+                size="sm"
                 busy={xoaBai.isPending}
                 onPress={() =>
                   xoaBai.mutate(postId, {

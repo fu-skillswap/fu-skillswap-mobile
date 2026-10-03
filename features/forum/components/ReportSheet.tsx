@@ -117,14 +117,14 @@ export function ReportSheet({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View testID="hop-bao-cao" className="gap-3 rounded-t-lg bg-surface p-4">
-          <Text className="text-base font-semibold text-text-main">
+          <Text className="text-base font-semibold text-ink">
             {target.targetType === 'POST' ? 'Báo cáo bài viết' : 'Báo cáo bình luận'}
           </Text>
 
           {daGui ? (
             <View testID="da-gui-bao-cao" className="gap-1 rounded-md bg-success-soft p-3">
               <Text className="font-semibold text-success">Đã gửi báo cáo</Text>
-              <Text className="text-text-secondary">
+              <Text className="text-ink-body">
                 Đội kiểm duyệt sẽ xem lại nội dung này. Cảm ơn bạn đã báo cho chúng tôi.
               </Text>
             </View>
@@ -138,11 +138,11 @@ export function ReportSheet({
                   onPress={() => setReason(item.value)}
                   className={`rounded-md border p-3 ${
                     reason === item.value
-                      ? 'border-primary bg-primary-light'
-                      : 'border-border-color'
+                      ? 'border-accent bg-surface-tint'
+                      : 'border-line'
                   }`}
                 >
-                  <Text className="text-text-main">{item.label}</Text>
+                  <Text className="text-ink">{item.label}</Text>
                 </Pressable>
               ))}
 
@@ -153,12 +153,12 @@ export function ReportSheet({
                 onChangeText={setDescription}
                 maxLength={DESCRIPTION_MAX}
                 multiline
-                className="min-h-20 rounded-md border border-border-color p-3 text-text-main"
+                className="min-h-20 rounded-md border border-line p-3 text-ink"
               />
 
               {loi ? (
                 // Khối đứng yên, KHÔNG nút thử lại: xem JSDoc đầu file.
-                <View testID="loi-gui-bao-cao" className="gap-1 rounded-md bg-danger-soft p-3">
+                <View testID="loi-gui-bao-cao" className="gap-1 rounded-md bg-neutral-soft p-3">
                   <Text className="font-semibold text-danger">{loi.title}</Text>
                   <Text className="text-danger">{loi.description}</Text>
                   {loi.retryAfterSeconds ? (

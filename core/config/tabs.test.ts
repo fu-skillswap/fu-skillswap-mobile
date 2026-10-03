@@ -4,11 +4,34 @@ describe('cấu hình tab', () => {
   it('mentee thấy đủ 5 tab theo đúng thứ tự', () => {
     expect(resolveTabs(['MENTEE']).map((t) => t.name)).toEqual([
       'index',
-      'booking',
-      'schedule',
-      'assistant',
+      'mentors',
+      'bookings',
+      'messages',
       'profile',
     ]);
+  });
+
+  it('nhãn và icon đúng thanh tab Mentee của thiết kế', () => {
+    // Nhãn lấy từ mục 3 của `docs/quy-uoc-dung-giao-dien.md`, icon lấy từ
+    // `Main.dc.html` dòng 105–109. Khoá cả hai ở đây vì tên route KHÔNG nói được
+    // gì về chúng: đổi `index` thành icon `message-square` thì test chỉ kiểm tên
+    // route vẫn xanh, và thanh tab sai icon là thứ không ai thấy trong CI.
+    expect(resolveTabs(['MENTEE'])).toEqual([
+      { name: 'index', title: 'Bảng tin', icon: 'home' },
+      { name: 'mentors', title: 'Mentor', icon: 'search' },
+      { name: 'bookings', title: 'Lịch hẹn', icon: 'calendar-days' },
+      { name: 'messages', title: 'Tin nhắn', icon: 'message-square' },
+      { name: 'profile', title: 'Hồ sơ', icon: 'user' },
+    ]);
+  });
+
+  it('Koko KHÔNG còn là một tab', () => {
+    // Thiết kế chuyển trợ lý AI thành một card trên Bảng tin dẫn sang màn
+    // `KokoChat`, không còn là mục thứ tư của thanh tab như bản trước.
+    const ten = resolveTabs(['MENTEE']).map((t) => t.name);
+
+    expect(ten).not.toContain('assistant');
+    expect(resolveTabs(['MENTEE']).map((t) => t.title)).not.toContain('Trợ lý');
   });
 
   it('mentor thấy đúng bộ tab như mentee', () => {

@@ -156,7 +156,7 @@ export function ComposeScreen({ postId }: { postId?: string }) {
     return (
       <Screen testID="man-hinh-soan-bai">
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator testID="dang-tai-bai-can-sua" color={colors.primary} />
+          <ActivityIndicator testID="dang-tai-bai-can-sua" color={colors.accent} />
         </View>
       </Screen>
     );
@@ -226,16 +226,16 @@ export function ComposeScreen({ postId }: { postId?: string }) {
         `thuRoiDi` để hỏi trước khi vứt bản nháp. `app/forum/_layout.tsx` vì thế
         tắt header cho riêng route này.
       */}
-      <View className="flex-row items-center gap-3 border-b border-border-light px-4 py-3">
+      <View className="flex-row items-center gap-3 border-b border-line px-4 py-3">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Quay lại"
           testID="nut-quay-lai"
           onPress={thuRoiDi}
         >
-          <Text className="text-base text-primary">Quay lại</Text>
+          <Text className="text-base text-accent">Quay lại</Text>
         </Pressable>
-        <Text className="text-base font-semibold text-text-main">
+        <Text className="text-base font-semibold text-ink">
           {dangSua ? 'Sửa bài viết' : 'Đăng bài mới'}
         </Text>
       </View>
@@ -247,9 +247,9 @@ export function ComposeScreen({ postId }: { postId?: string }) {
           value={title}
           onChangeText={setTitle}
           maxLength={TITLE_MAX}
-          className="h-control-lg rounded-md border border-border-color bg-surface px-3 text-text-main"
+          className="h-control-lg rounded-md border border-line bg-surface px-3 text-ink"
         />
-        <Text className="text-right text-xs text-text-muted">
+        <Text className="text-right text-xs text-ink-muted">
           {title.length}/{TITLE_MAX}
         </Text>
 
@@ -269,16 +269,16 @@ export function ComposeScreen({ postId }: { postId?: string }) {
           onChangeText={setContent}
           maxLength={CONTENT_MAX}
           multiline
-          className="min-h-40 rounded-md border border-border-color bg-surface p-3 text-text-main"
+          className="min-h-40 rounded-md border border-line bg-surface p-3 text-ink"
         />
-        <Text className="text-right text-xs text-text-muted">
+        <Text className="text-right text-xs text-ink-muted">
           {content.length}/{CONTENT_MAX}
         </Text>
 
         {loi ? (
           // Khối đứng yên dưới ô nhập, KHÔNG phải toast trôi đi: người dùng cần
           // đọc lại câu của backend trong lúc sửa chính nội dung vừa gõ.
-          <View testID="loi-gui-bai" className="gap-1 rounded-md bg-danger-soft p-3">
+          <View testID="loi-gui-bai" className="gap-1 rounded-md bg-neutral-soft p-3">
             <Text className="font-semibold text-danger">{loi.title}</Text>
             <Text className="text-danger">{loi.description}</Text>
             {loi.retryAfterSeconds ? (
@@ -306,8 +306,8 @@ export function ComposeScreen({ postId }: { postId?: string }) {
       >
         <View className="flex-1 items-center justify-center bg-black/40 px-8">
           <View testID="hop-xac-nhan-roi-di" className="w-full gap-3 rounded-lg bg-surface p-4">
-            <Text className="text-base font-semibold text-text-main">Bỏ bài đang soạn?</Text>
-            <Text className="text-text-secondary">
+            <Text className="text-base font-semibold text-ink">Bỏ bài đang soạn?</Text>
+            <Text className="text-ink-body">
               Nội dung bạn vừa gõ chưa được gửi đi và sẽ mất.
             </Text>
             <View className="flex-row justify-end gap-2">

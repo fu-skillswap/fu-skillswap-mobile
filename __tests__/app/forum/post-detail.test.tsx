@@ -7,6 +7,7 @@ import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
+import type { UserMeResponse } from '@/core/auth/types';
 import { PostDetailScreen } from '@/features/forum';
 import { donHangDoiDanhSach } from '@/test-utils/nhuongNhip';
 
@@ -49,11 +50,36 @@ jest.mock('@/core/net/onlineStatus', () => ({ useIsOffline: () => false }));
  * (`status`, `user`, `signInWithGoogle`, `signOut`) — trả về mỗi `user` thì
  * chỗ nào đọc `status` sau này sẽ chỉ vỡ trong test chứ không vỡ trên máy thật.
  *
+ * `user` phải là một `UserMeResponse` ĐẦY ĐỦ, không phải `{ publicId }`.
+ * Trước đây nó chỉ có `publicId` vì màn hình chỉ đọc đúng trường đó, và cái bẫy
+ * nổ đúng như JSDoc trên đã cảnh báo: khi thanh nhập bình luận được dựng theo
+ * thiết kế, nó vẽ avatar của người đang đăng nhập từ `user.fullName` —
+ * `tsc` thấy `useAuth()` thật nên không chặn gì, còn runtime nhận `undefined`
+ * và `Avatar` nổ. Mock bịa thiếu hình dạng thì lỗi chỉ hiện ra trong test, ở
+ * một task khác, dưới dạng một vụ sập không liên quan gì tới nội dung test.
+ *
  * Biến phải mở đầu bằng `mock` mới được tham chiếu từ trong factory (Jest hoist
  * `jest.mock` lên trên mọi khai báo); nó chỉ được ĐỌC lúc render nên TDZ không
  * chạm tới.
  */
-let mockNguoiDungHienTai: { publicId: string } | null = null;
+let mockNguoiDungHienTai: UserMeResponse | null = null;
+
+/** Một `UserMeResponse` đầy đủ; chỉ `publicId` là thứ từng test quan tâm. */
+function nguoiDung(publicId: string): UserMeResponse {
+  return {
+    publicId,
+    email: 'nguoi.dung@fpt.edu.vn',
+    fullName: 'Nguyen Van A',
+    avatarUrl: null,
+    status: 'ACTIVE',
+    roles: ['MENTEE'],
+    profileCompleted: true,
+    hasStudentProfile: true,
+    googleCalendarConnected: false,
+    googleCalendarSyncEnabled: false,
+    googleCalendarNeedsReconnect: false,
+  };
+}
 jest.mock('@/core/auth/AuthProvider', () => ({
   useAuth: () => ({
     status: mockNguoiDungHienTai ? 'authenticated' : 'unauthenticated',
@@ -165,7 +191,7 @@ beforeEach(() => {
   // `app/forum/_layout.tsx` có gate đăng nhập thì khách không thể tới được màn
   // hình này — 27 test mô tả một trạng thái không tồn tại, và chính điều đó che
   // mất việc nhánh /forum/* đang hở. Giữ mặc định khớp với thực tế.
-  mockNguoiDungHienTai = { publicId: 'u-khac' };
+  mockNguoiDungHienTai = nguoiDung('u-khac');
 });
 afterEach(() => {
   // `clear()` một mình bỏ sót bộ hẹn giờ gcTime của mutation và Jest treo sau
@@ -656,7 +682,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
   it('bài của NGƯỜI KHÁC thì không bày nút sửa hay nút xoá', async () => {
     // Backend trả 403 cho việc sửa/xoá bài người khác; bày nút ra chỉ để nhận
     // 403 là mời người dùng bấm vào một cái chắc chắn hỏng.
-    mockNguoiDungHienTai = { publicId: 'u-khac' };
+    mockNguoiDungHienTai = nguoiDung('u-khac');
     server.use(postOk(), commentsOk([]));
 
     await renderScreen();
@@ -670,7 +696,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
   it('bài của MÌNH thì không bày nút báo cáo bài viết', async () => {
     // Báo cáo bài của chính mình là vô nghĩa, và nút đó nằm đúng chỗ của nút
     // Sửa/Xoá nên rất dễ bấm nhầm.
-    mockNguoiDungHienTai = { publicId: 'u1' };
+    mockNguoiDungHienTai = nguoiDung('u1');
     server.use(postOk(), commentsOk([]));
 
     await renderScreen();
@@ -681,7 +707,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
   });
 
   it('bài của MÌNH thì bấm Sửa bài mở form soạn kèm đúng postId', async () => {
-    mockNguoiDungHienTai = { publicId: 'u1' };
+    mockNguoiDungHienTai = nguoiDung('u1');
     server.use(postOk(), commentsOk([]));
 
     await renderScreen();
@@ -699,7 +725,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
   it('bấm Xoá bài thì HỎI LẠI trước, chưa gửi DELETE nào', async () => {
     // Xoá không hoàn tác được. Một cú chạm nhầm mà gửi thẳng DELETE là mất bài.
     let soDelete = 0;
-    mockNguoiDungHienTai = { publicId: 'u1' };
+    mockNguoiDungHienTai = nguoiDung('u1');
     server.use(
       postOk(),
       commentsOk([]),
@@ -722,7 +748,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
 
   it('huỷ trong hộp xác nhận thì đóng hộp và không xoá gì', async () => {
     let soDelete = 0;
-    mockNguoiDungHienTai = { publicId: 'u1' };
+    mockNguoiDungHienTai = nguoiDung('u1');
     server.use(
       postOk(),
       commentsOk([]),
@@ -745,7 +771,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
 
   it('xác nhận xoá thì gửi DELETE tới đúng bài rồi quay lại màn trước', async () => {
     let duongDan = '';
-    mockNguoiDungHienTai = { publicId: 'u1' };
+    mockNguoiDungHienTai = nguoiDung('u1');
     server.use(
       postOk(),
       commentsOk([]),
@@ -769,7 +795,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
   it('xoá HỎNG thì nói rõ vì sao, không đóng hộp và im lặng', async () => {
     // Nếu DELETE hỏng mà giao diện không nói gì, hộp vẫn mở và nút hết quay:
     // người dùng không biết bài đã xoá được hay chưa và sẽ bấm lại.
-    mockNguoiDungHienTai = { publicId: 'u1' };
+    mockNguoiDungHienTai = nguoiDung('u1');
     server.use(
       postOk(),
       commentsOk([]),
@@ -804,7 +830,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
     // Comment trong code khẳng định điều này; trước đây gỡ hẳn `onRequestClose`
     // đi mà cả suite vẫn xanh, tức là lời khẳng định không được gì bảo vệ. Kẹt
     // trong một câu hỏi không có đường thoát là lỗi thật trên Android.
-    mockNguoiDungHienTai = { publicId: 'u1' };
+    mockNguoiDungHienTai = nguoiDung('u1');
     server.use(postOk(), commentsOk([]));
 
     await renderScreen();
@@ -828,7 +854,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
     // `back()` là no-op: người dùng ngồi nhìn chính bài vừa xoá, hộp đã đóng,
     // không hiểu chuyện gì vừa xảy ra.
     mockCanGoBack.mockReturnValue(false);
-    mockNguoiDungHienTai = { publicId: 'u1' };
+    mockNguoiDungHienTai = nguoiDung('u1');
     server.use(
       postOk(),
       commentsOk([]),
@@ -853,7 +879,7 @@ describe('PostDetailScreen — tác giả sửa và xoá bài của mình', () =
     // guard `draft.length <= COMMENT_MAX`. Trước đây bỏ hẳn nửa đó mà toàn bộ
     // 300 test vẫn xanh, tức là giới hạn của backend (forum.md §4.3) không được
     // gì canh.
-    mockNguoiDungHienTai = { publicId: 'u-khac' };
+    mockNguoiDungHienTai = nguoiDung('u-khac');
     server.use(postOk(), commentsOk([]));
 
     await renderScreen();

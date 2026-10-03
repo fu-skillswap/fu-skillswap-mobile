@@ -11,8 +11,8 @@ export default function IndexScreen() {
 
   if (route.kind === 'loading') {
     return (
-      <View className="flex-1 items-center justify-center bg-bg">
-        <ActivityIndicator color={colors.primary} />
+      <View className="flex-1 items-center justify-center bg-surface-page">
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }

@@ -5,17 +5,29 @@
  * Hai nguồn dữ liệu độc lập nên mỗi bên tự quyết trạng thái của mình: thông tin
  * phiên (`useAuth`) luôn có sẵn nên hiện ngay; hồ sơ sinh viên là một query
  * riêng, hỏng hay chưa có thì cũng KHÔNG được xoá phần trên khỏi màn hình.
+ *
+ * `Profile.dc.html` còn vẽ bốn khối nữa — ví S-coins, card "Trở thành Mentor",
+ * menu tài khoản (Hồ sơ học thuật / Lịch hẹn / Thông báo / Ngôn ngữ) và nút bánh
+ * răng Cài đặt. Lần này KHÔNG dựng khối nào trong số đó: tất cả đều là lối vào
+ * những màn hình repo chưa có, và riêng ví còn vướng ràng buộc ở mục 4.1 của
+ * `docs/quy-uoc-dung-giao-dien.md` (bản mobile chỉ xem và tiêu, nút "Nạp" mà
+ * thiết kế vẽ là thứ bị cấm). Xem mục (c) của báo cáo.
  */
 
+import { LogOut } from 'lucide-react-native';
 import { ScrollView, Text, View } from 'react-native';
 
 import { trangThaiTai } from '@/core/api/queryState';
 import { useAuth } from '@/core/auth/AuthProvider';
-import { Button } from '@/core/ui/Button';
+import { Avatar } from '@/core/ui/Avatar';
+import { Card } from '@/core/ui/Card';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
+import { ListRow } from '@/core/ui/ListRow';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
+import { ScreenHeader } from '@/core/ui/ScreenHeader';
+import { colors, fonts } from '@/core/ui/theme';
 import { useStudentProfile } from '@/features/profile/hooks/useProfileQueries';
 
 /** Một dòng "nhãn — giá trị"; bỏ hẳn dòng khi không có giá trị */
@@ -25,8 +37,15 @@ function Dong({ nhan, giaTri }: { nhan: string; giaTri: string | null | undefine
   }
   return (
     <View className="flex-row justify-between gap-4 py-2">
-      <Text className="text-text-muted">{nhan}</Text>
-      <Text className="flex-1 text-right text-text-main">{giaTri}</Text>
+      <Text className="text-body text-ink-muted" style={{ fontFamily: fonts.medium }}>
+        {nhan}
+      </Text>
+      <Text
+        className="flex-1 text-right text-body text-ink"
+        style={{ fontFamily: fonts.semibold }}
+      >
+        {giaTri}
+      </Text>
     </View>
   );
 }
@@ -58,15 +77,41 @@ export function ProfileScreen() {
   return (
     <Screen testID="man-hinh-ho-so">
       <OfflineBanner />
-      <ScrollView contentContainerClassName="gap-4 p-4">
-        <View className="items-center gap-1 rounded-lg bg-surface p-4">
-          <Text className="text-lg font-semibold text-text-main">{user?.fullName}</Text>
-          <Text className="text-text-muted">{user?.email}</Text>
-          <Text className="text-xs text-text-muted">{user?.roles.join(' · ')}</Text>
-        </View>
+      <ScrollView contentContainerClassName="gap-4 px-gutter pb-8 pt-2">
+        {/* Tiêu đề màn tab: 26/700, đúng `<h1>` của thiết kế. */}
+        <ScreenHeader title="Hồ sơ" size="lg" />
 
-        <View className="rounded-lg bg-surface p-4">
-          <Text className="pb-2 text-base font-semibold text-text-main">Hồ sơ sinh viên</Text>
+        {/* Card hồ sơ: avatar 64 nền accent, tên 18/700, rồi email và vai trò. */}
+        <Card elevated>
+          <View className="flex-row items-center gap-3.5">
+            <Avatar name={user?.fullName ?? ''} size={64} tone="accent" />
+            <View className="min-w-0 flex-1 gap-0.5">
+              <Text className="text-section-title text-ink" style={{ fontFamily: fonts.bold }}>
+                {user?.fullName}
+              </Text>
+              <Text
+                className="text-caption-lg text-ink-body"
+                style={{ fontFamily: fonts.regular }}
+              >
+                {user?.email}
+              </Text>
+              <Text
+                className="text-caption text-ink-muted"
+                style={{ fontFamily: fonts.medium }}
+              >
+                {user?.roles.join(' · ')}
+              </Text>
+            </View>
+          </View>
+        </Card>
+
+        <Card>
+          <Text
+            className="pb-1 text-section-title text-ink"
+            style={{ fontFamily: fonts.bold }}
+          >
+            Hồ sơ sinh viên
+          </Text>
 
           {trangThaiHoSo === 'mat-ket-noi' ? (
             <EmptyState title="Không có kết nối" description="Hồ sơ sẽ tải khi có mạng trở lại." />
@@ -92,14 +137,23 @@ export function ProfileScreen() {
               <Dong nhan="Giới thiệu" giaTri={hoSo.data?.bio} />
             </View>
           )}
-        </View>
+        </Card>
 
-        <Button
-          label="Đăng xuất"
-          variant="danger"
-          onPress={() => void dangXuat()}
-          testID="nut-dang-xuat"
-        />
+        {/*
+          Thiết kế để Đăng xuất làm hàng CUỐI của khối menu tài khoản, chữ đỏ
+          `danger` kèm icon. Khối menu đó không dựng (lý do ở JSDoc đầu file), nên
+          hàng này đứng một mình trong card của nó — vẫn đúng dáng `ListRow` cao
+          56 và vẫn là hành động duy nhất ở màn này đã nối được việc thật.
+        */}
+        <Card flush>
+          <ListRow
+            label="Đăng xuất"
+            destructive
+            icon={<LogOut size={20} color={colors.danger} strokeWidth={2} />}
+            onPress={() => void dangXuat()}
+            testID="nut-dang-xuat"
+          />
+        </Card>
       </ScrollView>
     </Screen>
   );

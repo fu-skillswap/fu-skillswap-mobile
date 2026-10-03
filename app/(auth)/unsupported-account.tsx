@@ -32,8 +32,8 @@ export default function UnsupportedAccountScreen() {
 
   if (route.kind === 'loading') {
     return (
-      <View className="flex-1 items-center justify-center bg-bg">
-        <ActivityIndicator color={colors.primary} />
+      <View className="flex-1 items-center justify-center bg-surface-page">
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -58,11 +58,11 @@ export default function UnsupportedAccountScreen() {
   };
 
   return (
-    <View className="flex-1 items-center justify-center gap-6 bg-bg px-6">
-      <Text className="text-center text-2xl font-bold text-text-main">
+    <View className="flex-1 items-center justify-center gap-6 bg-surface-page px-6">
+      <Text className="text-center text-2xl font-bold text-ink">
         Tài khoản không được hỗ trợ
       </Text>
-      <Text className="text-center text-text-muted">
+      <Text className="text-center text-ink-muted">
         Ứng dụng di động SkillSwap chỉ phục vụ tài khoản mentee và mentor. Tài
         khoản quản trị viên ({user?.roles.join(', ')}) vui lòng dùng phiên bản
         web để tiếp tục.
@@ -74,7 +74,7 @@ export default function UnsupportedAccountScreen() {
         onPress={() => {
           void handleSignOut();
         }}
-        className="h-control-lg w-full items-center justify-center rounded-md bg-primary"
+        className="h-control-lg w-full items-center justify-center rounded-md bg-accent"
       >
         {busy ? (
           <ActivityIndicator color="#ffffff" />

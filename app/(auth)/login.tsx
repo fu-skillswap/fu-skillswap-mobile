@@ -1,11 +1,14 @@
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { toUserMessage } from '@/core/api/errors';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { resolveAuthRoute } from '@/core/auth/authRoute';
 import { GoogleSignInCancelledError, GoogleSignInConfigError } from '@/core/auth/googleSignIn';
+import { Button } from '@/core/ui/Button';
+import { fonts } from '@/core/ui/theme';
 
 export default function LoginScreen() {
   const { status, user, signInWithGoogle } = useAuth();
@@ -64,31 +67,94 @@ export default function LoginScreen() {
   };
 
   return (
-    <View className="flex-1 items-center justify-center gap-6 bg-bg px-6">
-      <Text className="text-2xl font-bold text-text-main">SkillSwap</Text>
-      <Text className="text-center text-text-muted">
-        Đăng nhập bằng tài khoản Google của trường để tiếp tục.
-      </Text>
+    <SafeAreaView className="flex-1 bg-surface-page">
+      {/* `Welcome.dc.html`: padding 56/24/40 — phần trên đã do safe area lo. */}
+      <View className="flex-1 px-6 pb-10 pt-6">
+        <Text className="text-2xl text-ink" style={{ fontFamily: fonts.extrabold }}>
+          SkillSwap
+        </Text>
 
-      <Pressable
-        accessibilityRole="button"
-        disabled={busy}
-        onPress={handlePress}
-        className="h-control-lg w-full items-center justify-center rounded-md bg-primary"
-      >
-        {busy ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text className="font-semibold text-white">Đăng nhập với Google</Text>
-        )}
-      </Pressable>
-
-      {error ? (
-        <View className="gap-1">
-          <Text className="text-center font-semibold text-danger">{error.title}</Text>
-          <Text className="text-center text-danger">{error.description}</Text>
+        {/*
+          Khối hero bo 32 nền `surface-tint` với ba quả cầu trang trí. Thiết kế đặt
+          mascot Koko ở giữa khối này, nhưng repo mobile CHƯA có file ảnh nào của
+          Koko (`assets/images/` chỉ có icon app và logo Expo mặc định), nên ở đây
+          chỉ dựng khối và các quả cầu — xem báo cáo. Không hard-code chiều rộng
+          390 của khung thiết kế: khối tự co theo màn hình.
+        */}
+        <View
+          className="mt-6 overflow-hidden bg-surface-tint"
+          style={{ height: 330, borderRadius: 32 }}
+        >
+          {/*
+            Thiết kế vẽ hai quả cầu lớn bằng `radial-gradient`. React Native
+            không có gradient toả tròn, nên đây là màu đặc gần nhất của dải đó
+            (#56A8FF ở rìa) thay vì kéo thêm một thư viện chỉ để trang trí.
+          */}
+          <View
+            className="absolute rounded-full"
+            style={{ width: 120, height: 120, top: 28, left: 22, backgroundColor: '#8CC2FF' }}
+          />
+          <View
+            className="absolute rounded-full"
+            style={{ width: 56, height: 56, top: 64, right: 36, backgroundColor: '#56A8FF' }}
+          />
+          <View
+            className="absolute rounded-full bg-sky-blue"
+            style={{ width: 22, height: 22, bottom: 120, right: 70 }}
+          />
         </View>
-      ) : null}
-    </View>
+
+        <View className="mt-8 gap-3">
+          <Text
+            className="text-tab-label text-accent"
+            style={{ fontFamily: fonts.semibold, letterSpacing: 2.2 }}
+          >
+            ONE SKILL, A BRIGHTER TOMORROW
+          </Text>
+          <Text className="text-ink" style={{ fontFamily: fonts.bold, fontSize: 30, lineHeight: 38 }}>
+            Kết nối tri thức, kiến tạo tương lai
+          </Text>
+          <Text
+            className="text-ink-body"
+            style={{ fontFamily: fonts.regular, fontSize: 15, lineHeight: 24 }}
+          >
+            Học cùng senior và alumni FPT: làm đồ án, chuẩn bị OJT, review CV và định hướng nghề
+            nghiệp.
+          </Text>
+        </View>
+
+        {/* `margin-top: auto` của thiết kế — nhóm nút dính xuống đáy màn hình. */}
+        <View className="mt-auto gap-3">
+          {error ? (
+            <View className="gap-1 rounded-md bg-neutral-soft p-3">
+              <Text className="text-center text-body text-danger" style={{ fontFamily: fonts.semibold }}>
+                {error.title}
+              </Text>
+              <Text
+                className="text-center text-caption-lg text-danger"
+                style={{ fontFamily: fonts.regular }}
+              >
+                {error.description}
+              </Text>
+            </View>
+          ) : null}
+
+          <Button
+            label="Đăng nhập với Google"
+            onPress={() => void handlePress()}
+            busy={busy}
+            size="lg"
+          />
+
+          {/*
+            Thiết kế có thêm nút "Khám phá trước" (sang `Main`) và hai liên kết
+            "Điều khoản" / "Chính sách bảo mật". Cả ba đều KHÔNG dựng lần này:
+            `(tabs)` có gate đăng nhập nên "Khám phá trước" sẽ bị đẩy ngược về
+            đúng màn này, còn hai liên kết kia trong thiết kế là `href="#"`, chưa
+            có trang nào để trỏ tới. Xem mục (c) của báo cáo.
+          */}
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }

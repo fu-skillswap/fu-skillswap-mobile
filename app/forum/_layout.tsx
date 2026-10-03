@@ -3,7 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 
 import { useAuth } from '@/core/auth/AuthProvider';
 import { resolveAuthRoute } from '@/core/auth/authRoute';
-import { colors } from '@/core/ui/theme';
+import { colors, fonts } from '@/core/ui/theme';
 
 /**
  * Stack riêng cho nhánh `/forum/*`, kèm gate đăng nhập.
@@ -35,8 +35,8 @@ export default function ForumLayout() {
   // lúc khởi động sẽ bị bật ra ngoài rồi kẹt lại đó.
   if (route.kind === 'loading') {
     return (
-      <View className="flex-1 items-center justify-center bg-bg">
-        <ActivityIndicator testID="forum-loading-indicator" color={colors.primary} />
+      <View className="flex-1 items-center justify-center bg-surface-page">
+        <ActivityIndicator testID="forum-loading-indicator" color={colors.accent} />
       </View>
     );
   }
@@ -51,7 +51,26 @@ export default function ForumLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: true, headerBackTitle: 'Quay lại' }}>
+    <Stack
+      screenOptions={{
+        headerShown: true,
+        headerBackTitle: 'Quay lại',
+        /*
+          Thanh trên cùng của `PostDetail.dc.html`: nền trắng, tiêu đề 17/700 màu
+          `ink`, nút back màu `ink`. `headerShadowVisible: false` vì thiết kế dùng
+          một đường viền 1px `line` chứ không phải bóng đổ — và mỗi màn hình chỉ
+          được có một kiểu bóng (mục 2 của HANDOFF.md).
+
+          `fontFamily` phải là tên file font thật, không dùng `fontWeight`: trên
+          Android với font tuỳ biến `fontWeight` không có tác dụng và chữ lặng lẽ
+          rơi về nét thường — xem ghi chú ở `fonts` trong `core/ui/theme.ts`.
+        */
+        headerStyle: { backgroundColor: colors.surface },
+        headerShadowVisible: false,
+        headerTintColor: colors.ink,
+        headerTitleStyle: { fontFamily: fonts.bold, fontSize: 17, color: colors.ink },
+      }}
+    >
       <Stack.Screen name="[postId]" options={{ headerTitle: 'Bài viết' }} />
       {/*
         Màn soạn bài tự vẽ thanh trên cùng của nó: nút quay lại ở đó phải hỏi
