@@ -43,3 +43,7 @@ example
 /android
 
 .env
+
+# Ban build tai ve de cai len may ao/thiet bi — KHONG bao gio commit (hang tram MB)
+*.apk
+*.aab
