@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Xác nhận đặt lịch</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F6BFF;text-decoration:none}a:hover{color:#1A47D6}
+button,textarea{font-family:inherit}
+textarea::placeholder{color:#5A6A8C}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; background: #F4F7FD; font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif; color: #0F2D6B">
+  <div style="display: flex; flex-direction: column; gap: 16px; padding: 52px 20px 120px">
+    <header style="display: flex; align-items: center; gap: 12px">
+      <a href="Booking.dc.html" aria-label="Quay lại" style="width: 44px; height: 44px; border-radius: 9999px; background: #FFFFFF; border: 1px solid #DCE6FA; color: #0F2D6B; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a>
+      <div style="display: flex; flex-direction: column">
+        <h1 style="margin: 0; font-size: 18px; font-weight: 700">Xác nhận đặt lịch</h1>
+        <span style="font-size: 12px; color: #5A6A8C">Bước 3/3</span>
+      </div>
+    </header>
+    <div aria-hidden="true" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+      <span style="height: 6px; border-radius: 9999px; background: #2F6BFF"></span><span style="height: 6px; border-radius: 9999px; background: #2F6BFF"></span><span style="height: 6px; border-radius: 9999px; background: #2F6BFF"></span>
+    </div>
+
+    <section style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; box-shadow: 0 8px 32px rgba(15,45,107,0.06); padding: 16px; display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span style="width: 48px; height: 48px; border-radius: 9999px; background: #2F6BFF; color: #FFFFFF; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center">SC</span>
+        <div style="display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 700">Sarah Chen</span><span style="font-size: 12px; color: #5A6A8C">Senior Product Manager · Google</span></div>
+      </div>
+      <dl style="margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 12px; border-radius: 16px; background: #F4F7FD">
+        <div><dt style="font-size: 12px; color: #5A6A8C">Dịch vụ</dt><dd style="margin: 2px 0 0; font-size: 14px; font-weight: 700">Review CV 1:1</dd></div>
+        <div><dt style="font-size: 12px; color: #5A6A8C">Thời lượng</dt><dd style="margin: 2px 0 0; font-size: 14px; font-weight: 700">45 phút</dd></div>
+        <div><dt style="font-size: 12px; color: #5A6A8C">Thời gian</dt><dd style="margin: 2px 0 0; font-size: 14px; font-weight: 700; color: #2F6BFF">T3, 06/10 · 19:00</dd></div>
+        <div><dt style="font-size: 12px; color: #5A6A8C">Hình thức</dt><dd style="margin: 2px 0 0; font-size: 14px; font-weight: 700">Google Meet</dd></div>
+      </dl>
+    </section>
+
+    <label style="display: flex; flex-direction: column; gap: 8px; font-size: 15px; font-weight: 700">Mục tiêu buổi học
+      <span style="font-size: 12px; font-weight: 400; color: #5A6A8C">Giúp mentor chuẩn bị tốt hơn cho bạn</span>
+      <textarea rows="3" style="box-sizing: border-box; padding: 12px 14px; border-radius: 16px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 14px; line-height: 21px; color: #0F2D6B; resize: none">Em muốn chỉnh CV để ứng tuyển intern Product Manager, nhất là phần mô tả dự án.</textarea>
+    </label>
+
+    <section style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">Thanh toán bằng S-coins</h2>
+      <div style="display: flex; justify-content: space-between; font-size: 14px; color: #3D4F75"><span>Số dư hiện tại</span><span style="font-weight: 600; color: #0F2D6B">500.000</span></div>
+      <div style="display: flex; justify-content: space-between; font-size: 14px; color: #3D4F75"><span>Phí buổi học</span><span style="font-weight: 600; color: #0F2D6B">−150.000</span></div>
+      <div style="display: flex; justify-content: space-between; border-top: 1px dashed #DCE6FA; padding-top: 10px; font-size: 15px; font-weight: 700"><span>Số dư sau khi đặt</span><span>350.000 S-coins</span></div>
+      <p style="margin: 0; display: flex; gap: 8px; font-size: 12px; line-height: 18px; color: #5A6A8C"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F6BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>S-coins được tạm giữ đến khi mentor xác nhận. Nếu mentor từ chối, bạn được hoàn lại đầy đủ.</p>
+    </section>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 14px 20px 30px; background: #FFFFFF; border-top: 1px solid #DCE6FA">
+    <a href="MyBookings.dc.html" style="height: 56px; border-radius: 9999px; background: linear-gradient(135deg, #1A47D6 0%, #2F6BFF 100%); box-shadow: 0 8px 20px rgba(47,107,255,0.30); color: #FFFFFF; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center">Xác nhận &amp; thanh toán</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

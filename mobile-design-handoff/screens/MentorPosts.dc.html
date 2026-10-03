@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Mentor · Bài viết của tôi</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F6BFF;text-decoration:none}a:hover{color:#1A47D6}
+button,input,textarea{font-family:inherit}
+input::placeholder,textarea::placeholder{color:#5A6A8C}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; background: #F4F7FD; font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif; color: #0F2D6B">
+  <div style="display: flex; flex-direction: column; gap: 14px; padding: 52px 20px 40px">
+    <header style="display: flex; align-items: center; gap: 12px">
+      <a href="MentorMore.dc.html" aria-label="Quay lại" style="width: 44px; height: 44px; border-radius: 9999px; background: #FFFFFF; border: 1px solid #DCE6FA; color: #0F2D6B; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a>
+      <h1 style="margin: 0; flex-grow: 1; font-size: 20px; font-weight: 700">Bài viết của tôi</h1>
+    </header>
+
+    <article style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; box-shadow: 0 8px 32px rgba(15,45,107,0.06); padding: 16px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="padding: 4px 10px; border-radius: 9999px; background: #DCFCE7; color: #15803D; font-size: 11px; font-weight: 700">Công khai</span>
+        <span style="flex-grow: 1; font-size: 12px; color: #5A6A8C">6 giờ trước</span>
+        <button type="button" aria-label="Tuỳ chọn bài viết" style="width: 44px; height: 44px; margin: -10px -10px -10px 0; border: 0; background: transparent; color: #5A6A8C; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+      </div>
+      <h2 style="margin: 0; font-size: 16px; line-height: 22px; font-weight: 700">3 lỗi sai phổ biến nhất trên CV vị trí Product Manager</h2>
+      <p style="margin: 0; font-size: 13px; line-height: 20px; color: #3D4F75">Liệt kê trách nhiệm thay vì kết quả, thiếu con số chứng minh tác động, và dùng quá nhiều thuật ngữ…</p>
+      <div style="display: flex; gap: 16px; font-size: 12px; font-weight: 600; color: #5A6A8C"><span>182 lượt thích</span><span>1 bình luận</span></div>
+    </article>
+
+    <article style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; box-shadow: 0 8px 32px rgba(15,45,107,0.06); padding: 16px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="padding: 4px 10px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 11px; font-weight: 700">Mentee đã đặt dịch vụ</span>
+        <span style="flex-grow: 1; font-size: 12px; color: #5A6A8C">3 ngày trước</span>
+        <button type="button" aria-label="Tuỳ chọn bài viết" style="width: 44px; height: 44px; margin: -10px -10px -10px 0; border: 0; background: transparent; color: #5A6A8C; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+      </div>
+      <h2 style="margin: 0; font-size: 16px; line-height: 22px; font-weight: 700">Template PRD mình dùng khi làm ở Google</h2>
+      <p style="margin: 0; font-size: 13px; line-height: 20px; color: #3D4F75">Dành riêng cho các bạn đã học cùng mình: file mẫu và cách điền từng mục…</p>
+      <div style="display: flex; gap: 16px; font-size: 12px; font-weight: 600; color: #5A6A8C"><span>46 lượt thích</span><span>8 bình luận</span></div>
+    </article>
+  </div>
+
+  <button type="button" onClick="{{open}}" aria-label="Tạo bài đăng mới" style="position: absolute; right: 20px; bottom: 36px; height: 56px; padding: 0 22px; border: 0; border-radius: 9999px; background: linear-gradient(135deg, #1A47D6 0%, #2F6BFF 100%); box-shadow: 0 8px 20px rgba(47,107,255,0.30); color: #FFFFFF; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; cursor: pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Tạo bài đăng</button>
+
+  <sc-if value="{{composing}}" hint-placeholder-val="{{true}}">
+    <div style="position: absolute; inset: 0; background: rgba(15,45,107,0.45); display: flex; flex-direction: column; justify-content: flex-end">
+      <div role="dialog" aria-label="Tạo bài đăng mới" style="border-radius: 28px 28px 0 0; background: #FFFFFF; padding: 12px 20px 30px; display: flex; flex-direction: column; gap: 14px">
+        <span style="align-self: center; width: 40px; height: 5px; border-radius: 9999px; background: #DCE6FA"></span>
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <h2 style="margin: 0; font-size: 18px; font-weight: 700">Tạo bài đăng mới</h2>
+          <button type="button" onClick="{{close}}" aria-label="Đóng" style="width: 44px; height: 44px; margin-right: -10px; border: 0; background: transparent; color: #5A6A8C; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tiêu đề
+          <input type="text" placeholder="Nhập tiêu đề bài viết" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #DCE6FA; font-size: 15px; color: #0F2D6B">
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Nội dung
+          <textarea rows="5" placeholder="Chia sẻ kiến thức và kinh nghiệm của bạn…" style="box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1px solid #DCE6FA; font-size: 14px; line-height: 21px; color: #0F2D6B; resize: none"></textarea>
+        </label>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 13px; font-weight: 600">Ai có thể xem?</span>
+          <div role="radiogroup" aria-label="Phạm vi hiển thị" style="display: flex; flex-wrap: wrap; gap: 8px">
+            <sc-for list="{{vis}}" as="v" hint-placeholder-count="3">
+              <button type="button" role="radio" aria-checked="{{v.on}}" onClick="{{v.pick}}" style="{{v.style}}">{{v.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <button type="button" onClick="{{close}}" style="height: 52px; border: 0; border-radius: 9999px; background: linear-gradient(135deg, #1A47D6 0%, #2F6BFF 100%); box-shadow: 0 8px 20px rgba(47,107,255,0.30); color: #FFFFFF; font-size: 15px; font-weight: 700; cursor: pointer">Đăng bài</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { composing: true, vis: 'Công khai' }; }
+  renderVals() {
+    const vis = ['Công khai', 'Người dùng đã đăng nhập', 'Mentee đã đặt dịch vụ'].map((l) => {
+      const on = l === this.state.vis;
+      return {
+        label: l, on: on ? 'true' : 'false',
+        style: 'height: 40px; padding: 0 14px; border-radius: 9999px; font-size: 13px; cursor: pointer; ' + (on ? 'border: 2px solid #2F6BFF; background: #EBF3FF; color: #2F6BFF; font-weight: 700;' : 'border: 1px solid #DCE6FA; background: #FFFFFF; color: #3D4F75; font-weight: 600;'),
+        pick: () => this.setState({ vis: l })
+      };
+    });
+    return {
+      vis, composing: this.state.composing,
+      open: () => this.setState({ composing: true }),
+      close: () => this.setState({ composing: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

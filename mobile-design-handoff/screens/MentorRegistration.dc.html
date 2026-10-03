@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Đăng ký làm Mentor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F6BFF;text-decoration:none}a:hover{color:#1A47D6}
+button,input{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; background: #F4F7FD; font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif; color: #0F2D6B">
+  <div style="display: flex; flex-direction: column; gap: 16px; padding: 52px 20px 120px">
+    <header style="display: flex; align-items: center; gap: 12px">
+      <a href="Profile.dc.html" aria-label="Quay lại" style="width: 44px; height: 44px; border-radius: 9999px; background: #FFFFFF; border: 1px solid #DCE6FA; color: #0F2D6B; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a>
+      <div style="display: flex; flex-direction: column">
+        <h1 style="margin: 0; font-size: 18px; font-weight: 700">Đăng ký làm Mentor</h1>
+        <span style="font-size: 12px; color: #5A6A8C">Bước {{stepNo}}/6 · {{stepName}}</span>
+      </div>
+    </header>
+
+    <ol aria-label="Các bước đăng ký" style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px">
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="6">
+        <li><button type="button" onClick="{{s.pick}}" aria-current="{{s.cur}}" aria-label="{{s.name}}" style="{{s.style}}">{{s.n}}</button></li>
+      </sc-for>
+    </ol>
+
+    <sc-if value="{{isSubjects}}" hint-placeholder-val="{{true}}">
+      <section style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <h2 style="margin: 0; font-size: 18px; font-weight: 700">Môn học chuyên môn</h2>
+          <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3D4F75">Chọn các môn bạn muốn hướng dẫn và nhập điểm để SkillSwap xác thực.</p>
+        </div>
+        <sc-for list="{{subjects}}" as="m" hint-placeholder-count="3">
+          <div style="border-radius: 20px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 14px; display: flex; align-items: center; gap: 12px">
+            <span style="flex-shrink: 0; width: 56px; height: 44px; border-radius: 12px; background: #EBF3FF; color: #2F6BFF; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center">{{m.code}}</span>
+            <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 700">{{m.name}}</span><span style="{{m.badge}}">{{m.status}}</span></div>
+            <span style="font-size: 18px; font-weight: 800">{{m.grade}}</span>
+          </div>
+        </sc-for>
+        <button type="button" style="height: 52px; border-radius: 20px; border: 1.5px dashed #2F6BFF; background: transparent; color: #2F6BFF; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Thêm môn học</button>
+        <div style="border-radius: 20px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+          <span style="width: 48px; height: 48px; border-radius: 16px; background: #EBF3FF; color: #2F6BFF; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></svg></span>
+          <span style="font-size: 14px; font-weight: 700">Tải lên bảng điểm minh chứng</span>
+          <span style="font-size: 12px; color: #5A6A8C">PNG, JPG hoặc PDF (tối đa 15 MB)</span>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isLevels}}" hint-placeholder-val="{{false}}">
+      <section style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <h2 style="margin: 0; font-size: 18px; font-weight: 700">Mức độ hỗ trợ</h2>
+          <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3D4F75">Đánh giá khả năng đồng hành cùng mentee ở từng mảng.</p>
+        </div>
+        <sc-for list="{{levels}}" as="l" hint-placeholder-count="3">
+          <div style="border-radius: 20px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+            <span style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700">{{l.name}}<span style="color: #2F6BFF">Mức {{l.v}}</span></span>
+            <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px">
+              <sc-for list="{{l.bars}}" as="b" hint-placeholder-count="5"><span style="{{b}}"></span></sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isBasic}}" hint-placeholder-val="{{false}}">
+      <section style="display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 700">Thông tin cơ bản</h2>
+        <div style="border-radius: 20px; background: #EBF3FF; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #15803D"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Tư cách FPTU · Đã xác thực</span>
+          <span style="font-size: 15px; font-weight: 700">Nguyễn Thu Hà · SE192621</span>
+          <span style="font-size: 13px; color: #3D4F75">Kỹ thuật phần mềm · Học kỳ 5 · Hồ Chí Minh</span>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Số điện thoại
+          <input type="tel" placeholder="09xx xxx xxx" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 15px; color: #0F2D6B">
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">GitHub
+          <input type="url" placeholder="github.com/ten-cua-ban" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 15px; color: #0F2D6B">
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Portfolio
+          <input type="url" placeholder="https://" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 15px; color: #0F2D6B">
+        </label>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isAwards}}" hint-placeholder-val="{{false}}">
+      <section style="display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 700">Thành tích</h2>
+        <sc-for list="{{awards}}" as="a" hint-placeholder-count="2">
+          <div style="border-radius: 20px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 14px; display: flex; align-items: center; gap: 12px">
+            <span style="flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; background: #FEF3C7; color: #B45309; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="6"/><path d="M15.5 13 17 22l-5-3-5 3 1.5-9"/></svg></span>
+            <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 700">{{a.name}}</span><span style="font-size: 12px; color: #5A6A8C">{{a.meta}}</span></div>
+          </div>
+        </sc-for>
+        <button type="button" style="height: 52px; border-radius: 20px; border: 1.5px dashed #2F6BFF; background: transparent; color: #2F6BFF; font-size: 14px; font-weight: 700; cursor: pointer">+ Thêm thành tích</button>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isProjects}}" hint-placeholder-val="{{false}}">
+      <section style="display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 700">Dự án tiêu biểu <span style="font-size: 13px; font-weight: 500; color: #5A6A8C">(không bắt buộc)</span></h2>
+        <div style="border-radius: 20px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 15px; font-weight: 700">[TÊN DỰ ÁN]</span>
+          <span style="font-size: 13px; line-height: 19px; color: #3D4F75">[Mô tả ngắn: bạn làm gì, công nghệ, kết quả]</span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap"><span style="padding: 4px 10px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 12px; font-weight: 600">GitHub</span><span style="padding: 4px 10px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 12px; font-weight: 600">Demo</span></div>
+        </div>
+        <button type="button" style="height: 52px; border-radius: 20px; border: 1.5px dashed #2F6BFF; background: transparent; color: #2F6BFF; font-size: 14px; font-weight: 700; cursor: pointer">+ Thêm dự án</button>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isBooking}}" hint-placeholder-val="{{false}}">
+      <section style="display: flex; flex-direction: column; gap: 14px">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 700">Thời gian nhận booking</h2>
+        <div style="border-radius: 20px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 14px; display: flex; align-items: center; gap: 12px">
+          <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 700">Trạng thái nhận lịch</span><span style="font-size: 12px; color: #5A6A8C">Mentee có thể đặt lịch với bạn</span></div>
+          <span role="switch" aria-checked="true" aria-label="Nhận lịch" style="width: 52px; height: 30px; border-radius: 9999px; background: #2F6BFF; position: relative"><span style="position: absolute; right: 3px; top: 3px; width: 24px; height: 24px; border-radius: 9999px; background: #FFFFFF"></span></span>
+        </div>
+        <span style="font-size: 14px; font-weight: 700">Báo trước tối thiểu</span>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+          <span style="height: 44px; border-radius: 9999px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 14px; font-weight: 600; color: #3D4F75; display: flex; align-items: center; justify-content: center">12 giờ</span>
+          <span style="height: 44px; border-radius: 9999px; border: 2px solid #2F6BFF; background: #EBF3FF; font-size: 14px; font-weight: 700; color: #2F6BFF; display: flex; align-items: center; justify-content: center">24 giờ</span>
+          <span style="height: 44px; border-radius: 9999px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 14px; font-weight: 600; color: #3D4F75; display: flex; align-items: center; justify-content: center">48 giờ</span>
+        </div>
+        <span style="font-size: 14px; font-weight: 700">Hạn mở lịch tối đa</span>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+          <span style="height: 44px; border-radius: 9999px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 14px; font-weight: 600; color: #3D4F75; display: flex; align-items: center; justify-content: center">7 ngày</span>
+          <span style="height: 44px; border-radius: 9999px; border: 2px solid #2F6BFF; background: #EBF3FF; font-size: 14px; font-weight: 700; color: #2F6BFF; display: flex; align-items: center; justify-content: center">14 ngày</span>
+          <span style="height: 44px; border-radius: 9999px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 14px; font-weight: 600; color: #3D4F75; display: flex; align-items: center; justify-content: center">30 ngày</span>
+        </div>
+        <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 19px; color: #3D4F75"><input type="checkbox" checked style="width: 20px; height: 20px; margin: 0; accent-color: #2F6BFF; flex-shrink: 0">Tôi đồng ý với <a href="#" style="font-weight: 600">Điều khoản vận hành của SkillSwap</a></label>
+      </section>
+    </sc-if>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 14px 20px 30px; background: #FFFFFF; border-top: 1px solid #DCE6FA; display: flex; gap: 10px">
+    <button type="button" onClick="{{prev}}" style="height: 52px; padding: 0 22px; border: 0; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 15px; font-weight: 700; cursor: pointer">Quay lại</button>
+    <button type="button" onClick="{{next}}" style="flex-grow: 1; height: 52px; border: 0; border-radius: 9999px; background: linear-gradient(135deg, #1A47D6 0%, #2F6BFF 100%); box-shadow: 0 8px 20px rgba(47,107,255,0.30); color: #FFFFFF; font-size: 15px; font-weight: 700; cursor: pointer">{{nextLabel}}</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { step: 2 }; }
+  renderVals() {
+    const names = ['Thông tin cơ bản', 'Môn học chuyên môn', 'Thành tích', 'Dự án tiêu biểu', 'Mức độ hỗ trợ', 'Thời gian nhận booking'];
+    const cur = this.state.step;
+    const steps = names.map((name, i) => {
+      const n = i + 1;
+      let look = 'background: #FFFFFF; color: #5A6A8C; border: 1px solid #DCE6FA;';
+      if (n < cur) look = 'background: #EBF3FF; color: #2F6BFF; border: 1px solid #EBF3FF;';
+      if (n === cur) look = 'background: #2F6BFF; color: #FFFFFF; border: 1px solid #2F6BFF; box-shadow: 0 8px 20px rgba(47,107,255,0.30);';
+      return { n, name, cur: n === cur ? 'step' : 'false', style: 'width: 100%; height: 44px; border-radius: 9999px; font-size: 14px; font-weight: 700; cursor: pointer; ' + look, pick: () => this.setState({ step: n }) };
+    });
+    const badge = (ok) => 'font-size: 11px; font-weight: 700; ' + (ok ? 'color: #15803D;' : 'color: #B45309;');
+    const subjects = [
+      { code: 'PRO192', name: 'Lập trình hướng đối tượng', grade: '9.0', status: 'Đã xác thực', badge: badge(true) },
+      { code: 'DBI202', name: 'Cơ sở dữ liệu', grade: '8.5', status: 'Đã xác thực', badge: badge(true) },
+      { code: 'SWP391', name: 'Dự án phát triển phần mềm', grade: '8.8', status: 'Đang chờ duyệt', badge: badge(false) }
+    ];
+    const lv = [['Kiến thức căn bản', 5], ['Review đồ án / code', 4], ['Định hướng phát triển', 3], ['Chuẩn bị OJT', 4]];
+    const levels = lv.map(([name, v]) => ({ name, v, bars: [1, 2, 3, 4, 5].map((k) => 'height: 8px; border-radius: 9999px; background: ' + (k <= v ? '#2F6BFF' : '#DCE6FA') + ';') }));
+    return {
+      steps, subjects, levels,
+      stepNo: cur, stepName: names[cur - 1],
+      awards: [
+        { name: '[TÊN GIẢI THƯỞNG / CHỨNG CHỈ]', meta: '[Đơn vị cấp · năm]' },
+        { name: '[TÊN HỌC BỔNG]', meta: '[Đơn vị cấp · năm]' }
+      ],
+      isBasic: cur === 1, isSubjects: cur === 2, isAwards: cur === 3, isProjects: cur === 4, isLevels: cur === 5, isBooking: cur === 6,
+      nextLabel: cur === 6 ? 'Gửi hồ sơ' : 'Tiếp tục',
+      prev: () => this.setState({ step: Math.max(1, cur - 1) }),
+      next: () => this.setState({ step: Math.min(6, cur + 1) })
+    };
+  }
+}
+</script>
+</body>
+</html>

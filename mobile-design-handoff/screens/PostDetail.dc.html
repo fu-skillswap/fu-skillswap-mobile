@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Chi tiết bài viết</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F6BFF;text-decoration:none}a:hover{color:#1A47D6}
+button,input{font-family:inherit}
+input::placeholder{color:#5A6A8C}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; background: #F4F7FD; font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif; color: #0F2D6B; display: flex; flex-direction: column">
+  <header style="flex-shrink: 0; padding: 52px 16px 10px; background: #FFFFFF; border-bottom: 1px solid #DCE6FA; display: flex; align-items: center; gap: 8px">
+    <a href="Main.dc.html" aria-label="Quay lại" style="width: 44px; height: 44px; color: #0F2D6B; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a>
+    <h1 style="margin: 0; flex-grow: 1; font-size: 17px; font-weight: 700">Bài viết</h1>
+    <button type="button" aria-label="Báo cáo hoặc tuỳ chọn" style="width: 44px; height: 44px; border: 0; background: transparent; color: #5A6A8C; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+  </header>
+
+  <div style="flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 16px 16px 0">
+    <article style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <span style="width: 44px; height: 44px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center">MĐ</span>
+        <div style="flex-grow: 1; display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 700">Minh Đức</span><span style="font-size: 12px; color: #5A6A8C">3 giờ trước · Công khai</span></div>
+        <button type="button" style="height: 36px; padding: 0 14px; border-radius: 9999px; border: 1px solid #2F6BFF; background: #FFFFFF; color: #2F6BFF; font-size: 13px; font-weight: 700; cursor: pointer">Theo dõi</button>
+      </div>
+      <p style="margin: 0; font-size: 15px; line-height: 24px; color: #3D4F75">Tui vừa xong buổi Review CV 1:1 với chị Sarah Chen, đỉnh thực sự mọi người ơi! Chị chỉ ra những điểm còn thiếu mà trước giờ tui không hề nhận ra. Anh chị em nào đang chuẩn bị CV ứng tuyển vị trí PM thì rất nên đặt lịch với chị nhé!</p>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <span style="padding: 4px 10px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 12px; font-weight: 600">Review CV</span>
+        <span style="padding: 4px 10px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 12px; font-weight: 600">Product Management</span>
+      </div>
+      <a href="MentorDetail.dc.html" style="padding: 12px; border-radius: 16px; background: #F4F7FD; display: flex; align-items: center; gap: 10px; color: #0F2D6B">
+        <span style="width: 40px; height: 40px; border-radius: 9999px; background: #2F6BFF; color: #FFFFFF; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center">SC</span>
+        <span style="flex-grow: 1; display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 700">Sarah Chen</span><span style="font-size: 12px; color: #5A6A8C">Senior PM · Google · 4.9</span></span>
+        <span style="height: 36px; padding: 0 14px; border-radius: 9999px; background: #2F6BFF; color: #FFFFFF; font-size: 12px; font-weight: 700; display: flex; align-items: center">Đặt lịch</span>
+      </a>
+      <div style="display: flex; align-items: center; gap: 4px; border-top: 1px solid #DCE6FA; padding-top: 4px; margin-bottom: -6px">
+        <button type="button" onClick="{{toggleLike}}" aria-pressed="{{likedAria}}" style="{{likeStyle}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="{{likeFill}}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>{{likes}}</button>
+        <span style="height: 44px; padding: 0 10px; color: #5A6A8C; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>2 bình luận</span>
+      </div>
+    </article>
+
+    <h2 style="margin: 4px 4px 0; font-size: 15px; font-weight: 700">Bình luận</h2>
+    <div style="display: flex; gap: 10px">
+      <span style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center">TH</span>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <div style="padding: 10px 14px; border-radius: 6px 18px 18px 18px; background: #FFFFFF; border: 1px solid #DCE6FA"><span style="display: block; font-size: 13px; font-weight: 700">Thu Hà</span><span style="font-size: 14px; line-height: 21px; color: #3D4F75">Cùng cảm nhận luôn! Góp ý của chị khai sáng cực.</span></div>
+        <span style="font-size: 12px; color: #5A6A8C; padding-left: 8px">3 giờ · <a href="#" style="font-weight: 600">Thích</a> · <a href="#" style="font-weight: 600">Trả lời</a></span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px">
+      <span style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center">AK</span>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <div style="padding: 10px 14px; border-radius: 6px 18px 18px 18px; background: #FFFFFF; border: 1px solid #DCE6FA"><span style="display: block; font-size: 13px; font-weight: 700">Alex Kim <span style="margin-left: 4px; padding: 1px 6px; border-radius: 9999px; background: #2F6BFF; color: #FFFFFF; font-size: 10px">Mentor</span></span><span style="font-size: 14px; line-height: 21px; color: #3D4F75">Tui cũng vừa được tư vấn tuần trước, rất đáng nha!</span></div>
+        <span style="font-size: 12px; color: #5A6A8C; padding-left: 8px">3 giờ · <a href="#" style="font-weight: 600">Thích</a> · <a href="#" style="font-weight: 600">Trả lời</a></span>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-shrink: 0; padding: 12px 16px 30px; background: #FFFFFF; border-top: 1px solid #DCE6FA; display: flex; align-items: center; gap: 10px">
+    <span style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 9999px; background: #2F6BFF; color: #FFFFFF; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center">TH</span>
+    <label style="flex-grow: 1; height: 46px; border-radius: 9999px; background: #F4F7FD; border: 1px solid #DCE6FA; display: flex; align-items: center; padding: 0 16px">
+      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Viết bình luận</span>
+      <input type="text" placeholder="Viết bình luận của bạn…" style="flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 14px; color: #0F2D6B">
+    </label>
+    <button type="button" aria-label="Gửi bình luận" style="flex-shrink: 0; width: 46px; height: 46px; border: 0; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { liked: false }; }
+  renderVals() {
+    const liked = this.state.liked;
+    return {
+      likes: liked ? 48 : 47,
+      likedAria: liked ? 'true' : 'false',
+      likeFill: liked ? '#2F6BFF' : 'none',
+      likeStyle: 'height: 44px; padding: 0 10px; border: 0; background: transparent; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer; color: ' + (liked ? '#2F6BFF' : '#5A6A8C') + ';',
+      toggleLike: () => this.setState({ liked: !liked })
+    };
+  }
+}
+</script>
+</body>
+</html>

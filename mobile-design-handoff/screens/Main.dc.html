@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Bảng tin</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F6BFF;text-decoration:none}a:hover{color:#1A47D6}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; background: #F4F7FD; font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif; color: #0F2D6B">
+  <div style="display: flex; flex-direction: column; gap: 20px; padding: 52px 20px 100px">
+
+    <header style="display: flex; align-items: center; gap: 12px">
+      <img src="/_blob/610651dbf1b05101b10b59dd8078648d" alt="SkillSwap" style="width: 40px; height: 40px; object-fit: contain">
+      <div style="flex-grow: 1; display: flex; flex-direction: column">
+        <span style="font-size: 13px; color: #5A6A8C">Chào buổi tối,</span>
+        <span style="font-size: 20px; font-weight: 700; line-height: 26px">Thu Hà</span>
+      </div>
+      <a href="Notifications.dc.html" aria-label="Thông báo, 3 mới" style="position: relative; width: 44px; height: 44px; box-sizing: border-box; border-radius: 9999px; border: 1px solid #DCE6FA; background: #FFFFFF; color: #0F2D6B; display: flex; align-items: center; justify-content: center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span style="position: absolute; top: 8px; right: 9px; width: 9px; height: 9px; border-radius: 9999px; background: #F59E0B; border: 2px solid #FFFFFF"></span>
+      </a>
+    </header>
+
+    <a href="Mentors.dc.html" style="height: 52px; border-radius: 9999px; background: #FFFFFF; border: 1px solid #DCE6FA; display: flex; align-items: center; gap: 10px; padding: 0 18px; color: #5A6A8C; font-size: 14px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2F6BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      Tìm mentor, kỹ năng, môn học…
+    </a>
+
+    <a href="KokoChat.dc.html" style="position: relative; overflow: hidden; border-radius: 24px; background: #0F2D6B; padding: 18px 20px; display: flex; align-items: center; gap: 8px; min-height: 120px; box-sizing: border-box">
+      <div style="position: absolute; width: 140px; height: 140px; border-radius: 9999px; right: -30px; top: -20px; background: #1E3F85"></div>
+      <div style="position: relative; flex-grow: 1; display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.18em; color: #56D1FF">TRỢ LÝ AI</span>
+        <span style="font-size: 18px; font-weight: 700; line-height: 24px; color: #FFFFFF">Hỏi Koko bất cứ điều gì</span>
+        <span style="font-size: 13px; line-height: 19px; color: #B8C7E6">Gợi ý mentor, cách đặt lịch, S-coins…</span>
+      </div>
+      <img src="/_blob/b44554af311f956d8e3c3214653e0b69" alt="" style="position: relative; width: 96px; height: 96px; object-fit: contain">
+    </a>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 700">Mentor nổi bật</h2>
+        <a href="Mentors.dc.html" style="font-size: 13px; font-weight: 600">Xem tất cả</a>
+      </div>
+      <div style="display: flex; gap: 12px; margin-right: -20px">
+        <a href="MentorDetail.dc.html" style="flex-shrink: 0; width: 150px; box-sizing: border-box; padding: 16px; border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; box-shadow: 0 8px 32px rgba(15,45,107,0.06); display: flex; flex-direction: column; gap: 8px; color: #0F2D6B">
+          <span style="width: 52px; height: 52px; border-radius: 16px; background: #EBF3FF; color: #2F6BFF; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center">SC</span>
+          <span style="font-size: 15px; font-weight: 700">Sarah Chen</span>
+          <span style="font-size: 12px; line-height: 16px; color: #5A6A8C">Senior PM · Google</span>
+          <span style="display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600"><svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>4.9 <span style="font-weight: 400; color: #5A6A8C">(87)</span></span>
+        </a>
+        <a href="MentorDetail.dc.html" style="flex-shrink: 0; width: 150px; box-sizing: border-box; padding: 16px; border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; box-shadow: 0 8px 32px rgba(15,45,107,0.06); display: flex; flex-direction: column; gap: 8px; color: #0F2D6B">
+          <span style="width: 52px; height: 52px; border-radius: 16px; background: #EBF3FF; color: #2F6BFF; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center">DN</span>
+          <span style="font-size: 15px; font-weight: 700">David Nguyen</span>
+          <span style="font-size: 12px; line-height: 16px; color: #5A6A8C">Staff Engineer · Stripe</span>
+          <span style="display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600"><svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>4.8 <span style="font-weight: 400; color: #5A6A8C">(62)</span></span>
+        </a>
+        <a href="MentorDetail.dc.html" style="flex-shrink: 0; width: 150px; box-sizing: border-box; padding: 16px; border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; box-shadow: 0 8px 32px rgba(15,45,107,0.06); display: flex; flex-direction: column; gap: 8px; color: #0F2D6B">
+          <span style="width: 52px; height: 52px; border-radius: 16px; background: #EBF3FF; color: #2F6BFF; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center">LT</span>
+          <span style="font-size: 15px; font-weight: 700">Linh Tran</span>
+          <span style="font-size: 12px; line-height: 16px; color: #5A6A8C">UX Design Lead · Figma</span>
+          <span style="display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600"><svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>5.0 <span style="font-weight: 400; color: #5A6A8C">(43)</span></span>
+        </a>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 700">Bảng tin cộng đồng</h2>
+      <article style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; box-shadow: 0 8px 32px rgba(15,45,107,0.06); padding: 16px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="width: 40px; height: 40px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center">MĐ</span>
+          <div style="flex-grow: 1; display: flex; flex-direction: column">
+            <span style="font-size: 14px; font-weight: 700">Minh Đức</span>
+            <span style="font-size: 12px; color: #5A6A8C">3 giờ trước</span>
+          </div>
+          <button type="button" aria-label="Tuỳ chọn bài viết" style="width: 44px; height: 44px; border: 0; background: transparent; color: #5A6A8C; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+        </div>
+        <p style="margin: 0; font-size: 14px; line-height: 22px; color: #3D4F75">Tui vừa xong buổi Review CV 1:1 với chị Sarah Chen, đỉnh thực sự mọi người ơi! Chị chỉ ra những điểm còn thiếu mà trước giờ tui không hề nhận ra… <a href="PostDetail.dc.html" style="font-weight: 600">Xem thêm</a></p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <span style="padding: 4px 10px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 12px; font-weight: 600">Review CV</span>
+          <span style="padding: 4px 10px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 12px; font-weight: 600">Product Management</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px; border-top: 1px solid #DCE6FA; padding-top: 4px; margin-bottom: -4px">
+          <button type="button" style="height: 44px; padding: 0 10px; border: 0; background: transparent; color: #2F6BFF; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="#2F6BFF" stroke="#2F6BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>47</button>
+          <button type="button" style="height: 44px; padding: 0 10px; border: 0; background: transparent; color: #5A6A8C; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>2 bình luận</button>
+          <button type="button" aria-label="Chia sẻ" style="margin-left: auto; width: 44px; height: 44px; border: 0; background: transparent; color: #5A6A8C; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></svg></button>
+        </div>
+      </article>
+    </section>
+  </div>
+
+  <a href="#" aria-label="Tạo bài viết" style="position: absolute; right: 20px; bottom: 104px; width: 56px; height: 56px; border-radius: 9999px; background: linear-gradient(135deg, #1A47D6 0%, #2F6BFF 100%); box-shadow: 0 8px 20px rgba(47,107,255,0.30); color: #FFFFFF; display: flex; align-items: center; justify-content: center">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+  </a>
+
+  <nav aria-label="Điều hướng chính" style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 8px 8px 0; background: #FFFFFF; border-top: 1px solid #DCE6FA; display: flex; justify-content: space-around; align-items: flex-start">
+    <a href="Main.dc.html" aria-current="page" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #2F6BFF"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg><span>Bảng tin</span></a>
+    <a href="Mentors.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Mentor</span></a>
+    <a href="MyBookings.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg><span>Lịch hẹn</span></a>
+    <a href="Messages.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Tin nhắn</span></a>
+    <a href="Profile.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>Hồ sơ</span></a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

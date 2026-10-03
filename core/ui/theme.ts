@@ -1,40 +1,121 @@
 /**
  * @file theme.ts
- * @description Design token port 1:1 từ `fu-skillswap-fe-2/src/styles/globals.css`.
- * Dùng cho code cần giá trị thô (style inline, màu icon, thư viện biểu đồ);
- * phần giao diện thông thường dùng utility class NativeWind cùng tên.
+ * @description Design token của SkillSwap Mobile ở dạng GIÁ TRỊ THÔ, port 1:1 từ
+ * `mobile-design-handoff/tokens.json`.
+ *
+ * Dùng cho chỗ không viết được utility class: màu icon truyền qua prop, style
+ * inline, `tintColor`, `screenOptions` của expo-router, thư viện biểu đồ.
+ * Giao diện thông thường dùng class NativeWind **cùng tên** trong
+ * `tailwind.config.js` — hai nơi phải khớp, `theme.test.ts` canh việc đó.
+ *
+ * Bộ token CŨ (ported từ `fu-skillswap-fe-2`, primary #0095f6, slate…) đã bị
+ * thay hẳn: thiết kế mobile là một hệ riêng, không phải FE web thu nhỏ.
  */
 
 export const colors = {
-  primary: '#0095f6',
-  primaryHover: '#0088e2',
-  primaryLight: '#eff6ff',
-  primaryBorder: '#93c5fd',
+  // --- Màu thương hiệu ---
+  primaryBlue: '#2F6BFF',
+  brandBlue: '#119CF7',
+  skyBlue: '#56D1FF',
+  navy: '#0F2D6B',
+  lightBlue: '#EBF3FF',
+  white: '#FFFFFF',
 
-  textMain: '#0f172a',
-  textSecondary: '#475569',
-  textMuted: '#64748b',
-  textDisabled: '#94a3b8',
-  textSubtle: '#8e8e8e',
+  // --- Màu ngữ nghĩa ---
+  surfacePage: '#F4F7FD',
+  surface: '#FFFFFF',
+  surfaceTint: '#EBF3FF',
+  brandDeep: '#0F2D6B',
 
-  borderColor: '#e2e8f0',
-  borderStrong: '#cbd5e1',
-  borderLight: '#f1f5f9',
+  /** Tiêu đề và chữ nhấn */
+  ink: '#0F2D6B',
+  /** Nội dung */
+  inkBody: '#3D4F75',
+  /** Chú thích */
+  inkMuted: '#5A6A8C',
+  /** Chữ phụ trên nền navy — chỉ dùng trên `brandDeep` */
+  inkOnDeep: '#B8C7E6',
 
-  surface: '#ffffff',
-  surfaceSubtle: '#f8fafc',
-  bg: '#f8fafc',
+  /** Viền 1px và divider */
+  line: '#DCE6FA',
+  accent: '#2F6BFF',
+  /** Đầu tối của gradient nút chính */
+  accentStrong: '#1A47D6',
+  onAccent: '#FFFFFF',
 
-  success: '#10b981',
-  successSoft: '#ecfdf5',
-  warning: '#f59e0b',
-  warningSoft: '#fffbeb',
-  danger: '#ef4444',
-  dangerSoft: '#fef2f2',
+  success: '#22C55E',
+  successInk: '#15803D',
+  successSoft: '#DCFCE7',
+  warning: '#F59E0B',
+  warningInk: '#B45309',
+  warningSoft: '#FEF3C7',
+  /** Thiết kế chỉ khai màu CHỮ cho lỗi, không có nền danger */
+  danger: '#B42318',
+  neutralSoft: '#EEF2FA',
 } as const;
 
-/** Bo góc, đơn vị px — tương ứng --ui-radius-* của FE web */
-export const radius = { sm: 6, md: 8, lg: 12, full: 9999 } as const;
+/** Hai điểm dừng của gradient nút chính, theo thứ tự 0% → 100% */
+export const gradientButton = ['#1A47D6', '#2F6BFF'] as const;
 
-/** Chiều cao control, đơn vị px — tương ứng --ui-height-* của FE web */
-export const controlHeight = { sm: 32, md: 38, lg: 44 } as const;
+/**
+ * Bóng đổ. React Native không nhận chuỗi CSS, nên đây là bản dịch sang prop RN.
+ * `shadowColor`/`shadowOpacity` cho iOS, `elevation` cho Android.
+ */
+export const shadows = {
+  /** `0 8px 32px rgba(15,45,107,0.06)` — card trắng trên nền trang */
+  card: {
+    shadowColor: '#0F2D6B',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 32,
+    elevation: 3,
+  },
+  /** `0 8px 20px rgba(47,107,255,0.30)` — nút chính */
+  button: {
+    shadowColor: '#2F6BFF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 6,
+  },
+} as const;
+
+/** Bo góc, đơn vị px */
+export const radius = { sm: 8, md: 16, lg: 24, input: 12, full: 9999 } as const;
+
+/** Chiều cao control, đơn vị px */
+export const controlHeight = {
+  /** Ô nhập */
+  input: 48,
+  /** Nút phụ, nút tròn trên header */
+  md: 44,
+  /** Nút chính */
+  lg: 52,
+  /** Thanh tab dưới cùng */
+  tabBar: 84,
+} as const;
+
+/** Khoảng cách, đơn vị px */
+export const spacing = {
+  /** Lề hai bên màn hình */
+  gutter: 20,
+  /** Padding trong card */
+  card: 16,
+  /** Vùng chạm tối thiểu */
+  touch: 44,
+} as const;
+
+/**
+ * Tên font đã nạp trong `app/_layout.tsx`.
+ *
+ * React Native trên Android KHÔNG suy ra được nét đậm từ `fontWeight` với font
+ * tuỳ biến — phải chỉ đúng tên file của từng nét, nếu không mọi thứ đều ra nét
+ * thường. Vì vậy dùng `fonts.bold` chứ đừng dùng `fontWeight: '700'`.
+ */
+export const fonts = {
+  regular: 'Montserrat_400Regular',
+  medium: 'Montserrat_500Medium',
+  semibold: 'Montserrat_600SemiBold',
+  bold: 'Montserrat_700Bold',
+  extrabold: 'Montserrat_800ExtraBold',
+} as const;

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Mentor · Chi tiết lịch đặt</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F6BFF;text-decoration:none}a:hover{color:#1A47D6}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; background: #F4F7FD; font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif; color: #0F2D6B">
+  <div style="display: flex; flex-direction: column; gap: 14px; padding: 52px 20px 120px">
+    <header style="display: flex; align-items: center; gap: 12px">
+      <a href="MentorBookings.dc.html" aria-label="Quay lại" style="width: 44px; height: 44px; border-radius: 9999px; background: #FFFFFF; border: 1px solid #DCE6FA; color: #0F2D6B; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a>
+      <h1 style="margin: 0; flex-grow: 1; font-size: 18px; font-weight: 700">Chi tiết lịch đặt</h1>
+      <span style="padding: 5px 10px; border-radius: 9999px; background: #FEF3C7; color: #B45309; font-size: 11px; font-weight: 700">Đang chờ</span>
+    </header>
+
+    <section style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 16px; display: flex; align-items: center; gap: 12px">
+      <span style="width: 52px; height: 52px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center">TH</span>
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #5A6A8C">Mentee đặt lịch</span><span style="font-size: 16px; font-weight: 700">Nguyễn Thu Hà</span><span style="font-size: 12px; color: #3D4F75">Kỹ thuật phần mềm · Kỳ 5</span></div>
+      <a href="ChatDetail.dc.html" aria-label="Nhắn tin cho mentee" style="width: 44px; height: 44px; border-radius: 9999px; background: #EBF3FF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></a>
+    </section>
+
+    <section style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">Thông tin buổi học</h2>
+      <dl style="margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+        <div><dt style="font-size: 12px; color: #5A6A8C">Dịch vụ</dt><dd style="margin: 2px 0 0; font-size: 14px; font-weight: 700">Review CV 1:1</dd></div>
+        <div><dt style="font-size: 12px; color: #5A6A8C">Ngày hẹn</dt><dd style="margin: 2px 0 0; font-size: 14px; font-weight: 700">T3, 06/10/2026</dd></div>
+        <div><dt style="font-size: 12px; color: #5A6A8C">Thời gian</dt><dd style="margin: 2px 0 0; font-size: 14px; font-weight: 700">19:00 – 19:45</dd></div>
+        <div><dt style="font-size: 12px; color: #5A6A8C">Thu nhập</dt><dd style="margin: 2px 0 0; font-size: 14px; font-weight: 700">150.000 S-coins</dd></div>
+      </dl>
+      <div style="padding: 12px; border-radius: 16px; background: #F4F7FD; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 12px; font-weight: 600; color: #5A6A8C">Ghi chú từ mentee</span>
+        <span style="font-size: 14px; line-height: 21px; color: #3D4F75">Em muốn chỉnh CV để ứng tuyển intern Product Manager, nhất là phần mô tả dự án.</span>
+      </div>
+    </section>
+
+    <section style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">Hình thức</h2>
+      <div role="radiogroup" aria-label="Nền tảng" style="display: flex; flex-wrap: wrap; gap: 8px">
+        <sc-for list="{{platforms}}" as="p" hint-placeholder-count="5">
+          <button type="button" role="radio" aria-checked="{{p.on}}" onClick="{{p.pick}}" style="{{p.style}}">{{p.label}}</button>
+        </sc-for>
+      </div>
+      <span style="font-size: 12px; color: #5A6A8C; display: flex; gap: 6px; align-items: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2F6BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>{{hint}}</span>
+    </section>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 14px 20px 30px; background: #FFFFFF; border-top: 1px solid #DCE6FA; display: flex; gap: 10px">
+    <a href="MentorBookings.dc.html" style="height: 52px; padding: 0 24px; border-radius: 9999px; border: 1px solid #DCE6FA; color: #3D4F75; font-size: 15px; font-weight: 600; display: flex; align-items: center">Từ chối</a>
+    <a href="MentorBookings.dc.html" style="flex-grow: 1; height: 52px; border-radius: 9999px; background: linear-gradient(135deg, #1A47D6 0%, #2F6BFF 100%); box-shadow: 0 8px 20px rgba(47,107,255,0.30); color: #FFFFFF; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center">Xác nhận lịch</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { p: 'Google Meet' }; }
+  renderVals() {
+    const labels = ['Google Meet', 'Zoom', 'Microsoft Teams', 'Discord', 'Trực tiếp'];
+    const hints = { 'Google Meet': 'Google Meet sẽ được tạo tự động', 'Trực tiếp': 'Nhập địa điểm gặp sau khi xác nhận' };
+    const platforms = labels.map((l) => {
+      const on = l === this.state.p;
+      return {
+        label: l, on: on ? 'true' : 'false',
+        style: 'height: 40px; padding: 0 14px; border-radius: 9999px; font-size: 13px; cursor: pointer; ' + (on ? 'border: 2px solid #2F6BFF; background: #EBF3FF; color: #2F6BFF; font-weight: 700;' : 'border: 1px solid #DCE6FA; background: #FFFFFF; color: #3D4F75; font-weight: 600;'),
+        pick: () => this.setState({ p: l })
+      };
+    });
+    return { platforms, hint: hints[this.state.p] || 'Dán link phòng học sau khi xác nhận' };
+  }
+}
+</script>
+</body>
+</html>

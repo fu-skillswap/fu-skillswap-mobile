@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Tìm Mentor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F6BFF;text-decoration:none}a:hover{color:#1A47D6}
+button,input{font-family:inherit}
+input::placeholder{color:#5A6A8C}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; background: #F4F7FD; font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif; color: #0F2D6B">
+  <div style="display: flex; flex-direction: column; gap: 16px; padding: 52px 20px 100px">
+    <header style="display: flex; align-items: center; justify-content: space-between">
+      <h1 style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 700">Tìm Mentor</h1>
+      <button type="button" aria-label="Bộ lọc" style="width: 44px; height: 44px; border-radius: 9999px; border: 1px solid #DCE6FA; background: #FFFFFF; color: #0F2D6B; display: flex; align-items: center; justify-content: center; cursor: pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+      </button>
+    </header>
+
+    <label style="height: 52px; border-radius: 9999px; background: #FFFFFF; border: 1px solid #DCE6FA; display: flex; align-items: center; gap: 10px; padding: 0 18px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2F6BFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Tìm mentor</span>
+      <input type="search" placeholder="Tên, kỹ năng, công ty…" style="flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 14px; color: #0F2D6B">
+    </label>
+
+    <div role="group" aria-label="Lĩnh vực" style="display: flex; gap: 8px; margin-right: -20px; overflow: hidden">
+      <sc-for list="{{cats}}" as="c" hint-placeholder-count="6">
+        <button type="button" onClick="{{c.pick}}" aria-pressed="{{c.on}}" style="{{c.style}}">{{c.label}}</button>
+      </sc-for>
+    </div>
+
+    <div style="font-size: 13px; color: #5A6A8C">{{countLabel}}</div>
+
+    <sc-for list="{{list}}" as="m" hint-placeholder-count="3">
+      <article style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; box-shadow: 0 8px 32px rgba(15,45,107,0.06); padding: 16px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; gap: 12px">
+          <span style="flex-shrink: 0; width: 56px; height: 56px; border-radius: 16px; background: #EBF3FF; color: #2F6BFF; font-size: 18px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{m.ini}}</span>
+          <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+            <a href="MentorDetail.dc.html" style="font-size: 16px; font-weight: 700; color: #0F2D6B">{{m.name}}</a>
+            <span style="font-size: 13px; line-height: 18px; color: #3D4F75">{{m.role}}</span>
+            <span style="display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; margin-top: 2px"><svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>{{m.rating}} <span style="font-weight: 400; color: #5A6A8C">({{m.reviews}} đánh giá)</span></span>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <sc-for list="{{m.tags}}" as="t" hint-placeholder-count="2">
+            <span style="padding: 4px 10px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 12px; font-weight: 600">{{t}}</span>
+          </sc-for>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; border-top: 1px solid #DCE6FA; padding-top: 12px">
+          <div style="flex-grow: 1; display: flex; flex-direction: column">
+            <span style="font-size: 11px; color: #5A6A8C">Từ</span>
+            <span style="font-size: 15px; font-weight: 700">{{m.price}} <span style="font-size: 11px; font-weight: 600; color: #5A6A8C">S-coins</span></span>
+          </div>
+          <a href="MentorDetail.dc.html" style="height: 44px; padding: 0 20px; border-radius: 9999px; background: linear-gradient(135deg, #1A47D6 0%, #2F6BFF 100%); box-shadow: 0 8px 20px rgba(47,107,255,0.30); color: #FFFFFF; font-size: 14px; font-weight: 700; display: flex; align-items: center">Đặt lịch</a>
+        </div>
+      </article>
+    </sc-for>
+  </div>
+
+  <nav aria-label="Điều hướng chính" style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 8px 8px 0; background: #FFFFFF; border-top: 1px solid #DCE6FA; display: flex; justify-content: space-around; align-items: flex-start">
+    <a href="Main.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg><span>Bảng tin</span></a>
+    <a href="Mentors.dc.html" aria-current="page" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #2F6BFF"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Mentor</span></a>
+    <a href="MyBookings.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg><span>Lịch hẹn</span></a>
+    <a href="Messages.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Tin nhắn</span></a>
+    <a href="Profile.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>Hồ sơ</span></a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { cat: 'Tất cả' };
+  }
+  renderVals() {
+    const mentors = [
+      { ini: 'SC', name: 'Sarah Chen', role: 'Senior Product Manager · Google', rating: '4.9', reviews: 87, tags: ['Product Management', 'Career Coaching'], price: '150.000', cat: 'PM' },
+      { ini: 'DN', name: 'David Nguyen', role: 'Staff Full Stack Engineer · Stripe', rating: '4.8', reviews: 62, tags: ['React', 'System Design'], price: '250.000', cat: 'Tech' },
+      { ini: 'LT', name: 'Linh Tran', role: 'UX Design Lead · Figma', rating: '5.0', reviews: 43, tags: ['UX Design', 'Product Design'], price: '200.000', cat: 'Design' },
+      { ini: 'AK', name: 'Alex Kim', role: 'Principal Data Scientist · Netflix', rating: '4.7', reviews: 55, tags: ['Machine Learning', 'Python'], price: '280.000', cat: 'Data' },
+      { ini: 'MP', name: 'Mai Phuong', role: 'Marketing Director · Grab', rating: '4.8', reviews: 38, tags: ['Growth Marketing', 'Brand Strategy'], price: '220.000', cat: 'Marketing' }
+    ];
+    const labels = ['Tất cả', 'Tech', 'Data', 'Design', 'PM', 'Marketing'];
+    const cur = this.state.cat;
+    const base = 'flex-shrink: 0; height: 40px; padding: 0 16px; border-radius: 9999px; font-size: 13px; cursor: pointer; ';
+    const cats = labels.map((l) => ({
+      label: l,
+      on: l === cur ? 'true' : 'false',
+      style: base + (l === cur ? 'border: 1px solid #2F6BFF; background: #2F6BFF; color: #FFFFFF; font-weight: 700;' : 'border: 1px solid #DCE6FA; background: #FFFFFF; color: #3D4F75; font-weight: 600;'),
+      pick: () => this.setState({ cat: l })
+    }));
+    const list = cur === 'Tất cả' ? mentors : mentors.filter((m) => m.cat === cur);
+    return { cats, list, countLabel: list.length + ' mentor phù hợp' };
+  }
+}
+</script>
+</body>
+</html>

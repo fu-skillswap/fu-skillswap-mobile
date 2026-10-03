@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Lịch hẹn của tôi</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F6BFF;text-decoration:none}a:hover{color:#1A47D6}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; background: #F4F7FD; font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif; color: #0F2D6B">
+  <div style="display: flex; flex-direction: column; gap: 16px; padding: 52px 20px 100px">
+    <header style="display: flex; align-items: center; justify-content: space-between">
+      <h1 style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 700">Lịch hẹn</h1>
+      <button type="button" aria-label="Sắp xếp: gần nhất trước" style="height: 44px; padding: 0 14px; border-radius: 9999px; border: 1px solid #DCE6FA; background: #FFFFFF; color: #3D4F75; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16"/></svg>Gần nhất
+      </button>
+    </header>
+
+    <div role="tablist" aria-label="Lọc lịch đặt" style="display: flex; gap: 8px; margin-right: -20px; overflow: hidden">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+        <button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+      <div style="padding: 32px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center">
+        <img src="/_blob/2fb2a1e7e18e8aefff5c769076724f95" alt="" style="width: 140px; height: 140px; object-fit: contain">
+        <span style="font-size: 16px; font-weight: 700">Chưa có lịch nào ở đây</span>
+        <span style="font-size: 13px; color: #5A6A8C">Tìm một mentor phù hợp và đặt buổi đầu tiên nhé.</span>
+        <a href="Mentors.dc.html" style="margin-top: 8px; height: 44px; padding: 0 20px; border-radius: 9999px; background: #EBF3FF; font-size: 14px; font-weight: 700; display: flex; align-items: center">Tìm Mentor</a>
+      </div>
+    </sc-if>
+
+    <sc-for list="{{list}}" as="b" hint-placeholder-count="3">
+      <article style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; box-shadow: 0 8px 32px rgba(15,45,107,0.06); padding: 16px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span style="flex-shrink: 0; width: 44px; height: 44px; border-radius: 9999px; background: #EBF3FF; color: #2F6BFF; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{b.ini}}</span>
+          <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column">
+            <span style="font-size: 15px; font-weight: 700">{{b.mentor}}</span>
+            <span style="font-size: 13px; color: #3D4F75">{{b.service}}</span>
+          </div>
+          <span style="{{b.badge}}">{{b.status}}</span>
+        </div>
+        <div style="display: flex; gap: 16px; padding: 10px 12px; border-radius: 16px; background: #F4F7FD; font-size: 13px; font-weight: 600">
+          <span style="display: flex; align-items: center; gap: 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F6BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>{{b.date}}</span>
+          <span style="display: flex; align-items: center; gap: 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F6BFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>{{b.time}}</span>
+        </div>
+        <sc-if value="{{b.live}}" hint-placeholder-val="{{false}}">
+          <div style="display: flex; gap: 8px">
+            <a href="#" style="flex-grow: 1; height: 44px; border-radius: 9999px; background: linear-gradient(135deg, #1A47D6 0%, #2F6BFF 100%); box-shadow: 0 8px 20px rgba(47,107,255,0.30); color: #FFFFFF; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>Vào phòng học</a>
+            <a href="ChatDetail.dc.html" aria-label="Nhắn tin" style="width: 44px; height: 44px; border-radius: 9999px; background: #EBF3FF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></a>
+          </div>
+        </sc-if>
+        <sc-if value="{{b.waiting}}" hint-placeholder-val="{{false}}">
+          <div style="display: flex; gap: 8px">
+            <button type="button" style="flex-grow: 1; height: 44px; border-radius: 9999px; border: 1px solid #DCE6FA; background: #FFFFFF; color: #3D4F75; font-size: 14px; font-weight: 600; cursor: pointer">Hủy lịch</button>
+            <a href="ChatDetail.dc.html" style="flex-grow: 1; height: 44px; border-radius: 9999px; background: #EBF3FF; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center">Nhắn mentor</a>
+          </div>
+        </sc-if>
+        <sc-if value="{{b.done}}" hint-placeholder-val="{{false}}">
+          <div style="display: flex; gap: 8px">
+            <button type="button" style="flex-grow: 1; height: 44px; border-radius: 9999px; border: 0; background: #EBF3FF; color: #2F6BFF; font-size: 14px; font-weight: 700; cursor: pointer">Đánh giá buổi học</button>
+            <a href="MentorDetail.dc.html" style="flex-grow: 1; height: 44px; border-radius: 9999px; border: 1px solid #DCE6FA; color: #3D4F75; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center">Đặt lại</a>
+          </div>
+        </sc-if>
+      </article>
+    </sc-for>
+  </div>
+
+  <nav aria-label="Điều hướng chính" style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 8px 8px 0; background: #FFFFFF; border-top: 1px solid #DCE6FA; display: flex; justify-content: space-around; align-items: flex-start">
+    <a href="Main.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg><span>Bảng tin</span></a>
+    <a href="Mentors.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Mentor</span></a>
+    <a href="MyBookings.dc.html" aria-current="page" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #2F6BFF"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg><span>Lịch hẹn</span></a>
+    <a href="Messages.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Tin nhắn</span></a>
+    <a href="Profile.dc.html" style="width: 68px; min-height: 48px; padding-top: 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: #5A6A8C"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>Hồ sơ</span></a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'ALL' };
+  }
+  renderVals() {
+    const all = [
+      { ini: 'DN', mentor: 'David Nguyen', service: 'Mock interview System Design', date: 'Hôm nay', time: '20:30 – 21:30', kind: 'IN_PROGRESS' },
+      { ini: 'SC', mentor: 'Sarah Chen', service: 'Review CV 1:1', date: 'T3, 06/10', time: '19:00 – 19:45', kind: 'WAITING' },
+      { ini: 'LT', mentor: 'Linh Tran', service: 'Review portfolio UX', date: 'CN, 28/09', time: '09:30 – 10:30', kind: 'COMPLETED' },
+      { ini: 'AK', mentor: 'Alex Kim', service: 'Định hướng nghề Data', date: 'CN, 21/09', time: '14:00 – 14:45', kind: 'COMPLETED' },
+      { ini: 'TH', mentor: 'Tuan Hoang', service: 'Leadership cho team lead', date: 'T2, 15/09', time: '19:00 – 20:00', kind: 'CANCELLED' }
+    ];
+    const meta = {
+      IN_PROGRESS: { status: 'Đang diễn ra', badge: 'background: #2F6BFF; color: #FFFFFF;' },
+      WAITING: { status: 'Đang chờ', badge: 'background: #FEF3C7; color: #B45309;' },
+      COMPLETED: { status: 'Hoàn thành', badge: 'background: #DCFCE7; color: #15803D;' },
+      CANCELLED: { status: 'Mentor hủy', badge: 'background: #EEF2FA; color: #5A6A8C;' }
+    };
+    const defs = [['ALL', 'Tất cả'], ['WAITING', 'Đang chờ'], ['IN_PROGRESS', 'Đang diễn ra'], ['COMPLETED', 'Đã hoàn thành'], ['CANCELLED', 'Đã hủy']];
+    const cur = this.state.tab;
+    const base = 'flex-shrink: 0; height: 40px; padding: 0 14px; border-radius: 9999px; font-size: 13px; cursor: pointer; ';
+    const tabs = defs.map(([v, l]) => {
+      const n = v === 'ALL' ? all.length : all.filter((b) => b.kind === v).length;
+      const on = v === cur;
+      return {
+        label: l + ' (' + n + ')', on: on ? 'true' : 'false',
+        style: base + (on ? 'border: 1px solid #2F6BFF; background: #2F6BFF; color: #FFFFFF; font-weight: 700;' : 'border: 1px solid #DCE6FA; background: #FFFFFF; color: #3D4F75; font-weight: 600;'),
+        pick: () => this.setState({ tab: v })
+      };
+    });
+    const list = all.filter((b) => cur === 'ALL' || b.kind === cur).map((b) => ({
+      ...b,
+      status: meta[b.kind].status,
+      badge: 'flex-shrink: 0; padding: 5px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; ' + meta[b.kind].badge,
+      live: b.kind === 'IN_PROGRESS',
+      waiting: b.kind === 'WAITING',
+      done: b.kind === 'COMPLETED'
+    }));
+    return { tabs, list, empty: list.length === 0 };
+  }
+}
+</script>
+</body>
+</html>

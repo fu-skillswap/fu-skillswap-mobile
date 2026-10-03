@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Hoàn thiện hồ sơ</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F6BFF;text-decoration:none}a:hover{color:#1A47D6}
+button,input,select,textarea{font-family:inherit}
+input::placeholder,textarea::placeholder{color:#5A6A8C}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; background: #F4F7FD; font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif; color: #0F2D6B">
+  <div style="display: flex; flex-direction: column; gap: 16px; padding: 52px 20px 120px">
+    <div style="display: flex; align-items: center; gap: 12px">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.18em; color: #2F6BFF">BƯỚC CUỐI</span>
+        <h1 style="margin: 0; font-size: 24px; line-height: 30px; font-weight: 700">Hoàn thiện hồ sơ</h1>
+        <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3D4F75">Hồ sơ đầy đủ giúp bạn kết nối với mentor phù hợp hơn.</p>
+      </div>
+      <img src="/_blob/2fb2a1e7e18e8aefff5c769076724f95" alt="" style="width: 92px; height: 92px; object-fit: contain">
+    </div>
+
+    <form style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; box-shadow: 0 8px 32px rgba(15,45,107,0.06); padding: 18px 16px; display: flex; flex-direction: column; gap: 14px">
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tên hiển thị
+        <input type="text" value="Nguyễn Thu Hà" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 15px; font-weight: 500; color: #0F2D6B">
+      </label>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Mã số sinh viên
+        <input type="text" placeholder="SE192621" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 2px solid #2F6BFF; background: #FFFFFF; font-size: 15px; font-weight: 500; color: #0F2D6B">
+      </label>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Cơ sở
+          <select style="height: 48px; padding: 0 10px; border-radius: 12px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 14px; font-weight: 500; color: #0F2D6B"><option>Hồ Chí Minh</option><option>Hà Nội</option><option>Đà Nẵng</option><option>Cần Thơ</option><option>Quy Nhơn</option></select>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Năm nhập học
+          <select style="height: 48px; padding: 0 10px; border-radius: 12px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 14px; font-weight: 500; color: #0F2D6B"><option>2024</option><option>2023</option><option>2025</option></select>
+        </label>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Ngành học
+        <select style="height: 48px; padding: 0 10px; border-radius: 12px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 14px; font-weight: 500; color: #0F2D6B"><option>Kỹ thuật phần mềm</option><option>Trí tuệ nhân tạo</option><option>Thiết kế mỹ thuật số</option><option>Quản trị kinh doanh</option></select>
+      </label>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 13px; font-weight: 600">Học kỳ</span>
+        <div role="radiogroup" aria-label="Học kỳ" style="display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px">
+          <sc-for list="{{terms}}" as="t" hint-placeholder-count="9">
+            <button type="button" role="radio" aria-checked="{{t.on}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.n}}</button>
+          </sc-for>
+        </div>
+      </div>
+      <label style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; font-weight: 500; color: #3D4F75">
+        <input type="checkbox" style="width: 20px; height: 20px; accent-color: #2F6BFF">Tôi đã tốt nghiệp (alumni)
+      </label>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Giới thiệu <span style="font-weight: 400; color: #5A6A8C">(không bắt buộc)</span>
+        <textarea rows="3" placeholder="Kỹ năng và mục tiêu học tập của bạn" style="box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1px solid #DCE6FA; background: #FFFFFF; font-size: 14px; color: #0F2D6B; resize: none"></textarea>
+      </label>
+    </form>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 14px 20px 30px; background: #FFFFFF; border-top: 1px solid #DCE6FA; display: flex; gap: 10px">
+    <a href="Main.dc.html" style="height: 52px; padding: 0 20px; border-radius: 9999px; background: #EBF3FF; font-size: 15px; font-weight: 700; display: flex; align-items: center">Để sau</a>
+    <a href="Main.dc.html" style="flex-grow: 1; height: 52px; border-radius: 9999px; background: linear-gradient(135deg, #1A47D6 0%, #2F6BFF 100%); box-shadow: 0 8px 20px rgba(47,107,255,0.30); color: #FFFFFF; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center">Hoàn tất</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { term: 5 }; }
+  renderVals() {
+    const terms = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => {
+      const on = this.state.term === n;
+      return {
+        n, on: on ? 'true' : 'false',
+        style: 'height: 44px; padding: 0; border-radius: 12px; font-size: 14px; cursor: pointer; ' + (on ? 'border: 1px solid #2F6BFF; background: #2F6BFF; color: #FFFFFF; font-weight: 700;' : 'border: 1px solid #DCE6FA; background: #FFFFFF; color: #3D4F75; font-weight: 600;'),
+        pick: () => this.setState({ term: n })
+      };
+    });
+    return { terms };
+  }
+}
+</script>
+</body>
+</html>

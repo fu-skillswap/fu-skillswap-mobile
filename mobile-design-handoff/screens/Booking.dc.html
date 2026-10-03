@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Chọn lịch với mentor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#2F6BFF;text-decoration:none}a:hover{color:#1A47D6}
+button{font-family:inherit}
+button:disabled{cursor:not-allowed}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; box-sizing: border-box; background: #F4F7FD; font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif; color: #0F2D6B">
+  <div style="display: flex; flex-direction: column; gap: 18px; padding: 52px 20px 0">
+    <header style="display: flex; align-items: center; gap: 12px">
+      <a href="MentorDetail.dc.html" aria-label="Quay lại" style="width: 44px; height: 44px; border-radius: 9999px; background: #FFFFFF; border: 1px solid #DCE6FA; color: #0F2D6B; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a>
+      <div style="display: flex; flex-direction: column">
+        <h1 style="margin: 0; font-size: 18px; font-weight: 700">Chọn thời gian</h1>
+        <span style="font-size: 12px; color: #5A6A8C">Bước 2/3 · với Sarah Chen</span>
+      </div>
+    </header>
+
+    <div aria-hidden="true" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+      <span style="height: 6px; border-radius: 9999px; background: #2F6BFF"></span>
+      <span style="height: 6px; border-radius: 9999px; background: #2F6BFF"></span>
+      <span style="height: 6px; border-radius: 9999px; background: #DCE6FA"></span>
+    </div>
+
+    <div style="border-radius: 24px; background: #FFFFFF; border: 1px solid #DCE6FA; padding: 14px 16px; display: flex; align-items: center; gap: 12px">
+      <span style="width: 40px; height: 40px; border-radius: 9999px; background: #2F6BFF; color: #FFFFFF; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center">SC</span>
+      <div style="flex-grow: 1; display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 700">Review CV 1:1</span><span style="font-size: 12px; color: #5A6A8C">45 phút · Google Meet</span></div>
+      <a href="MentorDetail.dc.html" style="font-size: 13px; font-weight: 600; padding: 12px 4px">Đổi</a>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Tháng 10, 2026</h2>
+        <div style="display: flex; gap: 4px">
+          <button type="button" aria-label="Tuần trước" style="width: 44px; height: 44px; border: 0; border-radius: 9999px; background: transparent; color: #5A6A8C; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button type="button" aria-label="Tuần sau" style="width: 44px; height: 44px; border: 0; border-radius: 9999px; background: transparent; color: #0F2D6B; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px">
+        <sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+          <button type="button" onClick="{{d.pick}}" disabled="{{d.off}}" aria-pressed="{{d.on}}" aria-label="{{d.aria}}" style="{{d.style}}">
+            <span style="font-size: 11px; font-weight: 600; opacity: 0.85">{{d.dow}}</span>
+            <span style="font-size: 17px; font-weight: 700">{{d.num}}</span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Khung giờ trống</h2>
+        <span style="font-size: 12px; color: #5A6A8C">Giờ Việt Nam (GMT+7)</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+        <sc-for list="{{slots}}" as="s" hint-placeholder-count="6">
+          <button type="button" onClick="{{s.pick}}" disabled="{{s.off}}" aria-pressed="{{s.on}}" style="{{s.style}}">{{s.label}}</button>
+        </sc-for>
+      </div>
+    </section>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 18px 20px 30px; background: #FFFFFF; border-radius: 28px 28px 0 0; box-shadow: 0 -8px 32px rgba(15,45,107,0.08); display: flex; flex-direction: column; gap: 14px">
+    <dl style="margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+      <div><dt style="font-size: 12px; color: #5A6A8C">Thời gian</dt><dd style="margin: 2px 0 0; font-size: 14px; font-weight: 700; color: #2F6BFF">{{summary}}</dd></div>
+      <div style="text-align: right"><dt style="font-size: 12px; color: #5A6A8C">Tổng cộng</dt><dd style="margin: 2px 0 0; font-size: 14px; font-weight: 800">150.000 S-coins</dd></div>
+    </dl>
+    <a href="BookingConfirm.dc.html" style="height: 56px; border-radius: 9999px; background: linear-gradient(135deg, #1A47D6 0%, #2F6BFF 100%); box-shadow: 0 8px 20px rgba(47,107,255,0.30); color: #FFFFFF; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center">Tiếp tục</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { day: 1, slot: '19:00' };
+  }
+  renderVals() {
+    const dows = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    const full = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
+    const closed = [2, 6];
+    const dayBase = 'height: 64px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; ';
+    const days = dows.map((dow, i) => {
+      const off = closed.indexOf(i) >= 0;
+      const on = this.state.day === i;
+      let look = 'border: 1px solid #DCE6FA; background: #FFFFFF; color: #0F2D6B; cursor: pointer;';
+      if (on) look = 'border: 1px solid #2F6BFF; background: #2F6BFF; color: #FFFFFF; cursor: pointer; box-shadow: 0 8px 20px rgba(47,107,255,0.30);';
+      if (off) look = 'border: 1px dashed #DCE6FA; background: transparent; color: #5A6A8C; opacity: 0.6;';
+      return {
+        dow, num: String(5 + i).padStart(2, '0'), off, on: on ? 'true' : 'false',
+        aria: full[i] + ' ' + (5 + i) + ' tháng 10' + (off ? ', không có lịch' : ''),
+        style: dayBase + look,
+        pick: () => this.setState({ day: i })
+      };
+    });
+    const times = ['08:00', '09:30', '14:00', '15:30', '19:00', '20:30'];
+    const booked = this.state.day === 0 ? ['08:00', '15:30'] : ['09:30', '20:30'];
+    const slotBase = 'height: 48px; border-radius: 9999px; font-size: 14px; ';
+    const slots = times.map((t) => {
+      const off = booked.indexOf(t) >= 0;
+      const on = this.state.slot === t && !off;
+      let look = 'border: 1px solid #DCE6FA; background: #FFFFFF; color: #0F2D6B; font-weight: 600; cursor: pointer;';
+      if (on) look = 'border: 2px solid #2F6BFF; background: #EBF3FF; color: #2F6BFF; font-weight: 700; cursor: pointer;';
+      if (off) look = 'border: 1px solid #EEF2FA; background: #EEF2FA; color: #5A6A8C; font-weight: 500; text-decoration: line-through;';
+      return { label: t, off, on: on ? 'true' : 'false', style: slotBase + look, pick: () => this.setState({ slot: t }) };
+    });
+    const slotOk = booked.indexOf(this.state.slot) < 0;
+    const d = 5 + this.state.day;
+    const summary = slotOk ? dows[this.state.day] + ', ' + String(d).padStart(2, '0') + '/10 · ' + this.state.slot : 'Chọn một khung giờ';
+    return { days, slots, summary };
+  }
+}
+</script>
+</body>
+</html>

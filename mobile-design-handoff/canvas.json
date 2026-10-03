@@ -1,0 +1,56 @@
+{
+  "v": 3,
+  "attachments": {},
+  "createdOnFiles": {"at": "2026-10-03T17:55:00Z", "v": 1},
+  "title": "SkillSwap Mobile App",
+  "launch": {"view": "canvas"},
+  "pages": [
+    {"id": "mentee", "name": "Mentee"},
+    {"id": "mentor", "name": "Mentor"}
+  ],
+  "boards": {
+    "Welcome.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "01 · Chào mừng", "w": 390, "x": 0, "y": 0},
+    "Main.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "02 · Bảng tin", "w": 390, "x": 470, "y": 0},
+    "Mentors.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "03 · Tìm Mentor", "w": 390, "x": 940, "y": 0},
+    "MentorDetail.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "04 · Hồ sơ Mentor", "w": 390, "x": 1410, "y": 0},
+    "Booking.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "05 · Chọn lịch", "w": 390, "x": 1880, "y": 0},
+    "BookingConfirm.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "05b · Xác nhận đặt lịch", "w": 390, "x": 2350, "y": 0},
+    "MyBookings.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "06 · Lịch hẹn", "w": 390, "x": 0, "y": 1264},
+    "Messages.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "07 · Tin nhắn", "w": 390, "x": 470, "y": 1264},
+    "ChatDetail.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "07b · Chat 1:1", "w": 390, "x": 940, "y": 1264},
+    "KokoChat.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "08 · Chat với Koko", "w": 390, "x": 1410, "y": 1264},
+    "Profile.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "09 · Hồ sơ", "w": 390, "x": 1880, "y": 1264},
+    "Onboarding.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "10 · Hoàn thiện hồ sơ", "w": 390, "x": 0, "y": 2528},
+    "PostDetail.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "11 · Chi tiết bài viết", "w": 390, "x": 470, "y": 2528},
+    "Notifications.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "12 · Thông báo", "w": 390, "x": 940, "y": 2528},
+    "MentorRegistration.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "13 · Đăng ký làm Mentor", "w": 390, "x": 1410, "y": 2528},
+
+    "MentorDashboard.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "M1 · Tổng quan", "w": 390, "x": 0, "y": 0, "page": "mentor"},
+    "MentorBookings.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "M2 · Lịch đặt", "w": 390, "x": 470, "y": 0, "page": "mentor"},
+    "MentorBookingDetail.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "M3 · Chi tiết lịch đặt", "w": 390, "x": 940, "y": 0, "page": "mentor"},
+    "MentorSchedule.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "M4 · Lịch dạy", "w": 390, "x": 1410, "y": 0, "page": "mentor"},
+    "MentorServices.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "M5 · Dịch vụ", "w": 390, "x": 1880, "y": 0, "page": "mentor"},
+    "MentorServiceDetail.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "M6 · Chỉnh sửa dịch vụ", "w": 390, "x": 2350, "y": 0, "page": "mentor"},
+    "MentorWallet.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "M7 · Ví S-coins", "w": 390, "x": 0, "y": 1264, "page": "mentor"},
+    "MentorPosts.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "M8 · Bài viết & tạo bài", "w": 390, "x": 470, "y": 1264, "page": "mentor"},
+    "MentorCourses.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "M9 · Khóa học", "w": 390, "x": 940, "y": 1264, "page": "mentor"},
+    "MentorMore.dc.html": {"h": 844, "is_interactive": true, "radius": 40, "title": "M10 · Thêm", "w": 390, "x": 1410, "y": 1264, "page": "mentor"}
+  },
+  "order": [
+    "Welcome.dc.html", "Main.dc.html", "Mentors.dc.html", "MentorDetail.dc.html", "Booking.dc.html", "BookingConfirm.dc.html",
+    "MyBookings.dc.html", "Messages.dc.html", "ChatDetail.dc.html", "KokoChat.dc.html", "Profile.dc.html",
+    "Onboarding.dc.html", "PostDetail.dc.html", "Notifications.dc.html", "MentorRegistration.dc.html",
+    "MentorDashboard.dc.html", "MentorBookings.dc.html", "MentorBookingDetail.dc.html", "MentorSchedule.dc.html", "MentorServices.dc.html", "MentorServiceDetail.dc.html",
+    "MentorWallet.dc.html", "MentorPosts.dc.html", "MentorCourses.dc.html", "MentorMore.dc.html"
+  ],
+  "notes": {
+    "row1": {"kind": "title1", "maxW": 2740, "text": "Khám phá & đặt lịch Mentor", "w": 240, "x": 0, "y": -300},
+    "row2": {"kind": "title1", "maxW": 2270, "text": "Lịch hẹn, tin nhắn & hồ sơ", "w": 240, "x": 0, "y": 964},
+    "row3": {"kind": "title1", "maxW": 1800, "text": "Onboarding, bài viết, thông báo & đăng ký Mentor", "w": 240, "x": 0, "y": 2228},
+    "mrow1": {"kind": "title1", "maxW": 2740, "text": "Mentor: booking, lịch dạy & dịch vụ", "w": 240, "x": 0, "y": -300, "page": "mentor"},
+    "mrow2": {"kind": "title1", "maxW": 1800, "text": "Mentor: ví, bài viết, khóa học & menu", "w": 240, "x": 0, "y": 964, "page": "mentor"}
+  },
+  "designSystems": [
+    {"artifact": "https://claude.ai/artifact/JdRibYbgqWBM1rbimeRXeR", "copiedAt": "2026-10-03T17:55:00Z", "namespace": "skillswap", "title": "SkillSwap", "version": "1790196521-8ae7"}
+  ]
+}
