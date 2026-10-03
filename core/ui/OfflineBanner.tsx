@@ -8,6 +8,7 @@
 import { Text, View } from 'react-native';
 
 import { useIsOffline } from '@/core/net/onlineStatus';
+import { fonts } from '@/core/ui/theme';
 
 export function OfflineBanner() {
   if (!useIsOffline()) {
@@ -16,7 +17,12 @@ export function OfflineBanner() {
 
   return (
     <View className="bg-warning-soft px-4 py-2">
-      <Text className="text-center text-sm text-text-main">Không có kết nối</Text>
+      <Text
+        className="text-center text-caption-lg text-warning-ink"
+        style={{ fontFamily: fonts.semibold }}
+      >
+        Không có kết nối
+      </Text>
     </View>
   );
 }
