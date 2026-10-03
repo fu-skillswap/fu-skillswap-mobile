@@ -4,17 +4,18 @@
  * mọi chỗ đều là hai chữ cái trên nền `surface-tint` (hoặc nền `accent` cho
  * avatar lớn ở đầu trang hồ sơ).
  *
- * Năm cỡ và năm cỡ chữ tương ứng lấy đúng từ các màn hình, không nội suy:
+ * Sáu cỡ và sáu cỡ chữ tương ứng lấy đúng từ các màn hình, không nội suy:
  * 40/14 (bài viết) · 44/15 (card lịch hẹn) · 52/17 (card mentor nổi bật) ·
- * 56/18 (danh sách mentor) · 64/22 (đầu trang hồ sơ).
+ * 56/18 (danh sách mentor) · 64/22 (đầu trang hồ sơ) · 84/28 (avatar lớn đè lên
+ * card ở `MentorDetail.dc.html`).
  */
 
 import { Text, View } from 'react-native';
 
 import { fonts, radius } from '@/core/ui/theme';
 
-/** Cỡ avatar hợp lệ, tính bằng px — đúng năm cỡ thiết kế dùng */
-export type AvatarSize = 40 | 44 | 52 | 56 | 64;
+/** Cỡ avatar hợp lệ, tính bằng px — đúng sáu cỡ thiết kế dùng */
+export type AvatarSize = 40 | 44 | 52 | 56 | 64 | 84;
 
 export interface AvatarProps {
   /** Tên đầy đủ; component tự rút chữ cái đầu */
@@ -27,7 +28,7 @@ export interface AvatarProps {
   testID?: string;
 }
 
-const CO_CHU: Record<AvatarSize, number> = { 40: 14, 44: 15, 52: 17, 56: 18, 64: 22 };
+const CO_CHU: Record<AvatarSize, number> = { 40: 14, 44: 15, 52: 17, 56: 18, 64: 22, 84: 28 };
 
 /**
  * Rút tối đa hai chữ cái đầu từ tên.

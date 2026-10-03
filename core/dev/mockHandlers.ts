@@ -24,11 +24,13 @@ import { setupServer } from 'msw/native';
 
 import { authMockHandlers } from '@/core/auth/mocks/handlers';
 import { forumMockHandlers } from '@/features/forum/mocks/handlers';
+import { mentorMockHandlers } from '@/features/mentor/mocks/handlers';
 import { profileMockHandlers } from '@/features/profile/mocks/handlers';
 
 export const mockHandlers = [
   ...authMockHandlers,
   ...forumMockHandlers,
+  ...mentorMockHandlers,
   ...profileMockHandlers,
 ];
 

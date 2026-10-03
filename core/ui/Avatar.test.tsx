@@ -52,4 +52,14 @@ describe('Avatar', () => {
       borderRadius: 16,
     });
   });
+
+  it('cỡ 84 của đầu trang hồ sơ mentor có cỡ chữ riêng, không nội suy', async () => {
+    // `CO_CHU` là `Record<AvatarSize, number>`, nên thêm một cỡ mà quên cỡ chữ là
+    // lỗi đỏ của `tsc`. Test này canh thêm phần giá trị: 84 lấy chữ 28 theo đúng
+    // `MentorDetail.dc.html`, không phải một con số nội suy.
+    await render(<Avatar name="Sarah Chen" size={84} tone="accent" testID="anh" />);
+
+    expect(screen.getByTestId('anh').props.style).toMatchObject({ width: 84, height: 84 });
+    expect(screen.getByText('SC').props.style).toMatchObject({ fontSize: 28 });
+  });
 });
