@@ -23,10 +23,21 @@ import type { MentorReputation } from '@/features/mentor/types';
 
 export interface MentorRatingProps {
   reputation: MentorReputation;
+  /**
+   * Ẩn phần "(N đánh giá)", chỉ còn sao và điểm.
+   *
+   * Dùng ở hàng ba chỉ số của màn hồ sơ: ở đó cột kế bên ĐÃ là "Lượt review",
+   * nên in số lượt lần nữa vừa trùng thông tin vừa làm chữ tràn đè lên đường
+   * kẻ chia cột (gặp thật trên máy ảo 04/10/2026).
+   *
+   * Nhánh "Chưa có đánh giá" KHÔNG đổi: luật không-hiện-điểm vẫn do
+   * `moTaDiemDanhGia()` quyết, cờ này chỉ bớt phần đuôi khi ĐÃ có điểm.
+   */
+  anSoLuot?: boolean;
   testID?: string;
 }
 
-export function MentorRating({ reputation, testID }: MentorRatingProps) {
+export function MentorRating({ reputation, anSoLuot = false, testID }: MentorRatingProps) {
   const mo = moTaDiemDanhGia(reputation);
 
   if (!mo.coDiem) {
@@ -54,9 +65,11 @@ export function MentorRating({ reputation, testID }: MentorRatingProps) {
       >
         {mo.diem}
       </Text>
-      <Text className="text-caption text-ink-muted" style={{ fontFamily: fonts.regular }}>
-        ({mo.soLuot} đánh giá)
-      </Text>
+      {anSoLuot ? null : (
+        <Text className="text-caption text-ink-muted" style={{ fontFamily: fonts.regular }}>
+          ({mo.soLuot} đánh giá)
+        </Text>
+      )}
     </View>
   );
 }

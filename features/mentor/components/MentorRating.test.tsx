@@ -61,4 +61,34 @@ describe('MentorRating', () => {
     expect(screen.getByTestId('diem-diem').props.children).toBe('0.0');
     expect(screen.queryByText('Chưa có đánh giá')).toBeNull();
   });
+
+  it('`anSoLuot` thì ẩn phần "(N đánh giá)" nhưng VẪN hiện điểm', async () => {
+    // Hàng ba chỉ số của màn hồ sơ: cột kế bên đã là "Lượt review", in lại số
+    // lượt ở đây vừa trùng vừa làm chữ tràn đè lên đường kẻ chia cột.
+    await render(
+      <MentorRating
+        reputation={{ ratingState: 'RATED', ratingAverage: 4.2, reviewCount: 11, completedSessions: 19 }}
+        anSoLuot
+        testID="diem"
+      />,
+    );
+
+    expect(screen.getByTestId('diem-diem')).toHaveTextContent('4.2');
+    expect(screen.queryByText(/đánh giá\)/)).toBeNull();
+  });
+
+  it('`anSoLuot` KHÔNG làm hiện điểm cho mentor chưa có đánh giá', async () => {
+    // Cờ này chỉ bớt phần đuôi khi ĐÃ có điểm; luật không-hiện-điểm vẫn do
+    // `moTaDiemDanhGia()` quyết và không được cờ nào đi vòng qua.
+    await render(
+      <MentorRating
+        reputation={{ ratingState: 'NO_REVIEWS', ratingAverage: null, reviewCount: 0, completedSessions: 0 }}
+        anSoLuot
+        testID="diem"
+      />,
+    );
+
+    expect(screen.getByText('Chưa có đánh giá')).toBeTruthy();
+    expect(screen.queryByTestId('diem-diem')).toBeNull();
+  });
 });

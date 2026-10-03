@@ -281,7 +281,7 @@ export function MentorDetailScreen({ mentorUserId }: MentorDetailScreenProps) {
                     chưa có đánh giá thì ô này nói "Chưa có đánh giá" và KHÔNG có
                     ngôi sao hay con số nào.
                   */}
-                  <MentorRating reputation={hoSo.reputation} testID="diem-danh-gia" />
+                  <MentorRating reputation={hoSo.reputation} anSoLuot testID="diem-danh-gia" />
                 </OChiSo>
                 <OChiSo nhan="Lượt review" giua testID="o-luot-review">
                   <Text
