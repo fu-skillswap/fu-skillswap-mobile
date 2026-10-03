@@ -2,6 +2,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 import {
   GoogleSignInCancelledError,
+  GoogleSignInConfigError,
   MOCK_ID_TOKEN,
   __resetGoogleSignInConfiguredForTests,
   configureGoogleSignIn,
@@ -119,6 +120,34 @@ describe('googleSignIn', () => {
     mockSignIn.mockResolvedValue({ type: 'success', data: {} });
 
     await expect(getGoogleIdToken()).rejects.toThrow('Không lấy được Google ID token');
+  });
+
+  it('DEVELOPER_ERROR (mã 10) → ném GoogleSignInConfigError, KHÔNG phải lỗi chung', async () => {
+    // Gặp thật trên máy ảo 2026-10-03: Android OAuth client chưa đăng ký cặp
+    // package + SHA-1 trong cùng project với `webClientId`. Trước khi tách lớp
+    // lỗi này ra, nó rơi vào nhánh "lỗi không rõ" và app mời người dùng "thử
+    // lại sau ít phút" — một lời khuyên không bao giờ đúng, vì chờ bao lâu
+    // cũng không hết.
+    mockSignIn.mockRejectedValue({
+      code: '10',
+      message: 'DEVELOPER_ERROR: Follow troubleshooting instructions at ...',
+    });
+
+    await expect(getGoogleIdToken()).rejects.toBeInstanceOf(GoogleSignInConfigError);
+  });
+
+  it('DEVELOPER_ERROR dạng SỐ 10 cũng nhận ra', async () => {
+    // Thư viện trả `code` khi là chuỗi khi là số tuỳ đường ném, nên so sánh
+    // phải chuẩn hoá về chuỗi.
+    mockSignIn.mockRejectedValue({ code: 10 });
+
+    await expect(getGoogleIdToken()).rejects.toBeInstanceOf(GoogleSignInConfigError);
+  });
+
+  it('lỗi native khác KHÔNG bị nhận nhầm thành lỗi cấu hình', async () => {
+    mockSignIn.mockRejectedValue({ code: '7', message: 'NETWORK_ERROR' });
+
+    await expect(getGoogleIdToken()).rejects.not.toBeInstanceOf(GoogleSignInConfigError);
   });
 });
 

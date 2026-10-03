@@ -5,12 +5,19 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { toUserMessage } from '@/core/api/errors';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { resolveAuthRoute } from '@/core/auth/authRoute';
-import { GoogleSignInCancelledError } from '@/core/auth/googleSignIn';
+import { GoogleSignInCancelledError, GoogleSignInConfigError } from '@/core/auth/googleSignIn';
 
 export default function LoginScreen() {
   const { status, user, signInWithGoogle } = useAuth();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * Giữ CẢ tiêu đề lẫn mô tả. Trước đây chỉ giữ `description`, nên hai nguyên
+   * nhân hoàn toàn khác nhau — lỗi 5xx của backend ("Hệ thống đang bận") và lỗi
+   * không phải HTTP ("Đã có lỗi xảy ra") — hiện ra y hệt nhau là "Vui lòng thử
+   * lại sau ít phút.", không phân biệt được. Đúng chuyện đã xảy ra khi chẩn
+   * đoán đăng nhập trên máy ảo 2026-10-03.
+   */
+  const [error, setError] = useState<{ title: string; description: string } | null>(null);
   const route = resolveAuthRoute(status, user);
 
   // Đã có phiên hợp lệ (ví dụ vừa đăng nhập xong) thì rời màn hình này ngay,
@@ -35,9 +42,22 @@ export default function LoginScreen() {
     try {
       await signInWithGoogle();
     } catch (err) {
-      if (!(err instanceof GoogleSignInCancelledError)) {
-        setError(toUserMessage(err).description);
+      if (err instanceof GoogleSignInCancelledError) {
+        return;
       }
+      if (err instanceof GoogleSignInConfigError) {
+        // Lỗi cấu hình của chính ứng dụng, người dùng không thể tự khắc phục —
+        // nên KHÔNG mời họ thử lại. `toUserMessage` xếp nó vào nhánh lỗi chung
+        // và trả về "Vui lòng thử lại sau ít phút", một lời khuyên không bao
+        // giờ đúng với lỗi này (gặp thật trên máy ảo 2026-10-03).
+        setError({
+          title: 'Không đăng nhập được',
+          description: 'Ứng dụng đang có lỗi cấu hình đăng nhập. Vui lòng báo cho đội phát triển.',
+        });
+        return;
+      }
+      const message = toUserMessage(err);
+      setError({ title: message.title, description: message.description });
     } finally {
       setBusy(false);
     }
@@ -63,7 +83,12 @@ export default function LoginScreen() {
         )}
       </Pressable>
 
-      {error ? <Text className="text-center text-danger">{error}</Text> : null}
+      {error ? (
+        <View className="gap-1">
+          <Text className="text-center font-semibold text-danger">{error.title}</Text>
+          <Text className="text-center text-danger">{error.description}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }

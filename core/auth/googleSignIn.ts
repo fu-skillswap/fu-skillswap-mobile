@@ -47,6 +47,48 @@ export class GoogleSignInCancelledError extends Error {
   }
 }
 
+/**
+ * Lỗi CẤU HÌNH phía nhà phát triển, không phải lỗi tạm thời.
+ *
+ * Google trả `DEVELOPER_ERROR` khi Android OAuth client chưa đăng ký đúng cặp
+ * `android.package` + SHA-1 của keystore đã ký bản build, trong **cùng** Google
+ * Cloud project với `webClientId`.
+ *
+ * Phải là một lớp lỗi riêng vì cách nói với người dùng khác hẳn: chờ bao lâu
+ * cũng không hết, nên tuyệt đối không mời họ "thử lại sau ít phút". Gặp thật
+ * trên máy ảo 2026-10-03, và khi đó nó rơi vào nhánh lỗi chung đúng kiểu đó.
+ *
+ * Lưu ý khi đọc mã: hộp "Choose an account … to continue to SkillSwap" VẪN hiện
+ * ra bình thường trước khi lỗi này nổ, vì tên ứng dụng trong hộp đó đến từ màn
+ * hình đồng ý của `webClientId`. Thấy hộp đó KHÔNG có nghĩa là SHA-1 đã đúng.
+ */
+export class GoogleSignInConfigError extends Error {
+  constructor() {
+    super('Ứng dụng chưa được cấu hình đúng cho đăng nhập Google (DEVELOPER_ERROR)');
+    this.name = 'GoogleSignInConfigError';
+  }
+}
+
+/**
+ * Mã `DEVELOPER_ERROR` của Android (`CommonStatusCodes.DEVELOPER_ERROR`).
+ *
+ * Viết thẳng số vì `statusCodes` của `@react-native-google-signin/google-signin`
+ * 16.1.5 KHÔNG xuất mã này — bản đó chỉ có `SIGN_IN_CANCELLED`, `IN_PROGRESS`,
+ * `PLAY_SERVICES_NOT_AVAILABLE`, `SIGN_IN_REQUIRED` và `NULL_PRESENTER` (xem
+ * `lib/module/errors/errorCodes.js`). Giá trị 10 là hằng của Google Play
+ * Services, không phải của thư viện, nên nó ổn định hơn chính thư viện.
+ */
+const MA_LOI_CAU_HINH = '10';
+
+/** Thư viện trả `code` lúc là chuỗi lúc là số tuỳ đường ném — chuẩn hoá rồi so */
+function isConfigError(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const candidate = value as { code?: string | number };
+  return String(candidate.code) === MA_LOI_CAU_HINH;
+}
+
 /** Cấu hình thư viện. Giữ export để nơi khác gọi trực tiếp được nếu cần, nhưng
  * KHÔNG nơi nào trong app được gọi hàm này một cách nhiệt tình (eager) lúc
  * khởi động — dùng `ensureGoogleSignInConfigured()` bên dưới (lười, memo hoá). */
@@ -120,6 +162,9 @@ export async function getGoogleIdToken(): Promise<string> {
   } catch (error) {
     if (isCancellation(error)) {
       throw new GoogleSignInCancelledError();
+    }
+    if (isConfigError(error)) {
+      throw new GoogleSignInConfigError();
     }
     throw error;
   }
