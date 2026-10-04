@@ -58,12 +58,10 @@
  * Ô "Buổi đã hoàn thành" được thêm vào thay cho hai ô trên: nó đọc đúng
  * `completedSessions` với đúng cái tên của nó.
  *
- * ## 4. Nút chuông Thông báo bị BỎ
+ * ## 4. Nút chuông Thông báo
  *
- * `href="Notifications.dc.html"` — màn `Notifications` chưa tồn tại trong repo.
- * Cái dấu chấm cam báo "có thông báo mới" cũng bị bỏ theo: không có endpoint
- * đếm thông báo chưa đọc nào được nối, nên nó sẽ là một dấu hiệu luôn sáng hoặc
- * luôn tắt — cả hai đều nói sai.
+ * Dẫn sang màn Thông báo (`/notifications`). Chấm cam đọc từ
+ * `/api/me/notifications/unread-count` — xem `ChuongThongBao`.
  *
  * ## 5. Dòng "Đặt chỗ sắp tới" KHÔNG bấm được
  *
@@ -98,6 +96,7 @@ import { colors, fonts, radius } from '@/core/ui/theme';
 import { useMentorBookingCount, useMentorBookings } from '@/features/booking';
 import type { BookingResponse } from '@/features/booking';
 import { MentorStatTile } from '@/features/mentorMode/components/MentorStatTile';
+import { ChuongThongBao } from '@/features/notification';
 import { useMyMentorProfile, useMyMentorWallet } from '@/features/mentorMode/hooks/useMentorModeQueries';
 import {
   dangBiTreoNhanBooking,
@@ -226,6 +225,7 @@ export function MentorDashboardScreen() {
               {ten ? `Chào ${ten}` : 'Chào bạn'}
             </Text>
           </View>
+          <ChuongThongBao />
         </View>
 
         {biTreo ? (

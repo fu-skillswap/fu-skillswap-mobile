@@ -28,6 +28,7 @@ import { chatMockHandlers } from '@/features/chat/mocks/handlers';
 import { forumMockHandlers } from '@/features/forum/mocks/handlers';
 import { mentorMockHandlers } from '@/features/mentor/mocks/handlers';
 import { mentorModeMockHandlers } from '@/features/mentorMode/mocks/handlers';
+import { notificationMockHandlers } from '@/features/notification/mocks/handlers';
 import { profileMockHandlers } from '@/features/profile/mocks/handlers';
 
 export const mockHandlers = [
@@ -37,6 +38,7 @@ export const mockHandlers = [
   ...forumMockHandlers,
   ...mentorMockHandlers,
   ...mentorModeMockHandlers,
+  ...notificationMockHandlers,
   ...profileMockHandlers,
 ];
 

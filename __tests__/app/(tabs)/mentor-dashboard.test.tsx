@@ -113,7 +113,15 @@ function duLieuDayDu({
   ];
 }
 
-const server = setupServer();
+/**
+ * Chuông thông báo ở đầu trang luôn hỏi số chưa đọc khi màn mở. Đặt làm handler
+ * GỐC của server (sống qua `resetHandlers`) để test nào cũng có, không phải nhắc.
+ */
+const soChuaDocMacDinh = http.get(`${BASE}/api/me/notifications/unread-count`, () =>
+  HttpResponse.json(envelope({ unreadCount: 0 })),
+);
+
+const server = setupServer(soChuaDocMacDinh);
 
 /** Một QueryClient cho mỗi test — xem mục 6 của quy ước. */
 let queryClient: QueryClient;
@@ -438,13 +446,16 @@ describe('MentorDashboardScreen', () => {
     await doiXong();
   });
 
-  it('KHÔNG có nút chuông Thông báo — màn Notifications chưa có', async () => {
+  it('có nút chuông dẫn sang màn Thông báo', async () => {
     server.use(...duLieuDayDu());
 
     await renderScreen();
     await waitFor(() => expect(screen.getByText('Đánh giá')).toBeTruthy());
+    mockPush.mockClear();
 
-    expect(screen.queryByLabelText('Thông báo')).toBeNull();
+    await fireEvent.press(screen.getByTestId('nut-thong-bao'));
+
+    expect(mockPush).toHaveBeenCalledWith('/notifications');
     await doiXong();
   });
 

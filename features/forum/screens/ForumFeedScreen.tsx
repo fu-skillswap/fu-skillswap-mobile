@@ -30,6 +30,7 @@ import { PostCard } from '@/features/forum/components/PostCard';
 import { TopicChips } from '@/features/forum/components/TopicChips';
 import { useTogglePostLike } from '@/features/forum/hooks/useForumMutations';
 import { useForumList, useForumTopics } from '@/features/forum/hooks/useForumQueries';
+import { ChuongThongBao } from '@/features/notification';
 
 /**
  * Từ khoá phải đứng yên bấy nhiêu mili giây mới được đưa vào query key.
@@ -111,27 +112,32 @@ export function ForumFeedScreen() {
 
       <View className="gap-4 px-gutter pb-3 pt-2">
         {/*
-          Lời chào chỉ hiện khi đã biết người dùng là ai. Thiết kế còn có logo 40
-          bên trái và chuông thông báo bên phải; logo bỏ vì repo mobile chưa có
-          file ảnh nào của bộ nhận diện SkillSwap, còn chuông bỏ vì màn
-          `Notifications` chưa dựng — xem mục (c) của báo cáo.
+          Lời chào bên trái, chuông thông báo bên phải. Lời chào chỉ hiện khi đã
+          biết người dùng là ai; chuông luôn có. Thiết kế còn có logo 40 bên trái —
+          bỏ để đầu trang không chật trên máy hẹp.
         */}
-        {user ? (
-          <View>
-            <Text
-              className="text-caption-lg text-ink-muted"
-              style={{ fontFamily: fonts.regular }}
-            >
-              {loiChao(new Date().getHours())}
-            </Text>
-            <Text
-              className="text-ink"
-              style={{ fontFamily: fonts.bold, fontSize: 20, lineHeight: 26 }}
-            >
-              {user.fullName}
-            </Text>
+        <View className="flex-row items-center gap-3">
+          <View className="min-w-0 flex-1">
+            {user ? (
+              <>
+                <Text
+                  className="text-caption-lg text-ink-muted"
+                  style={{ fontFamily: fonts.regular }}
+                >
+                  {loiChao(new Date().getHours())}
+                </Text>
+                <Text
+                  className="text-ink"
+                  numberOfLines={1}
+                  style={{ fontFamily: fonts.bold, fontSize: 20, lineHeight: 26 }}
+                >
+                  {user.fullName}
+                </Text>
+              </>
+            ) : null}
           </View>
-        ) : null}
+          <ChuongThongBao />
+        </View>
 
         {/*
           Ô tìm kiếm GIỮ LẠI vì nó đang hoạt động thật (tìm bài viết qua

@@ -92,7 +92,15 @@ const TOPIC = { id: 't1', code: 'QUESTION', nameVi: 'Hỏi đáp', nameEn: 'Q&A'
 const topicsOk = (topics: unknown[] = []) =>
   http.get(`${BASE}/api/forum/topics`, () => HttpResponse.json(envelope(topics)));
 
-const server = setupServer();
+/**
+ * Chuông thông báo ở đầu trang luôn hỏi số chưa đọc khi màn mở. Đặt làm handler
+ * GỐC của server (sống qua `resetHandlers`) để test nào cũng có, không phải nhắc.
+ */
+const soChuaDocMacDinh = http.get(`${BASE}/api/me/notifications/unread-count`, () =>
+  HttpResponse.json(envelope({ unreadCount: 0 })),
+);
+
+const server = setupServer(soChuaDocMacDinh);
 
 /**
  * Một QueryClient cho mỗi test, KHÔNG phải mỗi lần gọi renderScreen.
@@ -140,6 +148,21 @@ describe('ForumFeedScreen', () => {
     await renderScreen();
 
     await waitFor(() => expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy());
+    await donHangDoiDanhSach();
+  });
+
+  it('có chuông thông báo; còn thông báo chưa đọc thì có chấm cam', async () => {
+    server.use(
+      topicsOk(),
+      http.get(`${BASE}/api/forum/feed`, () => HttpResponse.json(envelope(cursorPage([POST])))),
+      http.get(`${BASE}/api/me/notifications/unread-count`, () => HttpResponse.json(envelope({ unreadCount: 2 }))),
+    );
+
+    await renderScreen();
+
+    await waitFor(() => expect(screen.getByTestId('cham-thong-bao-moi')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('nut-thong-bao'));
+    expect(mockPush).toHaveBeenCalledWith('/notifications');
     await donHangDoiDanhSach();
   });
 
