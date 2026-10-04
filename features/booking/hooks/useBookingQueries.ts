@@ -1,0 +1,75 @@
+/**
+ * @file useBookingQueries.ts
+ * @description Các hook đọc dữ liệu nhánh booking.
+ *
+ * Phân trang là OFFSET (`page`/`size`) như nhánh mentor, không phải cursor như
+ * diễn đàn — dùng `getNextPageNumber`/`flattenOffsetPages`.
+ */
+
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useMemo, useRef } from 'react';
+
+import { flattenOffsetPages, getNextPageNumber } from '@/core/api/pagination';
+import { bookingRepo } from '@/features/booking/bookingRepo';
+import type { BoLocLichHen } from '@/features/booking/bookingRepo';
+import { bookingKeys } from '@/features/booking/queryKeys';
+
+/**
+ * Chốt chặn ĐỒNG BỘ cho việc tải trang kế.
+ *
+ * Cùng lý do và cùng cách làm như `useChotChanTrangKe` của
+ * `features/mentor/hooks/useMentorQueries.ts`: FlatList bắn `onEndReached` nhiều
+ * lần trong cùng một frame, và một guard dựa vào `isFetchingNextPage` đọc cùng
+ * một giá trị `false` của lần render cũ ở cả hai lần gọi — trang đó bị nối vào
+ * danh sách hai lượt. Ref đổi ngay lập tức nên lần gọi thứ hai bị chặn.
+ *
+ * Chốt chặn nằm TRONG hook chứ không ở màn hình (mục 6 của quy ước). Bản của
+ * nhánh booking là một bản RIÊNG chứ không import từ `features/mentor`: hai
+ * feature không được import chéo nhau, và việc nâng nó lên `core/` là một thay
+ * đổi kiến trúc nằm ngoài phạm vi màn này.
+ */
+function useChotChanTrangKe(query: {
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => Promise<unknown>;
+}) {
+  const dangTaiTrangKe = useRef(false);
+
+  return () => {
+    if (dangTaiTrangKe.current || !query.hasNextPage || query.isFetchingNextPage) return;
+    dangTaiTrangKe.current = true;
+    void query.fetchNextPage().finally(() => {
+      dangTaiTrangKe.current = false;
+    });
+  };
+}
+
+/**
+ * Danh sách lịch hẹn của chính mình, cuộn tới đâu tải tới đó.
+ *
+ * `filters` không nhận `page` — xem JSDoc của `BoLocLichHen`. Thứ tự spread
+ * trong `queryFn` cố ý đặt `page: pageParam` SAU `...filters`.
+ *
+ * `staleTime` ngắn hơn mặc định 30s của app: trạng thái một booking đổi theo
+ * ĐỒNG HỒ chứ không chỉ theo thao tác của người dùng (một buổi "Sắp diễn ra"
+ * thành "Đang diễn ra" khi tới giờ, một yêu cầu "Đang chờ" thành "Quá hạn" khi
+ * hết hạn phản hồi), và chính backend tính các mốc đó. Giữ cache lâu là hiện một
+ * nhãn đã sai mà không có cách nào biết.
+ *
+ * Trả thêm `taiTrangKe()` đã bọc chốt chặn — màn hình nối thẳng vào
+ * `onEndReached`, KHÔNG tự dựng `useRef` lần nữa.
+ */
+export function useMyBookings(filters: BoLocLichHen) {
+  const query = useInfiniteQuery({
+    queryKey: bookingKeys.list(filters),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => bookingRepo.getMyBookings({ ...filters, page: pageParam }),
+    getNextPageParam: getNextPageNumber,
+    staleTime: 15_000,
+  });
+
+  const bookings = useMemo(() => flattenOffsetPages(query.data?.pages), [query.data]);
+  const taiTrangKe = useChotChanTrangKe(query);
+
+  return { ...query, bookings, taiTrangKe };
+}

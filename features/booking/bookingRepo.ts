@@ -1,0 +1,103 @@
+/**
+ * @file bookingRepo.ts
+ * @description Toàn bộ lời gọi `/api/me/bookings/*`. Không React, không state.
+ *
+ * Nguồn: `modules/booking/controller/MyBookingController.java`. Mọi endpoint ở
+ * nhóm này BẮT BUỘC đăng nhập (`ensureAuthenticated(principal)` ném
+ * `UNAUTHENTICATED` khi thiếu principal) — tab Lịch hẹn nằm sau gate của
+ * `(tabs)` nên luôn có token, nhưng đừng dựa vào điều đó ở tầng này.
+ *
+ * ## Hai đặc tính của `GET /api/me/bookings` dễ hiểu sai
+ *
+ * 1. **`status` nhận MỘT giá trị `BookingStatus` LEGACY**, không nhận
+ *    `BookingLifecycleStatus` và không nhận danh sách. Vì vậy một tab giao diện
+ *    muốn gộp hai trạng thái (ví dụ "Đã hủy" = mentee hủy + mentor hủy) KHÔNG
+ *    làm được bằng một request — xem JSDoc của `MyBookingsScreen`.
+ * 2. **Không truyền `status` là một endpoint KHÁC HẲN về ngữ nghĩa**:
+ *    `BookingQueryService.getMyBookings()` trả "dashboard" từ 7 ngày trước đến 90
+ *    ngày tới, xếp theo việc-cần-làm rồi tới lịch gần nhất, và **bỏ qua
+ *    `sortBy`/`direction`** (`bookingPriorityPageable()` dựng `PageRequest.of(page,
+ *    size)` không kèm `Sort`). Có `status` thì trả toàn bộ lịch sử của trạng thái
+ *    đó, không giới hạn ngày, và lúc đó mới tôn trọng `sortBy`.
+ *    Vì vậy repo này KHÔNG gửi `sortBy` — một tham số chỉ có tác dụng ở một nửa
+ *    số tab là cái bẫy chờ người sau.
+ */
+
+import { apiClient } from '@/core/api/client';
+import { idempotencyHeaders } from '@/core/api/idempotency';
+import type { PageResponse } from '@/core/api/pagination';
+import type {
+  BookingResponse,
+  BookingStatus,
+  BookingViewRole,
+  CancelBookingRequest,
+} from '@/features/booking/types';
+
+/** Tham số của `GET /api/me/bookings` (`dto/request/BookingListRequest.java`) */
+export interface BookingListParams {
+  page?: number;
+  size?: number;
+  /** Mặc định của backend là `MENTEE`; repo vẫn gửi tường minh */
+  role?: BookingViewRole;
+  /** Bỏ trống = chế độ dashboard 7 ngày trước → 90 ngày tới */
+  status?: BookingStatus;
+}
+
+/**
+ * Bộ lọc mà MÀN HÌNH được phép truyền cho `useMyBookings`.
+ *
+ * `page` bị loại khỏi kiểu có chủ ý — cùng lý do đã ghi ở `BoLocTimMentor` của
+ * `features/mentor/mentorRepo.ts`: số trang do `useInfiniteQuery` quản qua
+ * `pageParam`, nên một `page` lọt vào bộ lọc vừa nhiễm vào khoá cache vừa có
+ * nguy cơ ghi đè `pageParam` và làm MỌI trang xin đúng một số trang.
+ */
+export type BoLocLichHen = Omit<BookingListParams, 'page'>;
+
+/**
+ * Bỏ các tham số rỗng thay vì gửi chuỗi trống.
+ *
+ * Lọc theo `undefined` và chuỗi rỗng, KHÔNG theo tính truthy: `page: 0` là trang
+ * đầu và phải được gửi đi. Bản riêng cho nhánh booking, giống `forumRepo` và
+ * `mentorRepo` — ba nhánh có thể lệch nhau về sau.
+ */
+function cleanParams(params: Record<string, string | number | boolean | undefined>) {
+  const result: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+export const bookingRepo = {
+  /** Danh sách booking theo góc nhìn của user hiện tại */
+  getMyBookings(params: BookingListParams) {
+    return apiClient<PageResponse<BookingResponse>>('/api/me/bookings', {
+      params: cleanParams({ role: 'MENTEE', ...params }),
+    });
+  },
+
+  /**
+   * Mentee hủy một booking của mình.
+   *
+   * `Idempotency-Key` là BẮT BUỘC, không phải tuỳ chọn: endpoint mang
+   * `@Idempotent`, và `IdempotencyAspect.normalizeKey()` ném
+   * `BaseException(BAD_REQUEST, "IDEMPOTENCY_KEY_REQUIRED")` ngay khi header
+   * thiếu hoặc không khớp `[A-Za-z0-9._~-]{1,100}`. Thiếu nó thì mọi lần hủy đều
+   * nhận 400 — và 400 đó KHÔNG nói gì về lý do hủy, nên rất dễ bị đọc thành
+   * "backend yêu cầu lý do khác".
+   *
+   * Key do CHỖ GỌI truyền vào (`useCancelBooking` giữ nó trong
+   * `createIdempotencyStore`), chứ không sinh tại đây: retry sau lỗi mạng phải
+   * dùng lại ĐÚNG key cũ để backend replay kết quả đã commit, mà repo này không
+   * có chỗ nào để nhớ.
+   */
+  cancelBooking(bookingId: string, input: CancelBookingRequest, idempotencyKey: string) {
+    return apiClient<BookingResponse>(`/api/me/bookings/${bookingId}/cancel`, {
+      method: 'POST',
+      headers: idempotencyHeaders(idempotencyKey),
+      body: input,
+    });
+  },
+};

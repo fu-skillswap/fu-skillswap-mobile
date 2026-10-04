@@ -23,12 +23,14 @@ import '@/core/dev/mswPolyfills';
 import { setupServer } from 'msw/native';
 
 import { authMockHandlers } from '@/core/auth/mocks/handlers';
+import { bookingMockHandlers } from '@/features/booking/mocks/handlers';
 import { forumMockHandlers } from '@/features/forum/mocks/handlers';
 import { mentorMockHandlers } from '@/features/mentor/mocks/handlers';
 import { profileMockHandlers } from '@/features/profile/mocks/handlers';
 
 export const mockHandlers = [
   ...authMockHandlers,
+  ...bookingMockHandlers,
   ...forumMockHandlers,
   ...mentorMockHandlers,
   ...profileMockHandlers,
