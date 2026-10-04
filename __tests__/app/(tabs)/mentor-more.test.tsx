@@ -316,6 +316,16 @@ describe('MentorMoreScreen — các hàng menu dẫn tới màn có thật', () 
     await doiXong();
   });
 
+  it('"Bài viết của tôi" mở danh sách blog của mentor', async () => {
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('hang-bai-viet'));
+
+    expect(mockPush).toHaveBeenCalledWith('/mentor-posts');
+    await doiXong();
+  });
+
   it('"Tin nhắn" mở hộp thư ngoài thanh tab, không mở tab ẩn của Mentee', async () => {
     await renderScreen();
     await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
@@ -342,14 +352,6 @@ describe('MentorMoreScreen — các hàng menu CỐ Ý bỏ', () => {
     await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
 
     expect(screen.queryByText('Khóa học của tôi')).toBeNull();
-    await doiXong();
-  });
-
-  it('KHÔNG có "Bài viết của tôi" — MentorPosts chưa dựng', async () => {
-    await renderScreen();
-    await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
-
-    expect(screen.queryByText('Bài viết của tôi')).toBeNull();
     await doiXong();
   });
 

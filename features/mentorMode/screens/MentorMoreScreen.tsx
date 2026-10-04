@@ -14,13 +14,12 @@
  *   (`/(tabs)/mentor-schedule?phan=dich-vu`).
  * - **Tin nhắn** → hộp thư ngoài thanh tab (`/chat`). Thanh Mentor không có mục
  *   Tin nhắn nên đây là lối duy nhất để mentor trả lời mentee.
+ * - **Bài viết của tôi** → `/mentor-posts`. Như bản web, đây là BLOG của mentor
+ *   (`/api/me/blog/posts`), không phải diễn đàn.
  *
  * Bỏ, vì chưa có màn hoặc chưa có đích:
  *
  * - **Khóa học của tôi** → `MentorCourses.dc.html`, chưa dựng.
- * - **Bài viết của tôi** → `MentorPosts.dc.html`, chưa dựng. (Diễn đàn trong repo
- *   là `features/forum`, một nhánh khác hẳn — `MeBlogController` /
- *   `MentorBlogController` của backend là blog, không phải diễn đàn.)
  * - **Trợ giúp & điều khoản** → thiết kế để `href="#"`, tức chính thiết kế cũng
  *   chưa có đích.
  * - **Con số "3"** cạnh hai hàng trên: thiết kế vẽ, nhưng dịch vụ không có
@@ -44,7 +43,7 @@
  */
 
 import { useRouter } from 'expo-router';
-import { ArrowLeftRight, BriefcaseBusiness, LogOut, MessageSquare } from 'lucide-react-native';
+import { ArrowLeftRight, BriefcaseBusiness, FileText, LogOut, MessageSquare } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { trangThaiTai } from '@/core/api/queryState';
@@ -185,6 +184,14 @@ export function MentorMoreScreen() {
             chevron
             onPress={() => router.push({ pathname: '/(tabs)/mentor-schedule', params: { phan: 'dich-vu' } })}
             testID="hang-dich-vu"
+          />
+          <ListRow
+            label="Bài viết của tôi"
+            icon={<FileText size={20} color={colors.accent} strokeWidth={2} />}
+            chevron
+            divider
+            onPress={() => router.push('/mentor-posts')}
+            testID="hang-bai-viet"
           />
           <ListRow
             label="Tin nhắn"
