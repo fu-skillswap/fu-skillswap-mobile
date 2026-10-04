@@ -23,16 +23,17 @@ const BASE = 'https://api.skillswap.asia';
 jest.mock('expo-router', () => {
   const back = jest.fn();
   const replace = jest.fn();
+  const push = jest.fn();
   const canGoBack = jest.fn(() => true);
   return {
-    useRouter: () => ({ back, replace, canGoBack }),
-    __mockRouter: { back, replace, canGoBack },
+    useRouter: () => ({ back, replace, push, canGoBack }),
+    __mockRouter: { back, replace, push, canGoBack },
   };
 });
 jest.mock('@/core/net/onlineStatus', () => ({ useIsOffline: () => false }));
 
 const { __mockRouter: mockRouter } = jest.requireMock<{
-  __mockRouter: { back: jest.Mock; replace: jest.Mock; canGoBack: jest.Mock };
+  __mockRouter: { back: jest.Mock; replace: jest.Mock; push: jest.Mock; canGoBack: jest.Mock };
 }>('expo-router');
 
 function envelope(data: unknown) {
@@ -101,6 +102,7 @@ function hoSo(overrides: {
   supportLevels?: { foundation: number | null; outputReview: number | null; direction: number | null };
   semester?: number | null;
   alumni?: boolean | null;
+  canRequestBooking?: boolean;
 } = {}) {
   return {
     identity: {
@@ -146,7 +148,11 @@ function hoSo(overrides: {
       reviewCount: overrides.reviewCount ?? 13,
       completedSessions: overrides.completedSessions ?? 41,
     },
-    availability: { isAvailable: true, suspendedUntil: null, canRequestBooking: true },
+    availability: {
+      isAvailable: true,
+      suspendedUntil: null,
+      canRequestBooking: overrides.canRequestBooking ?? true,
+    },
   };
 }
 
@@ -184,6 +190,7 @@ beforeEach(() => {
   queryClient = createQueryClient();
   mockRouter.back.mockClear();
   mockRouter.replace.mockClear();
+  mockRouter.push.mockClear();
   mockRouter.canGoBack.mockClear();
   mockRouter.canGoBack.mockReturnValue(true);
 });
@@ -335,12 +342,46 @@ describe('MentorDetailScreen', () => {
     await donHangDoiDanhSach();
   });
 
-  it('KHÔNG có nút đặt lịch và KHÔNG có nút nhắn tin nào ở giai đoạn này', async () => {
-    // Màn `Booking` và `ChatDetail` chưa dựng. Thiết kế có cả hai nút ở thanh
-    // dưới cùng; dựng chúng bây giờ là dựng nút chết. Xoá test này khi hai luồng
-    // đó có thật.
+  it('CTA "Đặt lịch" ở thanh dưới mang giá dịch vụ đầu tiên và mở bước chọn lịch', async () => {
     server.use(
-      hoSoOk(hoSo({ services: [dichVu('sv1', 'Review CV 1:1')] })),
+      hoSoOk(hoSo({ services: [dichVu('sv1', 'Review CV 1:1'), dichVu('sv2', 'Mock interview')] })),
+      danhGiaOk([]),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-dat-lich')).toBeTruthy());
+
+    expect(screen.getByText('Đặt lịch · 150.000 S-coins')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('nut-dat-lich'));
+
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      pathname: '/booking/[mentorUserId]',
+      params: { mentorUserId: 'm1', serviceId: 'sv1' },
+    });
+    await donHangDoiDanhSach();
+  });
+
+  it('chạm vào một thẻ dịch vụ thì mở bước chọn lịch với ĐÚNG dịch vụ đó', async () => {
+    server.use(
+      hoSoOk(hoSo({ services: [dichVu('sv1', 'Review CV 1:1'), dichVu('sv2', 'Mock interview')] })),
+      danhGiaOk([]),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('tab-ho-so')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('tab-ho-so-dich-vu'));
+    await fireEvent.press(screen.getByLabelText('Đặt lịch Mock interview'));
+
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      pathname: '/booking/[mentorUserId]',
+      params: { mentorUserId: 'm1', serviceId: 'sv2' },
+    });
+    await donHangDoiDanhSach();
+  });
+
+  it('mentor tạm ngưng nhận lịch thì KHÔNG có nút đặt lịch nào và nói rõ lý do', async () => {
+    server.use(
+      hoSoOk(hoSo({ canRequestBooking: false, services: [dichVu('sv1', 'Review CV 1:1')] })),
       danhGiaOk([]),
     );
 
@@ -348,8 +389,10 @@ describe('MentorDetailScreen', () => {
     await waitFor(() => expect(screen.getByTestId('tab-ho-so')).toBeTruthy());
     await fireEvent.press(screen.getByTestId('tab-ho-so-dich-vu'));
 
-    expect(screen.queryByText(/Đặt lịch/)).toBeNull();
-    expect(screen.queryByLabelText(/Nhắn tin/)).toBeNull();
+    expect(screen.queryByTestId('nut-dat-lich')).toBeNull();
+    expect(screen.queryByLabelText('Đặt lịch Review CV 1:1')).toBeNull();
+    expect(screen.getByTestId('tam-ngung-nhan-lich')).toBeTruthy();
+    // Không có endpoint lưu mentor, không có URL công khai để chia sẻ.
     expect(screen.queryByLabelText('Lưu mentor')).toBeNull();
     expect(screen.queryByLabelText('Chia sẻ')).toBeNull();
     await donHangDoiDanhSach();

@@ -9,6 +9,8 @@
  * barrel chứ không dựng bản thứ hai của cả tầng dữ liệu.
  */
 
+export { BookingConfirmScreen } from '@/features/booking/screens/BookingConfirmScreen';
+export { BookingSlotScreen } from '@/features/booking/screens/BookingSlotScreen';
 export { MentorBookingsScreen } from '@/features/booking/screens/MentorBookingsScreen';
 export { MyBookingsScreen } from '@/features/booking/screens/MyBookingsScreen';
 export { useMentorBookingCount, useMentorBookings } from '@/features/booking/hooks/useBookingQueries';

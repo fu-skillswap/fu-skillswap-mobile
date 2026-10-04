@@ -338,3 +338,139 @@ export interface CancelBookingRequest {
 
 /** Giới hạn `@Size(max = 1000)` của `CancelBookingRequest.cancelReason` */
 export const LY_DO_HUY_TOI_DA = 1000;
+
+// ---------------------------------------------------------------------------
+// Luồng đặt lịch: lịch rảnh → candidate → báo giá → tạo booking
+// ---------------------------------------------------------------------------
+
+/** `mentor/dto/response/SlotMutationCapabilityResponse.java` — chỉ dùng phía mentor */
+export interface SlotMutationCapabilityResponse {
+  mode: 'ALLOWED' | 'REQUIRES_PENDING_REJECTION' | 'BLOCKED_BY_LOCKING_BOOKING';
+  restrictionCode: string | null;
+  affectedPendingBookingCount: number;
+}
+
+/** `mentor/dto/response/AvailabilitySlotServiceBasicResponse.java` */
+export interface AvailabilitySlotServiceBasicResponse {
+  serviceId: string;
+  title: string;
+  durationMinutes: number;
+  isFree: boolean;
+  /** `Integer` đóng hộp phía Java — dịch vụ miễn phí có thể mang `null` */
+  priceScoin: number | null;
+  bindingRemoval: SlotMutationCapabilityResponse | null;
+}
+
+/**
+ * `mentor/dto/response/MentorAvailabilitySlotResponse.java` — parent slot.
+ *
+ * `startTime`/`endTime` là `LocalDateTime` (KHÔNG offset), giờ Việt Nam. Đọc bằng
+ * `core/time/localDateTime.ts`. Các field legacy (`durationMinutes`,
+ * `teachingMode`, `maxPendingRequests`, `remainingRequestSlots`) cố ý không khai:
+ * backend đánh `deprecated`, màn hình mới không được dựa vào chúng.
+ */
+export interface MentorAvailabilitySlotResponse {
+  slotId: string;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  pendingRequestCount: number;
+  acceptedSlotCount: number;
+  services: AvailabilitySlotServiceBasicResponse[];
+}
+
+/**
+ * `mentor/dto/response/ServiceSlotCandidateItemResponse.java` — một khung giờ
+ * chính xác của một dịch vụ.
+ *
+ * Hai cặp giờ song song: `startTime`/`endTime` là `LocalDateTime` để HIỂN THỊ,
+ * `startAt`/`endAt` là `Instant` UTC để GỬI LÊN (`POST /api/bookings/quote` và
+ * `POST /api/bookings`). Đừng tự dựng `startAt` từ giờ hiển thị.
+ */
+export interface ServiceSlotCandidateItemResponse {
+  startTime: string;
+  endTime: string;
+  startAt: string;
+  endAt: string;
+  pendingCount: number;
+  remainingPendingQuota: number;
+  /** Chỉ cho chọn khi `true` */
+  isSelectable: boolean;
+  reasonIfBlocked: string | null;
+  blockedByAcceptedBooking: boolean;
+  blockingBookingId: string | null;
+  blockingServiceId: string | null;
+  blockingServiceTitle: string | null;
+  blockedBySameService: boolean;
+  blockedByDifferentService: boolean;
+  bookingConflictNote: string | null;
+}
+
+/** `mentor/dto/response/ServiceSlotCandidatesResponse.java` */
+export interface ServiceSlotCandidatesResponse {
+  slotId: string;
+  serviceId: string;
+  serviceDurationMinutes: number;
+  candidateServiceSlots: ServiceSlotCandidateItemResponse[];
+}
+
+/** `booking/dto/request/BookingQuoteRequest.java` */
+export interface BookingQuoteRequest {
+  slotId: string;
+  serviceId: string;
+  /** Lấy NGUYÊN `candidate.startAt` */
+  startAt: string;
+}
+
+/** `booking/port/BookingPricingEstimate.java` */
+export interface BookingPricingEstimate {
+  pricingVersion: string;
+  calculatedAt: string;
+  serviceId: string;
+  priceScoin: number | null;
+  priceBeforeCampaignScoin: number | null;
+  campaignDiscountScoin: number | null;
+  estimatedPayableScoin: number | null;
+  campaignName: string | null;
+  isEstimate: boolean;
+  disclaimer: string | null;
+}
+
+/**
+ * `booking/dto/response/BookingQuoteResponse.java` — báo giá, CHƯA giữ chỗ.
+ *
+ * `scheduledStartAt`/`scheduledEndAt`/`pendingExpireAt` là `OffsetDateTime`, lên
+ * dây CÓ offset. Đọc bằng `core/time/offsetDateTime.ts`.
+ */
+export interface BookingQuoteResponse {
+  slotId: string;
+  serviceId: string;
+  serviceTitle: string;
+  durationMinutes: number;
+  scheduledStartAt: string;
+  scheduledEndAt: string;
+  pendingExpireAt: string | null;
+  paymentWindowMinutes: number;
+  paymentPreparationBufferMinutes: number;
+  pricing: BookingPricingEstimate;
+  cancellationRefundPolicy: BookingCancellationRefundPolicyResponse;
+  isEstimate: boolean;
+  disclaimer: string | null;
+}
+
+/** `booking/dto/request/CreateBookingRequest.java` */
+export interface CreateBookingRequest {
+  slotId: string;
+  serviceId: string;
+  startAt: string;
+  /** `@NotBlank`, tối đa 200 ký tự */
+  learningGoalTitle: string;
+  /** Tối đa 2000 ký tự, có thể bỏ */
+  learningGoalDescription?: string;
+}
+
+/** Giới hạn `@Size(max = 200)` của `CreateBookingRequest.learningGoalTitle` */
+export const MUC_TIEU_TIEU_DE_TOI_DA = 200;
+
+/** Giới hạn `@Size(max = 2000)` của `CreateBookingRequest.learningGoalDescription` */
+export const MUC_TIEU_MO_TA_TOI_DA = 2000;

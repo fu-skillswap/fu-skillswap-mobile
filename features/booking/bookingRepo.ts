@@ -37,10 +37,15 @@ import { apiClient } from '@/core/api/client';
 import { idempotencyHeaders } from '@/core/api/idempotency';
 import type { PageResponse } from '@/core/api/pagination';
 import type {
+  BookingQuoteRequest,
+  BookingQuoteResponse,
   BookingResponse,
   BookingStatus,
   BookingViewRole,
   CancelBookingRequest,
+  CreateBookingRequest,
+  MentorAvailabilitySlotResponse,
+  ServiceSlotCandidatesResponse,
 } from '@/features/booking/types';
 
 /** Tham số của `GET /api/me/bookings` (`dto/request/BookingListRequest.java`) */
@@ -138,6 +143,43 @@ export const bookingRepo = {
     return apiClient<BookingResponse>(`/api/me/bookings/${bookingId}/check-in`, {
       method: 'POST',
       headers: idempotencyHeaders(idempotencyKey),
+    });
+  },
+
+  /**
+   * Parent slot đang mở của một mentor trong khoảng ngày (cần đăng nhập).
+   * `fromDate`/`toDate` là `LocalDate` `"2026-10-05"`; bỏ trống thì backend tự lấy
+   * thứ Hai tuần này tới Chủ nhật tuần sau.
+   */
+  getAvailabilitySlots(mentorUserId: string, fromDate: string, toDate: string) {
+    return apiClient<MentorAvailabilitySlotResponse[]>(
+      `/api/mentors/${mentorUserId}/availability-slots`,
+      { params: cleanParams({ fromDate, toDate }) },
+    );
+  },
+
+  /** Khung giờ chính xác của MỘT dịch vụ trong MỘT parent slot */
+  getSlotCandidates(mentorUserId: string, slotId: string, serviceId: string) {
+    return apiClient<ServiceSlotCandidatesResponse>(
+      `/api/mentors/${mentorUserId}/availability-slots/${slotId}/candidates`,
+      { params: { serviceId } },
+    );
+  },
+
+  /** Báo giá tạm tính — POST nhưng chỉ đọc, KHÔNG giữ chỗ và không cần Idempotency-Key */
+  quoteBooking(input: BookingQuoteRequest) {
+    return apiClient<BookingQuoteResponse>('/api/bookings/quote', {
+      method: 'POST',
+      body: input,
+    });
+  },
+
+  /** Tạo yêu cầu đặt lịch. Backend bắt buộc `Idempotency-Key`. */
+  createBooking(input: CreateBookingRequest, idempotencyKey: string) {
+    return apiClient<BookingResponse>('/api/bookings', {
+      method: 'POST',
+      headers: idempotencyHeaders(idempotencyKey),
+      body: input,
     });
   },
 };

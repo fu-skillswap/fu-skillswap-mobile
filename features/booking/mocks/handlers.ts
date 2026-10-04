@@ -55,7 +55,14 @@ import { getEnv } from '@/core/config/env';
 import { jsonMock } from '@/core/dev/jsonMock';
 import { MOCK_USER } from '@/core/auth/mocks/handlers';
 import { taoBooking } from '@/features/booking/mocks/bookingFixture';
-import type { BookingResponse } from '@/features/booking/types';
+import {
+  docSlotId,
+  taoBaoGia,
+  taoKhungGio,
+  taoLichRanh,
+} from '@/features/booking/mocks/datLichFixture';
+import { MOCK_MENTOR_DETAILS } from '@/features/mentor/mocks/handlers';
+import type { BookingResponse, CreateBookingRequest } from '@/features/booking/types';
 
 const base = getEnv().apiUrl;
 
@@ -807,5 +814,95 @@ export const bookingMockHandlers = [
     );
 
     return jsonMock(envelope(daCheckIn));
+  }),
+
+  /**
+   * Lịch rảnh của mentor — sinh theo đồng hồ thật, xem `datLichFixture.ts`.
+   *
+   * PHẢI đăng ký ở đây (trong `bookingMockHandlers`) chứ không cạnh
+   * `/api/mentors/:mentorUserId`: MSW so khớp theo thứ tự, và hai đường dẫn này
+   * dài hơn nên không bị route kia nuốt — nhưng giữ chúng chung một chỗ với luồng
+   * đặt lịch thì người sửa không phải đi tìm.
+   */
+  http.get(`${base}/api/mentors/:mentorUserId/availability-slots`, ({ params, request }) => {
+    const mentorUserId = String(params.mentorUserId);
+    if (!MOCK_MENTOR_DETAILS[mentorUserId]) {
+      return loi(404, 'SYS_0003', 'Không tìm thấy mentor');
+    }
+    const sp = new URL(request.url).searchParams;
+    return jsonMock(envelope(taoLichRanh(mentorUserId, sp.get('fromDate'), sp.get('toDate'))));
+  }),
+
+  http.get(
+    `${base}/api/mentors/:mentorUserId/availability-slots/:slotId/candidates`,
+    ({ params, request }) => {
+      const serviceId = new URL(request.url).searchParams.get('serviceId') ?? '';
+      const khung = taoKhungGio(String(params.slotId), serviceId);
+      if (!khung) {
+        return loi(404, 'SYS_0003', 'Không tìm thấy khung giờ hoặc dịch vụ');
+      }
+      return jsonMock(envelope(khung));
+    },
+  ),
+
+  /** Báo giá — 409 khi khung giờ không còn chọn được, đúng như backend */
+  http.post(`${base}/api/bookings/quote`, async ({ request }) => {
+    const body = (await request.json()) as { slotId?: string; serviceId?: string; startAt?: string };
+    const baoGia = taoBaoGia(body.slotId ?? '', body.serviceId ?? '', body.startAt ?? '');
+    if (!baoGia) {
+      return loi(409, 'BOOK_4091', 'Khung giờ vừa thay đổi, vui lòng chọn lại');
+    }
+    return jsonMock(envelope(baoGia));
+  }),
+
+  /**
+   * Tạo yêu cầu đặt lịch. Booking mới vào ĐẦU danh sách mentee ở trạng thái
+   * `REQUESTED`, để tab Lịch hẹn tải lại thấy ngay buổi vừa đặt.
+   */
+  http.post(`${base}/api/bookings`, async ({ request }) => {
+    const khoa = request.headers.get('Idempotency-Key');
+    if (khoa === null || !KHUON_KHOA.test(khoa)) {
+      return loi(400, 'SYS_0002', 'IDEMPOTENCY_KEY_REQUIRED');
+    }
+    const body = (await request.json()) as Partial<CreateBookingRequest>;
+    if (!body.learningGoalTitle || body.learningGoalTitle.trim() === '') {
+      return loi(400, 'SYS_0001', 'learningGoalTitle không được để trống');
+    }
+    const baoGia = taoBaoGia(body.slotId ?? '', body.serviceId ?? '', body.startAt ?? '');
+    const slot = docSlotId(body.slotId ?? '');
+    const hoSo = slot ? MOCK_MENTOR_DETAILS[slot.mentorUserId] : undefined;
+    if (!baoGia || !hoSo) {
+      return loi(409, 'BOOK_4091', 'Khung giờ vừa thay đổi, vui lòng chọn lại');
+    }
+
+    const bookingId = `b-moi-${MOCK_BOOKINGS.length + 1}`;
+    const moi = taoBooking({
+      bookingId,
+      mentorUserId: hoSo.identity.mentorUserId,
+      mentorDisplayName: hoSo.identity.displayName,
+      availabilitySlotId: baoGia.slotId,
+      serviceId: baoGia.serviceId,
+      serviceTitle: baoGia.serviceTitle,
+      serviceDurationSnapshot: baoGia.durationMinutes,
+      serviceIsFreeSnapshot: baoGia.pricing.estimatedPayableScoin === 0,
+      servicePriceScoinSnapshot: baoGia.pricing.priceScoin,
+      servicePriceWithSurchargeScoin: baoGia.pricing.estimatedPayableScoin,
+      learningGoalTitle: body.learningGoalTitle.trim(),
+      learningGoalDescription: body.learningGoalDescription?.trim() || null,
+      status: 'PENDING',
+      sessionStatus: 'PENDING',
+      bookingStatus: 'REQUESTED',
+      paymentStatus: baoGia.pricing.estimatedPayableScoin === 0 ? 'NOT_REQUIRED' : 'PENDING',
+      displayState: 'PENDING_MENTOR_RESPONSE',
+      nextAction: 'NONE',
+      selectedStartTime: baoGia.scheduledStartAt,
+      selectedEndTime: baoGia.scheduledEndAt,
+      pendingExpireAt: baoGia.pendingExpireAt,
+      canCancel: true,
+      canJoin: false,
+      canPay: false,
+    });
+    MOCK_BOOKINGS = [moi, ...MOCK_BOOKINGS];
+    return jsonMock({ ...envelope(moi), status: 201, code: 'SUCCESS_0201' }, { status: 201 });
   }),
 ];

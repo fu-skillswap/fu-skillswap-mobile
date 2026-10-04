@@ -4,20 +4,19 @@
  * cao 210 với nút back tròn 44, card trắng đè lên dải đó mang avatar 84 và ba ô
  * chỉ số, rồi ba tab Giới thiệu · Dịch vụ · Đánh giá.
  *
+ * CTA "Đặt lịch · <giá>" ở thanh dưới mở bước chọn lịch với dịch vụ đầu tiên;
+ * chạm vào từng thẻ dịch vụ thì mở với đúng dịch vụ đó. Cả hai chỉ hiện khi
+ * `availability.canRequestBooking` — backend nói mentor đang nhận lịch.
+ *
  * Danh sách đánh giá là `data` của MỘT `FlatList`; toàn bộ phần hồ sơ và nội dung
  * hai tab còn lại nằm trong `ListHeaderComponent`. Cùng khuôn `PostDetailScreen`:
  * mentor có nhiều đánh giá vẫn cuộn được mà không lồng hai danh sách cuộn.
  *
  * ## Những gì thiết kế có mà màn này CỐ Ý KHÔNG dựng
  *
- * - **CTA "Đặt lịch · 150.000 S-coins"** ở thanh dưới cùng. Màn `Booking` chưa
- *   dựng — chọn khung giờ, báo giá và thanh toán thuộc đợt sau. Dịch vụ vẫn hiện
- *   đủ giá và thời lượng, nhưng dưới dạng thẻ TĨNH, và không có nút nào mời người
- *   dùng chạm. Một nút không đi đâu là nút chết, thứ repo này đã phải phá bỏ hai
- *   lần.
- * - **Nút nhắn tin** cạnh CTA đó: màn `ChatDetail` chưa dựng. Vì cả hai nút của
- *   thanh dưới đều bị bỏ, thanh dưới không được dựng — một `BottomBar` rỗng chỉ
- *   ăn mất 96px cuối màn hình.
+ * - **Nút nhắn tin** cạnh CTA "Đặt lịch": backend chỉ mở phòng chat khi đã có
+ *   booking đủ điều kiện (`realtime-chat-notification.md`), không có đường nhắn
+ *   cho một mentor chưa từng đặt. Thanh dưới chỉ có CTA đặt lịch.
  * - **Nút "Lưu mentor"** và **"Chia sẻ"** ở góc phải dải nền. Backend không có
  *   endpoint lưu mentor nào, và không có URL công khai nào của hồ sơ mentor để
  *   chia sẻ.
@@ -41,6 +40,8 @@ import { Screen } from '@/core/ui/Screen';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
 import type { SegmentedItem } from '@/core/ui/SegmentedControl';
 import { Avatar } from '@/core/ui/Avatar';
+import { BottomBar } from '@/core/ui/BottomBar';
+import { Button } from '@/core/ui/Button';
 import { StatusBadge } from '@/core/ui/StatusBadge';
 import { colors, fonts, radius, shadows, spacing } from '@/core/ui/theme';
 import { MentorRating } from '@/features/mentor/components/MentorRating';
@@ -49,6 +50,7 @@ import { MentorServiceCard } from '@/features/mentor/components/MentorServiceCar
 import { SupportLevelBadges } from '@/features/mentor/components/SupportLevelBadges';
 import { useMentor, useMentorReviews } from '@/features/mentor/hooks/useMentorQueries';
 import { moTaDiemDanhGia } from '@/features/mentor/rating';
+import { moTaGiaDichVu } from '@/features/mentor/serviceDisplay';
 import type { MentorDiscoveryDetailResponse } from '@/features/mentor/types';
 
 /** Ba tab của thiết kế, đúng thứ tự và đúng chữ */
@@ -208,6 +210,13 @@ export function MentorDetailScreen({ mentorUserId }: MentorDetailScreenProps) {
   */
   const dichVuDangMo = hoSo.services.filter((dv) => dv.isActive);
   const hocVan = hoSo.evidence.education;
+  const nhanLich = hoSo.availability.canRequestBooking && dichVuDangMo.length > 0;
+  const datLich = (serviceId: string) =>
+    router.push({
+      pathname: '/booking/[mentorUserId]',
+      params: { mentorUserId: hoSo.identity.mentorUserId, serviceId },
+    });
+  const giaDauTien = dichVuDangMo[0] ? moTaGiaDichVu(dichVuDangMo[0]) : null;
 
   return (
     <Screen testID="man-hinh-ho-so-mentor">
@@ -371,7 +380,13 @@ export function MentorDetailScreen({ mentorUserId }: MentorDetailScreenProps) {
             {tab === 'dich-vu' ? (
               <View className="gap-3">
                 {dichVuDangMo.length > 0 ? (
-                  dichVuDangMo.map((dv) => <MentorServiceCard key={dv.serviceId} service={dv} />)
+                  dichVuDangMo.map((dv) => (
+                    <MentorServiceCard
+                      key={dv.serviceId}
+                      service={dv}
+                      onDatLich={nhanLich ? () => datLich(dv.serviceId) : undefined}
+                    />
+                  ))
                 ) : (
                   <Text
                     testID="chua-mo-dich-vu"
@@ -381,17 +396,14 @@ export function MentorDetailScreen({ mentorUserId }: MentorDetailScreenProps) {
                     Mentor chưa mở dịch vụ nào.
                   </Text>
                 )}
-                {/*
-                  Nói thẳng là chưa đặt được, thay vì để một danh sách giá trông
-                  như sắp bấm được rồi không có nút nào. Xem JSDoc đầu file.
-                */}
-                {dichVuDangMo.length > 0 ? (
+                {dichVuDangMo.length > 0 && !nhanLich ? (
                   <Text
+                    testID="tam-ngung-nhan-lich"
                     className="text-caption text-ink-muted"
                     style={{ fontFamily: fonts.regular, lineHeight: 18 }}
                   >
-                    Việc đặt lịch trên ứng dụng đang được hoàn thiện. Hiện bạn xem được giá và
-                    thời lượng của từng dịch vụ.
+                    Mentor đang tạm ngưng nhận lịch. Bạn vẫn xem được giá và thời lượng của từng
+                    dịch vụ.
                   </Text>
                 ) : null}
               </View>
@@ -437,6 +449,24 @@ export function MentorDetailScreen({ mentorUserId }: MentorDetailScreenProps) {
           )
         }
       />
+      {nhanLich ? (
+        <BottomBar
+          primary={
+            <Button
+              label={
+                giaDauTien?.so
+                  ? `Đặt lịch · ${giaDauTien.so} S-coins`
+                  : giaDauTien?.nhan === 'Miễn phí'
+                    ? 'Đặt lịch · Miễn phí'
+                    : 'Đặt lịch'
+              }
+              size="md"
+              onPress={() => datLich(dichVuDangMo[0].serviceId)}
+              testID="nut-dat-lich"
+            />
+          }
+        />
+      ) : null}
     </Screen>
   );
 }

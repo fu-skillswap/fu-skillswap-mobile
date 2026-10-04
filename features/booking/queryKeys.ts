@@ -34,4 +34,13 @@ export const bookingKeys = {
   countsAll: () => [...bookingKeys.all, 'count'] as const,
   /** Số lượng booking khớp một bộ lọc (đọc `totalElements`, không đọc `content`) */
   count: (filters: BoLocLichHen) => [...bookingKeys.countsAll(), filters] as const,
+  /** Lịch rảnh của mentor theo khoảng ngày */
+  slots: (mentorUserId: string, fromDate: string, toDate: string) =>
+    [...bookingKeys.all, 'slots', mentorUserId, fromDate, toDate] as const,
+  /** Khung giờ chính xác của một dịch vụ trong một slot */
+  candidates: (mentorUserId: string, slotId: string, serviceId: string) =>
+    [...bookingKeys.all, 'candidates', mentorUserId, slotId, serviceId] as const,
+  /** Báo giá của đúng một bộ (slot, dịch vụ, giờ bắt đầu) */
+  quote: (slotId: string, serviceId: string, startAt: string) =>
+    [...bookingKeys.all, 'quote', slotId, serviceId, startAt] as const,
 };

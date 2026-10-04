@@ -10,3 +10,10 @@
 
 export { MentorDetailScreen } from '@/features/mentor/screens/MentorDetailScreen';
 export { MentorDiscoveryScreen } from '@/features/mentor/screens/MentorDiscoveryScreen';
+
+// Luồng đặt lịch (`features/booking`) cần hồ sơ mentor để biết tên và dịch vụ,
+// và phải in giá đúng một cách với màn hồ sơ — nên đọc qua barrel, không dựng
+// bản thứ hai.
+export { useMentor } from '@/features/mentor/hooks/useMentorQueries';
+export { moTaGiaDichVu, moTaThoiLuong } from '@/features/mentor/serviceDisplay';
+export type { MentorDiscoveryDetailResponse, MentorServiceResponse } from '@/features/mentor/types';

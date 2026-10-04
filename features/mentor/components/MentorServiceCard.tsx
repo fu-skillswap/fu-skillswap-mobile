@@ -15,8 +15,8 @@
  * giá" và "chưa có giá". Đừng nội suy `priceScoin` ở đây.
  */
 
-import { Clock, FileText } from 'lucide-react-native';
-import { Text, View } from 'react-native';
+import { ChevronRight, Clock, FileText } from 'lucide-react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { colors, fonts, radius, spacing } from '@/core/ui/theme';
 import { moTaGiaDichVu, moTaThoiLuong } from '@/features/mentor/serviceDisplay';
@@ -24,17 +24,18 @@ import type { MentorServiceResponse } from '@/features/mentor/types';
 
 export interface MentorServiceCardProps {
   service: MentorServiceResponse;
+  /**
+   * Có thì cả thẻ thành nút "Đặt lịch dịch vụ này" và hiện dòng "Đặt lịch ›".
+   * Không truyền khi mentor không nhận lịch — thẻ tĩnh, không mời chạm.
+   */
+  onDatLich?: () => void;
 }
 
-export function MentorServiceCard({ service }: MentorServiceCardProps) {
+export function MentorServiceCard({ service, onDatLich }: MentorServiceCardProps) {
   const gia = moTaGiaDichVu(service);
 
-  return (
-    <View
-      testID={`dich-vu-${service.serviceId}`}
-      className="flex-row gap-3 rounded-lg border border-line bg-surface"
-      style={{ padding: spacing.card }}
-    >
+  const noiDung = (
+    <>
       <View
         className="shrink-0 items-center justify-center bg-surface-tint"
         style={{ width: spacing.touch, height: spacing.touch, borderRadius: radius.md }}
@@ -69,6 +70,14 @@ export function MentorServiceCard({ service }: MentorServiceCardProps) {
             Giữ chat sau buổi học
           </Text>
         ) : null}
+        {onDatLich ? (
+          <View className="flex-row items-center pt-1" style={{ gap: 2 }}>
+            <Text className="text-caption-lg text-accent" style={{ fontFamily: fonts.bold }}>
+              Đặt lịch
+            </Text>
+            <ChevronRight size={16} color={colors.accent} strokeWidth={2.4} />
+          </View>
+        ) : null}
       </View>
 
       <View className="shrink-0 items-end">
@@ -98,6 +107,28 @@ export function MentorServiceCard({ service }: MentorServiceCardProps) {
           </Text>
         )}
       </View>
-    </View>
+    </>
+  );
+
+  const lop = 'flex-row gap-3 rounded-lg border border-line bg-surface';
+  if (!onDatLich) {
+    return (
+      <View testID={`dich-vu-${service.serviceId}`} className={lop} style={{ padding: spacing.card }}>
+        {noiDung}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      testID={`dich-vu-${service.serviceId}`}
+      accessibilityRole="button"
+      accessibilityLabel={`Đặt lịch ${service.title}`}
+      onPress={onDatLich}
+      className={lop}
+      style={{ padding: spacing.card }}
+    >
+      {noiDung}
+    </Pressable>
   );
 }
