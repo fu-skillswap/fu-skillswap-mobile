@@ -13,5 +13,10 @@ export { BookingConfirmScreen } from '@/features/booking/screens/BookingConfirmS
 export { BookingSlotScreen } from '@/features/booking/screens/BookingSlotScreen';
 export { MentorBookingsScreen } from '@/features/booking/screens/MentorBookingsScreen';
 export { MyBookingsScreen } from '@/features/booking/screens/MyBookingsScreen';
-export { useMentorBookingCount, useMentorBookings } from '@/features/booking/hooks/useBookingQueries';
+export {
+  useBookingDetail,
+  useMentorBookingCount,
+  useMentorBookings,
+} from '@/features/booking/hooks/useBookingQueries';
+export { nhanTrangThaiBooking } from '@/features/booking/bookingStatus';
 export type { BookingResponse, BookingStatus } from '@/features/booking/types';

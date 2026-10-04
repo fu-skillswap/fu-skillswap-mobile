@@ -15,7 +15,7 @@ import { Text, View } from 'react-native';
 import { fonts, radius } from '@/core/ui/theme';
 
 /** Cỡ avatar hợp lệ, tính bằng px — đúng sáu cỡ thiết kế dùng */
-export type AvatarSize = 40 | 44 | 52 | 56 | 64 | 84;
+export type AvatarSize = 32 | 36 | 40 | 44 | 48 | 52 | 56 | 64 | 84;
 
 export interface AvatarProps {
   /** Tên đầy đủ; component tự rút chữ cái đầu */
@@ -28,7 +28,17 @@ export interface AvatarProps {
   testID?: string;
 }
 
-const CO_CHU: Record<AvatarSize, number> = { 40: 14, 44: 15, 52: 17, 56: 18, 64: 22, 84: 28 };
+const CO_CHU: Record<AvatarSize, number> = {
+  32: 12,
+  36: 12,
+  40: 14,
+  44: 15,
+  48: 15,
+  52: 17,
+  56: 18,
+  64: 22,
+  84: 28,
+};
 
 /**
  * Rút tối đa hai chữ cái đầu từ tên.

@@ -205,6 +205,7 @@ export function MyBookingsScreen() {
               onVaoPhongHoc={vaoPhongHoc}
               onHuyLich={setDangHuy}
               onXemMentor={(mentorUserId) => router.push(`/mentor/${mentorUserId}`)}
+              onNhanTin={(conversationId) => router.push(`/chat/${conversationId}`)}
             />
           )}
           // `grow` để EmptyState (flex-1) căn giữa được theo chiều dọc; lề và gap

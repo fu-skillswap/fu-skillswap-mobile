@@ -39,13 +39,14 @@
  *   hiện để người dùng biết phải sang web.
  */
 
-import { CalendarDays, Clock, MapPin } from 'lucide-react-native';
+import { CalendarDays, Clock, MapPin, MessageSquare } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 
 import { dinhDangKhoangGio, nhanNgayNgan } from '@/core/time/offsetDateTime';
 import { Avatar } from '@/core/ui/Avatar';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
+import { IconButton } from '@/core/ui/IconButton';
 import { StatusBadge } from '@/core/ui/StatusBadge';
 import { colors, fonts, radius } from '@/core/ui/theme';
 import { nhanTrangThaiBooking } from '@/features/booking/bookingStatus';
@@ -57,6 +58,11 @@ export interface BookingCardProps {
   onVaoPhongHoc: (booking: BookingResponse) => void;
   onHuyLich: (booking: BookingResponse) => void;
   onXemMentor: (mentorUserId: string) => void;
+  /**
+   * Mở phòng chat của buổi học. Nút chỉ hiện khi booking có `conversationId` —
+   * backend chỉ tạo phòng chat khi mentor đã chấp nhận.
+   */
+  onNhanTin?: (conversationId: string) => void;
 }
 
 export function BookingCard({
@@ -64,8 +70,10 @@ export function BookingCard({
   onVaoPhongHoc,
   onHuyLich,
   onXemMentor,
+  onNhanTin,
 }: BookingCardProps) {
   const trangThai = nhanTrangThaiBooking(booking);
+  const coChat = !!booking.conversationId && !!onNhanTin;
   // `mentorDisplayName` là `null` khi mapper của backend không tra được user —
   // thẻ vẫn phải đọc được, nên có một tên thay thế thay vì một khoảng trống.
   const tenMentor = booking.mentorDisplayName ?? 'Mentor';
@@ -163,7 +171,7 @@ export function BookingCard({
           </View>
         ) : null}
 
-        {hienVaoPhongHoc || booking.canCancel || hienXemMentor ? (
+        {hienVaoPhongHoc || booking.canCancel || hienXemMentor || coChat ? (
           <View className="flex-row gap-2">
             {hienVaoPhongHoc ? (
               <View className="flex-1">
@@ -196,6 +204,15 @@ export function BookingCard({
                   testID={`nut-xem-mentor-${booking.bookingId}`}
                 />
               </View>
+            ) : null}
+            {coChat && booking.conversationId ? (
+              <IconButton
+                label="Nhắn tin cho mentor"
+                icon={<MessageSquare size={20} color={colors.accent} strokeWidth={2} />}
+                onPress={() => onNhanTin?.(booking.conversationId ?? '')}
+                variant="tint"
+                testID={`nut-nhan-tin-${booking.bookingId}`}
+              />
             ) : null}
           </View>
         ) : null}

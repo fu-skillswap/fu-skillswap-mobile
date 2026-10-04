@@ -114,3 +114,16 @@ export function useMentorBookingCount(status: BookingStatus) {
 
   return { ...query, soLuong: query.data?.totalElements ?? null };
 }
+
+/**
+ * Chi tiết một booking. `bookingId` rỗng (route chưa có tham số, hội thoại không
+ * gắn booking) thì không gọi gì.
+ */
+export function useBookingDetail(bookingId: string | null | undefined) {
+  return useQuery({
+    queryKey: bookingKeys.detail(bookingId ?? ''),
+    queryFn: () => bookingRepo.getBooking(bookingId ?? ''),
+    enabled: !!bookingId,
+    staleTime: 15_000,
+  });
+}

@@ -182,4 +182,9 @@ export const bookingRepo = {
       body: input,
     });
   },
+
+  /** Chi tiết một booking — người gọi phải là mentee HOẶC mentor của nó */
+  getBooking(bookingId: string) {
+    return apiClient<BookingResponse>(`/api/me/bookings/${bookingId}`);
+  },
 };

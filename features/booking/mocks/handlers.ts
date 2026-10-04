@@ -113,6 +113,7 @@ function layTrang<T>(tatCa: T[], page: number, size: number): PageResponse<T> {
 let MOCK_BOOKINGS: BookingResponse[] = [
   taoBooking({
     bookingId: 'b1',
+    conversationId: 'c1',
     mentorUserId: 'm1',
     mentorDisplayName: 'Trần Minh Quân',
     serviceTitle: 'Mock interview System Design',
@@ -131,6 +132,7 @@ let MOCK_BOOKINGS: BookingResponse[] = [
   }),
   taoBooking({
     bookingId: 'b2',
+    conversationId: 'c2',
     mentorUserId: 'm2',
     mentorDisplayName: 'Lê Thu Hà',
     serviceTitle: 'Review CV 1:1',

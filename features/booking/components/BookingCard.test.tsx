@@ -8,11 +8,13 @@ import type { BookingResponse } from '@/features/booking/types';
 const vaoPhongHoc = jest.fn();
 const huyLich = jest.fn();
 const xemMentor = jest.fn();
+const nhanTin = jest.fn();
 
 beforeEach(() => {
   vaoPhongHoc.mockClear();
   huyLich.mockClear();
   xemMentor.mockClear();
+  nhanTin.mockClear();
 });
 
 /** `render` của RNTL 14 là HÀM ASYNC — phải await, nếu không act scope rò ra. */
@@ -23,11 +25,26 @@ async function renderCard(ghiDe: Partial<BookingResponse> = {}) {
       onVaoPhongHoc={vaoPhongHoc}
       onHuyLich={huyLich}
       onXemMentor={xemMentor}
+      onNhanTin={nhanTin}
     />,
   );
 }
 
 describe('BookingCard', () => {
+  it('có phòng chat thì hiện nút nhắn tin và mở đúng hội thoại', async () => {
+    await renderCard({ bookingId: 'b9', conversationId: 'c9' });
+
+    await fireEvent.press(screen.getByTestId('nut-nhan-tin-b9'));
+
+    expect(nhanTin).toHaveBeenCalledWith('c9');
+  });
+
+  it('chưa có phòng chat (mentor chưa chấp nhận) thì KHÔNG có nút nhắn tin', async () => {
+    await renderCard({ bookingId: 'b9', conversationId: null });
+
+    expect(screen.queryByTestId('nut-nhan-tin-b9')).toBeNull();
+  });
+
   it('hiện tên mentor, tên dịch vụ, nhãn trạng thái và mốc thời gian', async () => {
     await renderCard();
 
