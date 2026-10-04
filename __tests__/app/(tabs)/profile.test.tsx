@@ -51,6 +51,47 @@ jest.mock('@/core/auth/AuthProvider', () => ({
 let mockMatMang = false;
 jest.mock('@/core/net/onlineStatus', () => ({ useIsOffline: () => mockMatMang }));
 
+/**
+ * Spy điều hướng phải dựng BÊN TRONG factory rồi lấy ra qua `requireMock`.
+ *
+ * `useRouter: () => ({ replace: jest.fn() })` tạo một hàm giả MỚI mỗi lần
+ * component gọi `useRouter()`, nên không có spy nào giữ lại được để assert. Và
+ * không thể tham chiếu một `const` ngoài factory: Jest hoist `jest.mock` lên trên
+ * mọi khai báo.
+ *
+ * Phải mock cả package vì `expo-router` kéo theo `standard-navigation`, một
+ * module ESM nằm ngoài `transformIgnorePatterns` của repo.
+ */
+jest.mock('expo-router', () => {
+  const replace = jest.fn();
+  const push = jest.fn();
+  return { useRouter: () => ({ replace, push }), __mockReplace: replace, __mockPush: push };
+});
+
+const { __mockReplace: mockReplace, __mockPush: mockPush } = jest.requireMock<{
+  __mockReplace: jest.Mock;
+  __mockPush: jest.Mock;
+}>('expo-router');
+
+/**
+ * Chế độ vai trò: mock ở biên CONTEXT chứ không mock `expo-secure-store`.
+ *
+ * Màn này chỉ đọc `cheDoKhaDung` và gọi `chuyenCheDo` — việc lựa chọn được lưu
+ * thế nào là trách nhiệm của `RoleModeProvider`, và nó đã có test riêng ở
+ * `core/roleMode/RoleModeProvider.test.tsx`. Mock ở đây để test màn hình không
+ * phải dựng keystore giả.
+ */
+let mockCheDoKhaDung: ('MENTEE' | 'MENTOR')[] = ['MENTEE', 'MENTOR'];
+const mockChuyenCheDo = jest.fn();
+jest.mock('@/core/roleMode/RoleModeProvider', () => ({
+  useRoleMode: () => ({
+    cheDo: 'MENTEE',
+    cheDoKhaDung: mockCheDoKhaDung,
+    dangTai: false,
+    chuyenCheDo: mockChuyenCheDo,
+  }),
+}));
+
 function envelope(data: unknown) {
   return { timestamp: '2026-09-30T00:00:00Z', status: 200, code: 'SUCCESS', message: 'OK', data };
 }
@@ -110,6 +151,10 @@ beforeEach(() => {
   mockMatMang = false;
   mockSignOut.mockClear();
   mockSignOut.mockResolvedValue(undefined);
+  mockCheDoKhaDung = ['MENTEE', 'MENTOR'];
+  mockChuyenCheDo.mockClear();
+  mockReplace.mockClear();
+  mockPush.mockClear();
 });
 afterEach(() => {
   queryClient.clear();
@@ -311,5 +356,87 @@ describe('ProfileScreen', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(screen.getByText('Nguyễn Văn A')).toBeTruthy();
+  });
+});
+
+describe('ProfileScreen — lối chuyển sang chế độ Mentor', () => {
+  it('tài khoản hai vai thấy card chuyển sang chế độ Mentor', async () => {
+    mockCheDoKhaDung = ['MENTEE', 'MENTOR'];
+    server.use(hoSoOk());
+
+    await renderScreen();
+    await doiHoSoXong();
+
+    expect(screen.getByTestId('nut-chuyen-sang-mentor')).toBeTruthy();
+    expect(screen.getByText('Chuyển sang chế độ Mentor')).toBeTruthy();
+  });
+
+  it('bấm card thì ĐỔI chế độ VÀ điều hướng sang tab đầu của thanh Mentor', async () => {
+    // Hai vế đều cần. Chỉ đổi chế độ mà không điều hướng sẽ để người dùng đứng
+    // trên màn Hồ sơ — một màn vừa bị ẩn khỏi thanh tab (`href: null`) nên không
+    // tab nào sáng và không có cách nào đoán phải bấm đâu.
+    mockCheDoKhaDung = ['MENTEE', 'MENTOR'];
+    server.use(hoSoOk());
+
+    await renderScreen();
+    await doiHoSoXong();
+
+    await fireEvent.press(screen.getByTestId('nut-chuyen-sang-mentor'));
+
+    expect(mockChuyenCheDo).toHaveBeenCalledWith('MENTOR');
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/mentor-dashboard');
+  });
+
+  it('điều hướng bằng replace, KHÔNG phải push', async () => {
+    // `push` giữ lại stack của thanh tab vừa rời đi, nên nút back của Android sẽ
+    // mang người dùng trở về một màn hình của chế độ họ vừa thoát ra.
+    mockCheDoKhaDung = ['MENTEE', 'MENTOR'];
+    server.use(hoSoOk());
+
+    await renderScreen();
+    await doiHoSoXong();
+
+    await fireEvent.press(screen.getByTestId('nut-chuyen-sang-mentor'));
+
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('mentee THUẦN KHÔNG thấy card đó', async () => {
+    // Với người chưa là mentor, nút đó sẽ đưa họ sang một thanh tab mà
+    // `quyCheDoVaiTro()` lập tức lùi về — một nút không làm gì cả.
+    mockCheDoKhaDung = ['MENTEE'];
+    server.use(hoSoOk());
+
+    await renderScreen();
+    await doiHoSoXong();
+
+    expect(screen.queryByTestId('nut-chuyen-sang-mentor')).toBeNull();
+  });
+
+  it('KHÔNG dựng lối "Trở thành Mentor" — màn đăng ký mentor chưa có', async () => {
+    // TEST CANH — đừng xoá. `MentorRegistration.dc.html` là màn 6 bước mà repo
+    // chưa có; một card dẫn tới đó là nút chết. Khi dựng xong thì xoá dòng canh
+    // VÀ thêm card, đừng chỉ xoá dòng canh.
+    mockCheDoKhaDung = ['MENTEE'];
+    server.use(hoSoOk());
+
+    await renderScreen();
+    await doiHoSoXong();
+
+    expect(screen.queryByText('Trở thành Mentor')).toBeNull();
+  });
+
+  it('KHÔNG dựng lối nạp S-coins nào', async () => {
+    // TEST CANH — mục 4.1 của quy ước: bản mobile là consumption-only, và chính
+    // lối nạp là thứ làm app bị gỡ khỏi Play.
+    mockCheDoKhaDung = ['MENTEE', 'MENTOR'];
+    server.use(hoSoOk());
+
+    await renderScreen();
+    await doiHoSoXong();
+
+    expect(screen.queryByText('Nạp')).toBeNull();
+    expect(screen.queryByText('Thêm S-coins')).toBeNull();
+    expect(screen.queryByText('VÍ S-COINS')).toBeNull();
   });
 });

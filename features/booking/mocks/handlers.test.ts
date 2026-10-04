@@ -15,6 +15,7 @@ import { __resetApiClientForTests, apiClient } from '@/core/api/client';
 import { ApiClientError } from '@/core/api/errors';
 import { getNextPageNumber } from '@/core/api/pagination';
 import { docOffsetDateTime } from '@/core/time/offsetDateTime';
+import { MOCK_USER } from '@/core/auth/mocks/handlers';
 import { bookingRepo } from '@/features/booking/bookingRepo';
 import { nhanTrangThaiBooking } from '@/features/booking/bookingStatus';
 import { bookingMockHandlers } from '@/features/booking/mocks/handlers';
@@ -288,3 +289,187 @@ async function huyVoiKhoa(
     (e: unknown) => e,
   );
 }
+
+describe('handler mock của nhánh booking — góc nhìn MENTOR', () => {
+  /** Lấy toàn bộ danh sách phía mentor trong một lần */
+  function layTatCaMentor() {
+    return bookingRepo.getMyBookings({ role: 'MENTOR', size: 100 });
+  }
+
+  it('role=MENTOR trả về một danh sách KHÁC HẲN role=MENTEE', async () => {
+    // Backend thật hỏi hai cột khác nhau (`menteeUserId` so `mentorUserId`), và
+    // người dùng mock có cả hai vai trò. Một handler bỏ qua `role` sẽ cho tab
+    // Booking của mentor hiện đúng các buổi người đó đã ĐẶT với mentor khác —
+    // trông hoàn toàn bình thường và sai hoàn toàn.
+    const mentee = await layTatCa();
+    const mentor = await layTatCaMentor();
+
+    const idMentee = new Set(mentee.content.map((b) => b.bookingId));
+    const idMentor = mentor.content.map((b) => b.bookingId);
+
+    expect(idMentor.length).toBeGreaterThan(0);
+    expect(idMentor.some((id) => idMentee.has(id))).toBe(false);
+  });
+
+  it('KHÔNG truyền role thì mặc định MENTEE, đúng như BookingListRequest', async () => {
+    // `BookingListRequest.role` khởi tạo bằng `BookingViewRole.MENTEE`. Mock mặc
+    // định sang MENTOR sẽ che đi đúng lỗi "quên gửi role".
+    const khongRole = await apiClient<{ content: { bookingId: string }[] }>('/api/me/bookings', {
+      params: { size: 100 },
+    });
+    const mentee = await layTatCa();
+
+    expect(khongRole.content.map((b) => b.bookingId)).toEqual(
+      mentee.content.map((b) => b.bookingId),
+    );
+  });
+
+  it('mọi booking phía mentor có mentorUserId là chính người dùng mock', async () => {
+    const mentor = await layTatCaMentor();
+
+    expect(mentor.content.every((b) => b.mentorUserId === MOCK_USER.publicId)).toBe(true);
+    // `menteeDisplayName` là trường mà thẻ phía mentor đọc — phải có người thật ở
+    // ít nhất một số booking, kèm một trường hợp `null` để kiểm chỗ dự phòng.
+    expect(mentor.content.some((b) => (b.menteeDisplayName ?? '') !== '')).toBe(true);
+    expect(mentor.content.some((b) => b.menteeDisplayName === null)).toBe(true);
+  });
+
+  it('có booking cho mỗi BookingStatus mà hàng chip của mentor lọc theo', async () => {
+    const mentor = await layTatCaMentor();
+    const trangThai = new Set(mentor.content.map((b) => b.status));
+
+    for (const canCo of ['PENDING', 'PAID', 'AWAITING_MENTOR_COMPLETION', 'COMPLETED']) {
+      expect([...trangThai]).toContain(canCo);
+    }
+  });
+
+  it('lọc theo status LÀM THẬT ở góc nhìn mentor', async () => {
+    const tatCa = await layTatCaMentor();
+    const dangCho = await bookingRepo.getMyBookings({
+      role: 'MENTOR',
+      status: 'PENDING',
+      size: 100,
+    });
+
+    expect(dangCho.content.length).toBeGreaterThan(0);
+    expect(dangCho.content.length).toBeLessThan(tatCa.content.length);
+    expect(dangCho.content.every((b) => b.status === 'PENDING')).toBe(true);
+  });
+
+  it('size=1 vẫn trả totalElements ĐÚNG — dải nhắc việc dựa vào đúng con số này', async () => {
+    // `useMentorBookingCount` xin `size: 1` và đọc `totalElements`. Nếu mock trả
+    // `totalElements` bằng số phần tử của TRANG thì dải nhắc việc luôn nói
+    // "1 yêu cầu" bất kể thực tế.
+    const day = await bookingRepo.getMyBookings({ role: 'MENTOR', status: 'PENDING', size: 100 });
+    const mot = await bookingRepo.getMyBookings({ role: 'MENTOR', status: 'PENDING', size: 1 });
+
+    expect(mot.content).toHaveLength(1);
+    expect(mot.totalElements).toBe(day.content.length);
+    expect(mot.totalElements).toBeGreaterThan(1);
+  });
+
+  it('danh sách mentor nhiều hơn một trang — việc cuộn tải thêm xem được thật', async () => {
+    const trang = await bookingRepo.getMyBookings({ role: 'MENTOR' });
+
+    expect(trang.content).toHaveLength(10);
+    expect(trang.last).toBe(false);
+    expect(getNextPageNumber(trang)).toBe(1);
+  });
+
+  it('phủ các nhãn trạng thái mà thẻ phía mentor sẽ hiện, kể cả "Vắng mặt"', async () => {
+    const mentor = await layTatCaMentor();
+    const nhan = new Set(mentor.content.map((b) => nhanTrangThaiBooking(b).label));
+
+    for (const canCo of [
+      'Đang chờ',
+      'Sắp diễn ra',
+      'Đang diễn ra',
+      'Chờ xác nhận',
+      'Đã hoàn thành',
+      'Vắng mặt',
+      'Mentee hủy',
+    ]) {
+      expect([...nhan]).toContain(canCo);
+    }
+  });
+
+  it('giữ nguyên canAccept/canReject của backend dù giao diện cố ý không dùng', async () => {
+    // Nếu ta sửa chúng về `false` cho tiện thì test canh "KHÔNG có nút Xác nhận"
+    // sẽ xanh vì một lý do sai.
+    const mentor = await layTatCaMentor();
+
+    expect(mentor.content.some((b) => b.canAccept && b.canReject)).toBe(true);
+  });
+
+  it('có buổi miễn phí, buổi có giá, và buổi không gắn service', async () => {
+    const mentor = await layTatCaMentor();
+
+    expect(mentor.content.some((b) => b.serviceIsFreeSnapshot === true)).toBe(true);
+    expect(mentor.content.some((b) => (b.servicePriceScoinSnapshot ?? 0) > 0)).toBe(true);
+    expect(
+      mentor.content.some(
+        (b) => b.serviceIsFreeSnapshot === null && b.servicePriceScoinSnapshot === null,
+      ),
+    ).toBe(true);
+  });
+
+  it('có buổi mentor check-in được, và có buổi OFFLINE chỉ có địa điểm', async () => {
+    const mentor = await layTatCaMentor();
+
+    expect(mentor.content.some((b) => b.attendance.canCheckIn)).toBe(true);
+    expect(
+      mentor.content.some(
+        (b) => b.canJoin && (b.meetingLink ?? '') === '' && (b.location ?? '') !== '',
+      ),
+    ).toBe(true);
+    expect(mentor.content.some((b) => b.canJoin && (b.meetingLink ?? '') !== '')).toBe(true);
+  });
+
+  it('check-in THIẾU Idempotency-Key bị từ chối 400', async () => {
+    const err = await bookingRepo.checkIn('mb1', '').then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(ApiClientError);
+    expect((err as ApiClientError).status).toBe(400);
+    expect((err as ApiClientError).message).toBe('IDEMPOTENCY_KEY_REQUIRED');
+  });
+
+  it('check-in ngoài cửa sổ cho phép thì 409, KHÔNG phải 400', async () => {
+    // `SessionAttendanceService.checkIn()` ném `RESOURCE_CONFLICT` khi
+    // `SessionAttendancePolicy.canCheckIn()` không đồng ý. Mock trả 400 ở đây sẽ
+    // làm khối lỗi của màn hình hiện một câu khác hẳn câu người dùng thật thấy.
+    const err = await bookingRepo.checkIn('mb4', 'khoa-checkin-1').then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(ApiClientError);
+    expect((err as ApiClientError).status).toBe(409);
+  });
+
+  it('check-in thành công thì cờ canCheckIn tắt VÀ danh sách tải lại đổi thật', async () => {
+    // Test này đứng gần cuối vì nó đổi dữ liệu dùng chung của handler.
+    const daCheckIn = await bookingRepo.checkIn('mb1', 'khoa-checkin-2');
+
+    expect(daCheckIn.attendance.currentUserCheckedIn).toBe(true);
+    expect(daCheckIn.attendance.canCheckIn).toBe(false);
+    // Backend chuyển `session.status` sang `IN_PROGRESS`, thứ làm `displayState`
+    // thành `IN_SESSION` — tức là đổi cả NHÃN trên thẻ.
+    expect(nhanTrangThaiBooking(daCheckIn).label).toBe('Đang diễn ra');
+
+    const sau = await layTatCaMentor();
+    expect(sau.content.find((b) => b.bookingId === 'mb1')?.attendance.canCheckIn).toBe(false);
+  });
+
+  it('check-in LẦN HAI vẫn thành công, không báo lỗi', async () => {
+    // `SessionAttendanceService.checkIn()` trả booking nguyên trạng khi đã có bản
+    // ghi điểm danh cho vai trò đó. Mock trả 409 cho lần thứ hai sẽ làm nút
+    // "Check-in" trông như hỏng ở đúng tình huống nó phải êm (bấm lại sau lỗi
+    // mạng).
+    const lai = await bookingRepo.checkIn('mb1', 'khoa-checkin-2');
+
+    expect(lai.attendance.currentUserCheckedIn).toBe(true);
+  });
+});

@@ -22,4 +22,16 @@ export const bookingKeys = {
    */
   list: (filters: BoLocLichHen) => [...bookingKeys.listsAll(), filters] as const,
   detail: (bookingId: string) => [...bookingKeys.all, 'detail', bookingId] as const,
+  /**
+   * Tiền tố chung của mọi phép ĐẾM booking.
+   *
+   * Tách khỏi `listsAll()` có chủ ý: một phép đếm xin `size=1` và chỉ đọc
+   * `totalElements`, nên nếu nó nằm dưới cùng tiền tố với danh sách thì
+   * `flattenOffsetPages` của màn hình danh sách sẽ có cơ hội đọc một entry cache
+   * chỉ có 1 phần tử và hiện đúng một thẻ. Việc invalidate sau khi ghi vẫn phải
+   * chạm CẢ HAI tiền tố — xem `useCheckInBooking`.
+   */
+  countsAll: () => [...bookingKeys.all, 'count'] as const,
+  /** Số lượng booking khớp một bộ lọc (đọc `totalElements`, không đọc `content`) */
+  count: (filters: BoLocLichHen) => [...bookingKeys.countsAll(), filters] as const,
 };

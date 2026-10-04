@@ -21,6 +21,16 @@
  *    đó, không giới hạn ngày, và lúc đó mới tôn trọng `sortBy`.
  *    Vì vậy repo này KHÔNG gửi `sortBy` — một tham số chỉ có tác dụng ở một nửa
  *    số tab là cái bẫy chờ người sau.
+ *
+ * ## `role=MENTOR` đi qua ĐÚNG endpoint này, không qua `/api/mentor/bookings`
+ *
+ * `MentorBookingController` (`/api/mentor/bookings`) **không có endpoint GET nào**
+ * — chỉ `accept`, `reject`, `cancel`, `complete`, `meeting-link`. Danh sách
+ * booking nhìn từ phía mentor là `GET /api/me/bookings?role=MENTOR`
+ * (`BookingListRequest.role`, rồi `case MENTOR` trong
+ * `BookingQueryService.getMyBookings`). Hai góc nhìn chạy cùng một hàm, cùng cách
+ * phân trang, cùng ngữ nghĩa "không có status = dashboard" — chỉ khác bộ trạng
+ * thái ưu tiên (`MENTOR_PRIMARY_ACTION_STATUSES` thay cho bản của mentee).
  */
 
 import { apiClient } from '@/core/api/client';
@@ -98,6 +108,36 @@ export const bookingRepo = {
       method: 'POST',
       headers: idempotencyHeaders(idempotencyKey),
       body: input,
+    });
+  },
+
+  /**
+   * Check-in một buổi mentoring. Dùng được cho CẢ mentor và mentee.
+   *
+   * `POST /api/me/bookings/{id}/check-in` — không ở nhánh `/api/mentor/` dù đây
+   * là hành động mentor dùng nhiều nhất: `SessionAttendanceService.checkIn()`
+   * tự suy vai trò người gọi bằng `resolveParticipantRole(booking, currentUserId)`,
+   * nên cùng một endpoint phục vụ hai phía.
+   *
+   * **Không có thân request.** Đây là điểm khác biệt quan trọng so với
+   * `accept`: `AcceptBookingRequest` đòi `meetingPlatform` (+ link hoặc địa
+   * điểm) khi mentor chưa kết nối Google Calendar, còn check-in không đòi gì cả
+   * — nên nó là hành động một-cú-bấm duy nhất của mentor mà giao diện dựng được
+   * mà chắc chắn không 400.
+   *
+   * `Idempotency-Key` là BẮT BUỘC (endpoint mang `@Idempotent`;
+   * `IdempotencyAspect.normalizeKey()` ném `BAD_REQUEST /
+   * "IDEMPOTENCY_KEY_REQUIRED"` khi thiếu hoặc sai khuôn). Backend còn tự chịu
+   * được việc gửi lại: `checkIn()` trả về booking nguyên trạng nếu đã có bản
+   * ghi điểm danh cho vai trò đó, kể cả khi session đã kết thúc.
+   *
+   * Key do CHỖ GỌI truyền vào, không sinh tại đây — cùng lý do như
+   * `cancelBooking`.
+   */
+  checkIn(bookingId: string, idempotencyKey: string) {
+    return apiClient<BookingResponse>(`/api/me/bookings/${bookingId}/check-in`, {
+      method: 'POST',
+      headers: idempotencyHeaders(idempotencyKey),
     });
   },
 };

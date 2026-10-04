@@ -18,6 +18,7 @@ import { createQueryClient } from '@/core/api/queryClient';
 import { AuthProvider } from '@/core/auth/AuthProvider';
 import { startMockServerIfEnabled } from '@/core/dev/mockServer';
 import { setupOnlineManager } from '@/core/net/onlineStatus';
+import { RoleModeProvider } from '@/core/roleMode/RoleModeProvider';
 import { colors } from '@/core/ui/theme';
 
 // Bật TRƯỚC khi bất cứ component nào render, và cố ý ở tầng module chứ không
@@ -72,7 +73,21 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <Stack screenOptions={{ headerShown: false }} />
+          {/*
+            `RoleModeProvider` nằm BÊN TRONG `AuthProvider`: chế độ vai trò được
+            quy từ `user.roles` của phiên đăng nhập, nên nó phải đọc được
+            `useAuth()`. Đặt ngược lại sẽ ném "useAuth phải được dùng bên trong
+            <AuthProvider>" ngay lúc khởi động.
+
+            Và nó ở ĐÂY chứ không ở `app/(tabs)/_layout.tsx`: màn Hồ sơ của
+            Mentee cũng có lối chuyển sang chế độ Mentor, nên cả hai nhánh route
+            phải nhìn thấy cùng một context. Dựng hai provider ở hai chỗ sẽ cho
+            hai state riêng, và lựa chọn bấm ở bên này không có tác dụng ở bên
+            kia cho tới lần mở app sau.
+          */}
+          <RoleModeProvider>
+            <Stack screenOptions={{ headerShown: false }} />
+          </RoleModeProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

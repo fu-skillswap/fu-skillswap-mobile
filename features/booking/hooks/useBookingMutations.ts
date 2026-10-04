@@ -77,3 +77,48 @@ export function useCancelBooking() {
     },
   });
 }
+
+/**
+ * Check-in một buổi mentoring (dùng ở phía mentor, màn `MentorBookings`).
+ *
+ * Bốn luật ở đầu file vẫn áp dụng; thêm ba điều riêng của thao tác này:
+ *
+ * 1. **Cờ `attendance.canCheckIn` của backend là NGUỒN SỰ THẬT để hiện nút**, chứ
+ *    không phải `bookingStatus` hay giờ hiện tại của máy.
+ *    `BookingResponseMapper` tính nó bằng `SessionAttendancePolicy.canCheckIn()`
+ *    với giờ SERVER và trạng thái session, và nó còn thành `false` ngay sau khi
+ *    người này đã check-in (`!currentUserCheckedIn`). Tự suy ra từ
+ *    `selectedStartTime` so với `Date.now()` sẽ lệch với backend ở mọi máy lệch
+ *    giờ, và sẽ hiện nút cho một buổi chưa có session (`checkIn()` trả 409
+ *    "Booking chưa có session để check-in").
+ *
+ * 2. **Gửi lại là AN TOÀN, và backend tự chịu được.** `SessionAttendanceService.checkIn()`
+ *    trả về booking nguyên trạng nếu đã có bản ghi điểm danh cho vai trò đó, kể
+ *    cả khi session đã kết thúc. Cộng với `Idempotency-Key` ổn định theo
+ *    `bookingId`, một lần bấm lại sau lỗi mạng không bao giờ tạo ra hai lần
+ *    điểm danh.
+ *
+ * 3. **Invalidate CẢ `listsAll()` lẫn `countsAll()`.** Check-in đổi
+ *    `attendance`, và `session.status` chuyển `SCHEDULED → IN_PROGRESS` — thứ
+ *    làm `displayState` của backend thành `IN_SESSION`, tức là đổi cả NHÃN trên
+ *    thẻ. Bỏ `countsAll()` thì dải nhắc việc ở màn Tổng quan sẽ đứng ở con số cũ.
+ */
+export function useCheckInBooking() {
+  const queryClient = useQueryClient();
+  // Kho key phải sống qua các lần render — xem lý do ở `useCancelBooking`.
+  const khoKhoa = useMemo(() => createIdempotencyStore(), []);
+
+  return useMutation({
+    networkMode: 'always',
+    // Không payload: `POST /api/me/bookings/{id}/check-in` không có thân request,
+    // nên `keyFor` chỉ lấy `bookingId` — cùng một booking luôn cho cùng một key.
+    mutationFn: ({ bookingId }: { bookingId: string }) =>
+      bookingRepo.checkIn(bookingId, khoKhoa.keyFor(bookingId, null)),
+    onSuccess: (_data, { bookingId }) => {
+      khoKhoa.release(bookingId);
+      void queryClient.invalidateQueries({ queryKey: bookingKeys.listsAll() });
+      void queryClient.invalidateQueries({ queryKey: bookingKeys.countsAll() });
+      void queryClient.invalidateQueries({ queryKey: bookingKeys.detail(bookingId) });
+    },
+  });
+}

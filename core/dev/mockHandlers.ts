@@ -26,6 +26,7 @@ import { authMockHandlers } from '@/core/auth/mocks/handlers';
 import { bookingMockHandlers } from '@/features/booking/mocks/handlers';
 import { forumMockHandlers } from '@/features/forum/mocks/handlers';
 import { mentorMockHandlers } from '@/features/mentor/mocks/handlers';
+import { mentorModeMockHandlers } from '@/features/mentorMode/mocks/handlers';
 import { profileMockHandlers } from '@/features/profile/mocks/handlers';
 
 export const mockHandlers = [
@@ -33,6 +34,7 @@ export const mockHandlers = [
   ...bookingMockHandlers,
   ...forumMockHandlers,
   ...mentorMockHandlers,
+  ...mentorModeMockHandlers,
   ...profileMockHandlers,
 ];
 

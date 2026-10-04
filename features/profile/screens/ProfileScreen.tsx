@@ -12,13 +12,27 @@
  * những màn hình repo chưa có, và riêng ví còn vướng ràng buộc ở mục 4.1 của
  * `docs/quy-uoc-dung-giao-dien.md` (bản mobile chỉ xem và tiêu, nút "Nạp" mà
  * thiết kế vẽ là thứ bị cấm). Xem mục (c) của báo cáo.
+ *
+ * ## Card "Trở thành Mentor" đổi thành "Chuyển sang chế độ Mentor"
+ *
+ * Thiết kế đặt ở đây một card dẫn sang `MentorRegistration.dc.html` — màn hình 6
+ * bước mà repo CHƯA có, nên lối "Trở thành Mentor" vẫn bị bỏ (một nút chết).
+ *
+ * Nhưng với người **ĐÃ là mentor**, cùng chỗ đó là lối chuyển sang thanh tab
+ * Mentor, và nó phải có ở đây vì phía Mentee không có chỗ nào khác để chuyển:
+ * lối ngược lại nằm trong màn `MentorMore` của thanh Mentor. Card chỉ hiện khi
+ * tài khoản THẬT SỰ có cả hai vai trò (`cheDoKhaDung.length === 2`) — với một
+ * mentee thuần, nút đó sẽ đưa họ sang một thanh tab mà `quyCheDoVaiTro()` lập
+ * tức lùi về, tức là một nút không làm gì cả.
  */
 
-import { LogOut } from 'lucide-react-native';
-import { ScrollView, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ArrowLeftRight, LogOut } from 'lucide-react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { trangThaiTai } from '@/core/api/queryState';
 import { useAuth } from '@/core/auth/AuthProvider';
+import { useRoleMode } from '@/core/roleMode/RoleModeProvider';
 import { Avatar } from '@/core/ui/Avatar';
 import { Card } from '@/core/ui/Card';
 import { EmptyState } from '@/core/ui/EmptyState';
@@ -27,7 +41,7 @@ import { ListRow } from '@/core/ui/ListRow';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenHeader } from '@/core/ui/ScreenHeader';
-import { colors, fonts } from '@/core/ui/theme';
+import { colors, fonts, radius } from '@/core/ui/theme';
 import { useStudentProfile } from '@/features/profile/hooks/useProfileQueries';
 
 /** Một dòng "nhãn — giá trị"; bỏ hẳn dòng khi không có giá trị */
@@ -51,8 +65,11 @@ function Dong({ nhan, giaTri }: { nhan: string; giaTri: string | null | undefine
 }
 
 export function ProfileScreen() {
+  const router = useRouter();
   const { user, signOut } = useAuth();
+  const { cheDoKhaDung, chuyenCheDo } = useRoleMode();
   const hoSo = useStudentProfile();
+  const coHaiVaiTro = cheDoKhaDung.length === 2;
 
   const trangThaiHoSo = trangThaiTai({
     isPaused: hoSo.isPaused,
@@ -63,6 +80,20 @@ export function ProfileScreen() {
     // sẽ đổi lời mời tạo hồ sơ thành ErrorView.
     coDuLieu: hoSo.data !== undefined,
   });
+
+  const sangCheDoMentor = () => {
+    chuyenCheDo('MENTOR');
+    /*
+      PHẢI điều hướng, không chỉ đổi chế độ. Thanh tab vẽ lại theo chế độ mới và
+      tab `profile` bị ẩn (`href: null`), nhưng màn hình ĐANG hiện vẫn là
+      `profile` — người dùng sẽ đứng trên một màn không có tab nào sáng.
+
+      `replace` chứ không `push`: stack cũ thuộc thanh tab vừa rời đi, giữ nó lại
+      thì nút back của Android sẽ mang người dùng trở về một màn hình của chế độ
+      họ vừa thoát ra.
+    */
+    router.replace('/(tabs)/mentor-dashboard');
+  };
 
   const dangXuat = async () => {
     try {
@@ -138,6 +169,31 @@ export function ProfileScreen() {
             </View>
           )}
         </Card>
+
+        {coHaiVaiTro ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={sangCheDoMentor}
+            testID="nut-chuyen-sang-mentor"
+            className="flex-row items-center gap-3 bg-surface-tint px-4 py-3.5"
+            style={{ borderRadius: radius.lg }}
+          >
+            <View
+              className="h-10 w-10 items-center justify-center bg-surface"
+              style={{ borderRadius: radius.input }}
+            >
+              <ArrowLeftRight size={20} color={colors.accent} strokeWidth={2} />
+            </View>
+            <View className="min-w-0 flex-1">
+              <Text className="text-body-lg text-ink" style={{ fontFamily: fonts.bold }}>
+                Chuyển sang chế độ Mentor
+              </Text>
+              <Text className="text-caption text-ink-body" style={{ fontFamily: fonts.medium }}>
+                Xem tổng quan, lịch đặt và ví S-coin của bạn
+              </Text>
+            </View>
+          </Pressable>
+        ) : null}
 
         {/*
           Thiết kế để Đăng xuất làm hàng CUỐI của khối menu tài khoản, chữ đỏ

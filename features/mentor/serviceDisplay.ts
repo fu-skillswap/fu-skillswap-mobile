@@ -15,6 +15,7 @@
  * — hai câu nói sai về tiền, thứ người dùng tin nhất trên màn hình này.
  */
 
+import { phanCachNghin } from '@/core/format/soLuong';
 import type { MentorServiceResponse } from '@/features/mentor/types';
 
 export interface MoTaGiaDichVu {
@@ -22,20 +23,6 @@ export interface MoTaGiaDichVu {
   so: string | null;
   /** Chữ thay cho số ("Miễn phí" / "Chưa có giá"); `null` khi đã có số */
   nhan: string | null;
-}
-
-/**
- * Chèn dấu chấm phân cách hàng nghìn, đúng kiểu thiết kế viết ("150.000").
- *
- * Tự chèn chứ không dùng `Intl.NumberFormat`: Hermes chỉ có Intl đầy đủ khi bản
- * build bật `jsEngine` kèm ICU, và khi thiếu nó thì `Intl` âm thầm rơi về một bản
- * tối giản định dạng theo `en-US` ("150,000"). Một dấu phẩy ở chỗ dấu chấm làm
- * người Việt đọc 150.000 thành 150 — sai 1000 lần, và chỉ sai trên máy thật.
- */
-function phanCachNghin(so: number): string {
-  const nguyen = Math.trunc(Math.abs(so));
-  const chuoi = String(nguyen).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return so < 0 ? `-${chuoi}` : chuoi;
 }
 
 /** Quy giá của một dịch vụ thành thứ màn hình được phép hiện */

@@ -8,7 +8,10 @@ import React from 'react';
 import { __resetApiClientForTests } from '@/core/api/client';
 import { ApiClientError } from '@/core/api/errors';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
-import { useCancelBooking } from '@/features/booking/hooks/useBookingMutations';
+import {
+  useCancelBooking,
+  useCheckInBooking,
+} from '@/features/booking/hooks/useBookingMutations';
 import { bookingKeys } from '@/features/booking/queryKeys';
 
 /**
@@ -235,5 +238,189 @@ describe('useCancelBooking', () => {
     expect(loi).toBeInstanceOf(ApiClientError);
     expect((loi as ApiClientError).status).toBe(429);
     expect((loi as ApiClientError).retryAfterSeconds).toBe(3600);
+  });
+});
+
+/** Handler check-in thành công, ghi lại header để assert */
+function checkInOk(ghiNhan: { khoa: (string | null)[]; than: unknown[] }) {
+  return http.post(`${BASE}/api/me/bookings/:bookingId/check-in`, async ({ request }) => {
+    ghiNhan.khoa.push(request.headers.get('Idempotency-Key'));
+    ghiNhan.than.push(await request.text());
+    return HttpResponse.json(
+      envelope({
+        bookingId: 'mb1',
+        displayState: 'IN_SESSION',
+        attendance: { currentUserCheckedIn: true, canCheckIn: false },
+      }),
+    );
+  });
+}
+
+describe('useCheckInBooking', () => {
+  it('gửi Idempotency-Key và KHÔNG gửi thân request', async () => {
+    // `POST /api/me/bookings/{id}/check-in` không nhận body nào. Gửi `{}` cũng
+    // chạy, nhưng nó mở đường cho người sau tưởng endpoint này có payload và
+    // đưa `meetingPlatform` vào — thứ chỉ `accept` cần.
+    const ghiNhan = { khoa: [] as (string | null)[], than: [] as unknown[] };
+    server.use(checkInOk(ghiNhan));
+
+    const { result } = await renderHook(() => useCheckInBooking(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ bookingId: 'mb1' });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(ghiNhan.khoa[0]).toMatch(/^[A-Za-z0-9._~-]{1,100}$/);
+    expect(ghiNhan.than[0]).toBe('');
+  });
+
+  it('sau khi THÀNH CÔNG thì key được quên — lần sau là một thao tác mới', async () => {
+    // `onSuccess` gọi `release(bookingId)`. Giữ lại key cũ sẽ làm lần check-in
+    // tiếp theo của cùng booking (sau khi backend đã mở lại cửa sổ, hoặc sau khi
+    // mentor hủy rồi đặt lại) bị replay kết quả cũ thay vì chạy thật.
+    const ghiNhan = { khoa: [] as (string | null)[], than: [] as unknown[] };
+    server.use(checkInOk(ghiNhan));
+
+    const { result } = await renderHook(() => useCheckInBooking(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ bookingId: 'mb1' });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    await act(async () => {
+      result.current.mutate({ bookingId: 'mb1' });
+    });
+    await waitFor(() => expect(ghiNhan.khoa).toHaveLength(2));
+
+    expect(ghiNhan.khoa[0]).not.toBe(ghiNhan.khoa[1]);
+  });
+
+  it('thất bại rồi bấm lại: giữ NGUYÊN key, vì thao tác chưa kết thúc', async () => {
+    const ghiNhan = { khoa: [] as (string | null)[], than: [] as unknown[] };
+    server.use(
+      http.post(`${BASE}/api/me/bookings/:bookingId/check-in`, ({ request }) => {
+        ghiNhan.khoa.push(request.headers.get('Idempotency-Key'));
+        return HttpResponse.json(
+          { timestamp: 'x', status: 409, code: 'SYS_0004', message: 'Chưa đến giờ', data: null },
+          { status: 409 },
+        );
+      }),
+    );
+
+    const { result } = await renderHook(() => useCheckInBooking(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ bookingId: 'mb1' });
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    await act(async () => {
+      result.current.mutate({ bookingId: 'mb1' });
+    });
+    await waitFor(() => expect(ghiNhan.khoa).toHaveLength(2));
+
+    expect(ghiNhan.khoa[0]).toBe(ghiNhan.khoa[1]);
+  });
+
+  it('hai booking khác nhau thì hai key khác nhau', async () => {
+    const ghiNhan = { khoa: [] as (string | null)[], than: [] as unknown[] };
+    server.use(checkInOk(ghiNhan));
+
+    const { result } = await renderHook(() => useCheckInBooking(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ bookingId: 'mb1' });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await act(async () => {
+      result.current.mutate({ bookingId: 'mb4' });
+    });
+    await waitFor(() => expect(ghiNhan.khoa).toHaveLength(2));
+
+    expect(ghiNhan.khoa[0]).not.toBe(ghiNhan.khoa[1]);
+  });
+
+  it('`networkMode: always` — mất mạng thì THẤT BẠI NGAY, không treo', async () => {
+    // Mặc định `'online'` HOÃN request: nút quay mãi, `onSettled` không chạy, và
+    // mentor không có cách nào biết yêu cầu của mình vẫn đang nằm chờ.
+    const online = jest.spyOn(onlineManager, 'isOnline').mockReturnValue(false);
+    server.use(
+      http.post(`${BASE}/api/me/bookings/:bookingId/check-in`, () =>
+        HttpResponse.error(),
+      ),
+    );
+
+    const { result } = await renderHook(() => useCheckInBooking(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ bookingId: 'mb1' });
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.isPaused).toBe(false);
+    online.mockRestore();
+  });
+
+  it('409 giữ nguyên mã lỗi của backend để màn hình nói đúng câu', async () => {
+    // Lỗi hay gặp nhất ở đây là 409 "chưa đến giờ / đã hết giờ / booking chưa có
+    // session" (`SessionAttendanceService` ném `RESOURCE_CONFLICT`). Đọc nó thành
+    // 400 sẽ làm `ErrorView` chọn một thông điệp khác.
+    server.use(
+      http.post(`${BASE}/api/me/bookings/:bookingId/check-in`, () =>
+        HttpResponse.json(
+          { timestamp: 'x', status: 409, code: 'SYS_0004', message: 'Chưa đến giờ', data: null },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    const { result } = await renderHook(() => useCheckInBooking(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ bookingId: 'mb1' });
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(result.current.error).toBeInstanceOf(ApiClientError);
+    expect((result.current.error as ApiClientError).status).toBe(409);
+  });
+
+  it('thành công thì invalidate CẢ danh sách lẫn phép ĐẾM', async () => {
+    // Check-in đổi `attendance` và chuyển `session.status` sang `IN_PROGRESS` —
+    // thứ làm `displayState` của backend thành `IN_SESSION`, tức đổi cả NHÃN
+    // trên thẻ. Bỏ `countsAll()` thì dải nhắc việc ở màn Tổng quan đứng ở con
+    // số cũ.
+    const ghiNhan = { khoa: [] as (string | null)[], than: [] as unknown[] };
+    server.use(checkInOk(ghiNhan));
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = await renderHook(() => useCheckInBooking(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ bookingId: 'mb1' });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const khoaDaGoi = invalidate.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+    expect(khoaDaGoi).toContain(JSON.stringify(bookingKeys.listsAll()));
+    expect(khoaDaGoi).toContain(JSON.stringify(bookingKeys.countsAll()));
+    expect(khoaDaGoi).toContain(JSON.stringify(bookingKeys.detail('mb1')));
+    invalidate.mockRestore();
+  });
+
+  it('thất bại thì KHÔNG invalidate gì — không có gì đổi để tải lại', async () => {
+    server.use(
+      http.post(`${BASE}/api/me/bookings/:bookingId/check-in`, () =>
+        HttpResponse.json(
+          { timestamp: 'x', status: 409, code: 'SYS_0004', message: 'Chưa đến giờ', data: null },
+          { status: 409 },
+        ),
+      ),
+    );
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = await renderHook(() => useCheckInBooking(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ bookingId: 'mb1' });
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(invalidate).not.toHaveBeenCalled();
+    invalidate.mockRestore();
   });
 });

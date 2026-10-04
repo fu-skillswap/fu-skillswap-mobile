@@ -6,13 +6,14 @@
  * diễn đàn — dùng `getNextPageNumber`/`flattenOffsetPages`.
  */
 
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo, useRef } from 'react';
 
 import { flattenOffsetPages, getNextPageNumber } from '@/core/api/pagination';
 import { bookingRepo } from '@/features/booking/bookingRepo';
 import type { BoLocLichHen } from '@/features/booking/bookingRepo';
 import { bookingKeys } from '@/features/booking/queryKeys';
+import type { BookingStatus } from '@/features/booking/types';
 
 /**
  * Chốt chặn ĐỒNG BỘ cho việc tải trang kế.
@@ -72,4 +73,44 @@ export function useMyBookings(filters: BoLocLichHen) {
   const taiTrangKe = useChotChanTrangKe(query);
 
   return { ...query, bookings, taiTrangKe };
+}
+
+/**
+ * Danh sách booking nhìn từ phía MENTOR.
+ *
+ * Chỉ là `useMyBookings` với `role` bị ghim thành `'MENTOR'`, nhưng tồn tại
+ * thành một hook riêng vì `role` là thứ dễ quên nhất ở đây: bỏ nó đi thì backend
+ * mặc định `BookingViewRole.MENTEE` (`BookingListRequest.role` khởi tạo bằng
+ * `MENTEE`) và màn hình mentor sẽ hiện **các buổi người đó đã đặt với mentor
+ * khác** — một danh sách hợp lệ, có dữ liệu, trông hoàn toàn bình thường, và
+ * sai hoàn toàn. Không có lỗi nào chặn được chuyện đó ngoài một hook đặt tên
+ * đúng.
+ *
+ * `role` bị loại khỏi kiểu tham số để chỗ gọi KHÔNG ghi đè được.
+ */
+export function useMentorBookings(filters: Omit<BoLocLichHen, 'role'>) {
+  return useMyBookings({ ...filters, role: 'MENTOR' });
+}
+
+/**
+ * Đếm booking của mentor ở một trạng thái, dùng cho dải nhắc việc ở màn Tổng quan.
+ *
+ * Đọc `totalElements` của backend, KHÔNG đếm trên mảng đã tải: `size: 1` nên
+ * request chỉ mang về một phần tử, còn con số thì là tổng thật của cả tập. Đếm
+ * bằng `bookings.length` sẽ cho "10 yêu cầu" mãi mãi (đúng `size` mặc định) khi
+ * mentor có nhiều hơn một trang — và con số đó là lý do người dùng bấm vào.
+ *
+ * `staleTime` ngắn: một yêu cầu `PENDING` tự hết hạn theo `pendingExpireAt` do
+ * backend tính, nên con số này đổi theo đồng hồ.
+ */
+export function useMentorBookingCount(status: BookingStatus) {
+  const filters: BoLocLichHen = { role: 'MENTOR', status, size: 1 };
+
+  const query = useQuery({
+    queryKey: bookingKeys.count(filters),
+    queryFn: () => bookingRepo.getMyBookings(filters),
+    staleTime: 15_000,
+  });
+
+  return { ...query, soLuong: query.data?.totalElements ?? null };
 }
