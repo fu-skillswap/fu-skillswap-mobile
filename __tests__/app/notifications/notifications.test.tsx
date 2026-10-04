@@ -243,6 +243,7 @@ describe('ChuongThongBao', () => {
 
     await waitFor(() => expect(screen.getByTestId('cham-thong-bao-moi')).toBeTruthy());
     expect(screen.getByLabelText('Thông báo, 3 chưa đọc')).toBeTruthy();
+    await donHangDoiDanhSach();
   });
 
   it('không có thông báo chưa đọc thì không có chấm', async () => {
@@ -252,6 +253,7 @@ describe('ChuongThongBao', () => {
 
     await waitFor(() => expect(queryClient.getQueryState(['notification', 'unread-count'])?.status).toBe('success'));
     expect(screen.queryByTestId('cham-thong-bao-moi')).toBeNull();
+    await donHangDoiDanhSach();
   });
 
   it('lỗi khi đếm thì im lặng — không có chấm nào để nói sai', async () => {
@@ -267,6 +269,7 @@ describe('ChuongThongBao', () => {
       timeout: 10_000,
     });
     expect(screen.queryByTestId('cham-thong-bao-moi')).toBeNull();
+    await donHangDoiDanhSach();
   });
 
   it('chạm chuông mở màn Thông báo', async () => {
@@ -277,5 +280,6 @@ describe('ChuongThongBao', () => {
 
     expect(mockRouter.push).toHaveBeenCalledWith('/notifications');
     await waitFor(() => expect(queryClient.getQueryState(['notification', 'unread-count'])?.status).toBe('success'));
+    await donHangDoiDanhSach();
   });
 });

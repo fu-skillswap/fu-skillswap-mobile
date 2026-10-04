@@ -9,6 +9,7 @@ import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
 import { OnboardingScreen } from '@/features/profile';
 import { __resetProfileMockForTests, profileMockHandlers } from '@/features/profile/mocks/handlers';
+import { donHangDoiDanhSach } from '@/test-utils/nhuongNhip';
 
 const BASE = 'https://api.skillswap.asia';
 
@@ -56,8 +57,14 @@ async function moMan() {
   );
 }
 
+/**
+ * Đợi mọi query/mutation ngã ngũ RỒI nhường một nhịp trong act: TanStack còn gom
+ * việc báo cho subscriber vào một `setTimeout(0)` sau khi `isFetching()` về 0 —
+ * xem `doiHoSoXong()` ở `profile.test.tsx`.
+ */
 async function doiXong() {
   await waitFor(() => expect(queryClient.isFetching() + queryClient.isMutating()).toBe(0));
+  await donHangDoiDanhSach();
 }
 
 /** Điền đủ form của người chưa có hồ sơ (cơ sở Hà Nội, CNTT → KTPM, kỳ 5) */
