@@ -438,17 +438,25 @@ describe('ProfileScreen — lối chuyển sang chế độ Mentor', () => {
     expect(screen.queryByTestId('nut-chuyen-sang-mentor')).toBeNull();
   });
 
-  it('KHÔNG dựng lối "Trở thành Mentor" — màn đăng ký mentor chưa có', async () => {
-    // TEST CANH — đừng xoá. `MentorRegistration.dc.html` là màn 6 bước mà repo
-    // chưa có; một card dẫn tới đó là nút chết. Khi dựng xong thì xoá dòng canh
-    // VÀ thêm card, đừng chỉ xoá dòng canh.
+  it('mentee THUẦN thấy "Trở thành Mentor", bấm thì mở màn đăng ký', async () => {
     mockCheDoKhaDung = ['MENTEE'];
     server.use(hoSoOk());
 
     await renderScreen();
     await doiHoSoXong();
+    await fireEvent.press(screen.getByTestId('nut-tro-thanh-mentor'));
 
-    expect(screen.queryByText('Trở thành Mentor')).toBeNull();
+    expect(mockPush).toHaveBeenCalledWith('/mentor-registration');
+  });
+
+  it('đã là mentor thì KHÔNG thấy "Trở thành Mentor"', async () => {
+    mockCheDoKhaDung = ['MENTEE', 'MENTOR'];
+    server.use(hoSoOk());
+
+    await renderScreen();
+    await doiHoSoXong();
+
+    expect(screen.queryByTestId('nut-tro-thanh-mentor')).toBeNull();
   });
 
   it('KHÔNG dựng lối nạp S-coins nào', async () => {

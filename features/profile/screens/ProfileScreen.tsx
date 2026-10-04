@@ -9,19 +9,19 @@
  * Khối hồ sơ sinh viên dẫn sang màn Hoàn thiện hồ sơ (`/onboarding`): nút
  * "Hoàn thiện hồ sơ" khi chưa có, "Chỉnh sửa" khi đã có.
  *
- * `Profile.dc.html` còn vẽ bốn khối nữa — ví S-coins, card "Trở thành Mentor",
- * menu tài khoản (Hồ sơ học thuật / Lịch hẹn / Thông báo / Ngôn ngữ) và nút bánh
+ * `Profile.dc.html` còn vẽ ba khối nữa — ví S-coins, menu tài khoản (Hồ sơ học thuật / Lịch hẹn / Thông báo / Ngôn ngữ) và nút bánh
  * răng Cài đặt. Lần này KHÔNG dựng khối nào trong số đó: tất cả đều là lối vào
  * những màn hình repo chưa có, và riêng ví còn vướng ràng buộc ở mục 4.1 của
  * `docs/quy-uoc-dung-giao-dien.md` (bản mobile chỉ xem và tiêu, nút "Nạp" mà
  * thiết kế vẽ là thứ bị cấm). Xem mục (c) của báo cáo.
  *
- * ## Card "Trở thành Mentor" đổi thành "Chuyển sang chế độ Mentor"
+ * ## Card "Trở thành Mentor" / "Chuyển sang chế độ Mentor"
  *
- * Thiết kế đặt ở đây một card dẫn sang `MentorRegistration.dc.html` — màn hình 6
- * bước mà repo CHƯA có, nên lối "Trở thành Mentor" vẫn bị bỏ (một nút chết).
+ * Người CHƯA là mentor thấy card "Trở thành Mentor" của thiết kế, dẫn sang màn
+ * đăng ký 6 bước (`/mentor-registration`) — màn đó cũng là nơi xem hồ sơ đang
+ * chờ duyệt.
  *
- * Nhưng với người **ĐÃ là mentor**, cùng chỗ đó là lối chuyển sang thanh tab
+ * Với người **ĐÃ là mentor**, cùng chỗ đó là lối chuyển sang thanh tab
  * Mentor, và nó phải có ở đây vì phía Mentee không có chỗ nào khác để chuyển:
  * lối ngược lại nằm trong màn `MentorMore` của thanh Mentor. Card chỉ hiện khi
  * tài khoản THẬT SỰ có cả hai vai trò (`cheDoKhaDung.length === 2`) — với một
@@ -30,13 +30,14 @@
  */
 
 import { useRouter } from 'expo-router';
-import { ArrowLeftRight, LogOut } from 'lucide-react-native';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ArrowLeftRight, ChevronRight, LogOut } from 'lucide-react-native';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { trangThaiTai } from '@/core/api/queryState';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { useRoleMode } from '@/core/roleMode/RoleModeProvider';
 import { Avatar } from '@/core/ui/Avatar';
+import { KOKO } from '@/core/ui/brand';
 import { Card } from '@/core/ui/Card';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
@@ -73,6 +74,7 @@ export function ProfileScreen() {
   const { cheDoKhaDung, chuyenCheDo } = useRoleMode();
   const hoSo = useStudentProfile();
   const coHaiVaiTro = cheDoKhaDung.length === 2;
+  const chuaLaMentor = !cheDoKhaDung.includes('MENTOR');
 
   const trangThaiHoSo = trangThaiTai({
     isPaused: hoSo.isPaused,
@@ -211,6 +213,27 @@ export function ProfileScreen() {
                 Xem tổng quan, lịch đặt và ví S-coin của bạn
               </Text>
             </View>
+          </Pressable>
+        ) : null}
+
+        {chuaLaMentor ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/mentor-registration')}
+            testID="nut-tro-thanh-mentor"
+            className="flex-row items-center gap-3 bg-surface-tint px-4 py-3.5"
+            style={{ borderRadius: radius.lg }}
+          >
+            <Image source={KOKO} style={{ width: 56, height: 56 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+            <View className="min-w-0 flex-1">
+              <Text className="text-body-lg text-ink" style={{ fontFamily: fonts.bold }}>
+                Trở thành Mentor
+              </Text>
+              <Text className="text-caption text-ink-body" style={{ fontFamily: fonts.medium }}>
+                Chia sẻ kinh nghiệm với đàn em và nhận S-coins
+              </Text>
+            </View>
+            <ChevronRight size={20} color={colors.accent} strokeWidth={2} />
           </Pressable>
         ) : null}
 

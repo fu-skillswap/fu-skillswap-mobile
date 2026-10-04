@@ -27,7 +27,9 @@ import { bookingMockHandlers } from '@/features/booking/mocks/handlers';
 import { chatMockHandlers } from '@/features/chat/mocks/handlers';
 import { forumMockHandlers } from '@/features/forum/mocks/handlers';
 import { mentorMockHandlers } from '@/features/mentor/mocks/handlers';
+import { mentorBlogMockHandlers } from '@/features/mentorBlog/mocks/handlers';
 import { mentorModeMockHandlers } from '@/features/mentorMode/mocks/handlers';
+import { mentorRegistrationMockHandlers } from '@/features/mentorRegistration/mocks/handlers';
 import { notificationMockHandlers } from '@/features/notification/mocks/handlers';
 import { profileMockHandlers } from '@/features/profile/mocks/handlers';
 
@@ -37,7 +39,9 @@ export const mockHandlers = [
   ...chatMockHandlers,
   ...forumMockHandlers,
   ...mentorMockHandlers,
+  ...mentorBlogMockHandlers,
   ...mentorModeMockHandlers,
+  ...mentorRegistrationMockHandlers,
   ...notificationMockHandlers,
   ...profileMockHandlers,
 ];
