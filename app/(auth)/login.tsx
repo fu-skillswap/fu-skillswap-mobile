@@ -33,7 +33,11 @@ export default function LoginScreen() {
   // đẩy nó sang (tabs) thì hai màn hình đá nhau vô hạn. Đưa nó sang màn hình
   // "không hỗ trợ" — một trạng thái cuối, không redirect tiếp.
   if (route.kind === 'tabs') {
-    return <Redirect href="/(tabs)" />;
+    // Lần đăng nhập đầu (chưa có hồ sơ sinh viên) đi qua màn Hoàn thiện hồ sơ,
+    // đúng luồng Welcome → Onboarding của thiết kế và của bản web. CHỈ ở đây,
+    // không ở `app/index.tsx`: người đã bấm "Để sau" không bị đẩy lại vào form
+    // mỗi lần mở app — lối vào lại nằm ở tab Hồ sơ.
+    return <Redirect href={user?.hasStudentProfile === false ? '/onboarding' : '/(tabs)'} />;
   }
   if (route.kind === 'unsupported') {
     return <Redirect href="/(auth)/unsupported-account" />;

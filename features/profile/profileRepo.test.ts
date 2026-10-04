@@ -22,7 +22,7 @@ const HO_SO = {
   studentCode: 'HE180001',
   displayName: 'Nguyễn Văn A',
   avatarUrl: null,
-  campus: { id: 'c1', code: 'HL', name: 'FPT University Hà Nội', city: 'Hà Nội' },
+  campus: { id: 'c1', code: 'HA_NOI', name: 'FPT University Hà Nội', city: 'Hà Nội' },
   program: {
     id: 'p1',
     code: 'CNTT',
@@ -32,11 +32,11 @@ const HO_SO = {
   specialization: null,
   semester: 5,
   intakeYear: 2022,
-  isAlumni: false,
+  alumni: false,
   graduationYear: null,
   bio: 'Thích backend',
-  createdAt: '2026-01-01T00:00:00Z',
-  updatedAt: '2026-09-01T00:00:00Z',
+  createdAt: '2026-01-01T07:00:00',
+  updatedAt: '2026-09-01T07:00:00',
 };
 
 const server = setupServer();
@@ -138,5 +138,49 @@ describe('profileRepo.getStudentProfile', () => {
     );
 
     await expect(profileRepo.getStudentProfile()).rejects.toBeInstanceOf(ApiClientError);
+  });
+});
+
+describe('profileRepo — lưu hồ sơ và danh mục', () => {
+  it('PUT gửi đúng khoá `isAlumni` (Boolean đóng hộp phía Java), không phải `alumni`', async () => {
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.put(`${BASE}/api/me/student-profile`, async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(envelope({ ...HO_SO, alumni: true }));
+      }),
+    );
+
+    const hoSo = await profileRepo.saveStudentProfile({
+      studentCode: 'SE192621',
+      displayName: null,
+      campusId: 'c1',
+      programId: 'p1',
+      specializationId: 's1',
+      semester: 9,
+      intakeYear: 2019,
+      isAlumni: true,
+      graduationYear: 2023,
+      bio: null,
+    });
+
+    expect(body).toMatchObject({ isAlumni: true, graduationYear: 2023 });
+    expect(body).not.toHaveProperty('alumni');
+    // Chiều ngược lại: phản hồi dùng `alumni` (boolean nguyên thuỷ của Lombok).
+    expect(hoSo.alumni).toBe(true);
+  });
+
+  it('chuyên ngành gọi theo ĐÚNG ngành đã chọn', async () => {
+    let duongDan = '';
+    server.use(
+      http.get(`${BASE}/api/academic-programs/:programId/specializations`, ({ request }) => {
+        duongDan = new URL(request.url).pathname;
+        return HttpResponse.json(envelope([]));
+      }),
+    );
+
+    await profileRepo.getSpecializations('p9');
+
+    expect(duongDan).toBe('/api/academic-programs/p9/specializations');
   });
 });

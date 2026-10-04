@@ -6,6 +6,9 @@
  * phiên (`useAuth`) luôn có sẵn nên hiện ngay; hồ sơ sinh viên là một query
  * riêng, hỏng hay chưa có thì cũng KHÔNG được xoá phần trên khỏi màn hình.
  *
+ * Khối hồ sơ sinh viên dẫn sang màn Hoàn thiện hồ sơ (`/onboarding`): nút
+ * "Hoàn thiện hồ sơ" khi chưa có, "Chỉnh sửa" khi đã có.
+ *
  * `Profile.dc.html` còn vẽ bốn khối nữa — ví S-coins, card "Trở thành Mentor",
  * menu tài khoản (Hồ sơ học thuật / Lịch hẹn / Thông báo / Ngôn ngữ) và nút bánh
  * răng Cài đặt. Lần này KHÔNG dựng khối nào trong số đó: tất cả đều là lối vào
@@ -41,7 +44,7 @@ import { ListRow } from '@/core/ui/ListRow';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenHeader } from '@/core/ui/ScreenHeader';
-import { colors, fonts, radius } from '@/core/ui/theme';
+import { colors, fonts, radius, spacing } from '@/core/ui/theme';
 import { useStudentProfile } from '@/features/profile/hooks/useProfileQueries';
 
 /** Một dòng "nhãn — giá trị"; bỏ hẳn dòng khi không có giá trị */
@@ -137,12 +140,26 @@ export function ProfileScreen() {
         </Card>
 
         <Card>
-          <Text
-            className="pb-1 text-section-title text-ink"
-            style={{ fontFamily: fonts.bold }}
-          >
-            Hồ sơ sinh viên
-          </Text>
+          <View className="flex-row items-center justify-between pb-1">
+            <Text className="text-section-title text-ink" style={{ fontFamily: fonts.bold }}>
+              Hồ sơ sinh viên
+            </Text>
+            {/* Chỉ khi ĐÃ có hồ sơ: chưa có thì lối vào là nút trong trạng thái rỗng bên dưới. */}
+            {hoSo.data ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Chỉnh sửa hồ sơ sinh viên"
+                onPress={() => router.push('/onboarding')}
+                testID="nut-sua-ho-so"
+                className="justify-center"
+                style={{ minHeight: spacing.touch }}
+              >
+                <Text className="text-caption-lg text-accent" style={{ fontFamily: fonts.semibold }}>
+                  Chỉnh sửa
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
 
           {trangThaiHoSo === 'mat-ket-noi' ? (
             <EmptyState title="Không có kết nối" description="Hồ sơ sẽ tải khi có mạng trở lại." />
@@ -152,6 +169,8 @@ export function ProfileScreen() {
             <EmptyState
               title="Chưa có hồ sơ sinh viên"
               description="Hoàn thành hồ sơ để mentor biết bạn đang học ngành nào."
+              actionLabel="Hoàn thiện hồ sơ"
+              onAction={() => router.push('/onboarding')}
             />
           ) : (
             <View>

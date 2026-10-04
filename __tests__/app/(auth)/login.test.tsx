@@ -81,6 +81,17 @@ describe('LoginScreen', () => {
     expect(screen.queryByText('Đăng nhập với Google')).toBeNull();
   });
 
+  it('đăng nhập lần đầu (chưa có hồ sơ sinh viên): sang màn Hoàn thiện hồ sơ, không sang (tabs)', async () => {
+    mockedUseAuth.mockReturnValue(
+      authValue({ status: 'authenticated', user: { ...meWithRoles(['MENTEE']), hasStudentProfile: false } }),
+    );
+
+    await render(<LoginScreen />);
+
+    expect(mockedRedirect).toHaveBeenCalledWith({ href: '/onboarding' }, undefined);
+    expect(mockedRedirect).not.toHaveBeenCalledWith({ href: '/(tabs)' }, undefined);
+  });
+
   it('status đã đăng nhập, vai trò ADMIN: điều hướng sang màn hình không hỗ trợ, không sang (tabs)', async () => {
     mockedUseAuth.mockReturnValue(
       authValue({ status: 'authenticated', user: meWithRoles(['ADMIN']) }),

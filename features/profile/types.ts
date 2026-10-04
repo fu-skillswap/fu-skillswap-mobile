@@ -1,14 +1,27 @@
 /**
  * @file types.ts
- * @description Kiểu dữ liệu hồ sơ sinh viên, port từ
- * `fu-skillswap-be/docs/frontend-guide/identity.md` §4.1–4.3 và §5.1.
+ * @description Kiểu dữ liệu hồ sơ sinh viên, đối chiếu với source Java
+ * (`modules/identity/dto/...`, `domain/CampusCode.java`) — KHÔNG chỉ theo
+ * `identity.md`, vì tài liệu đó lệch source ở ba chỗ (mục 5 của quy ước):
+ *
+ * - `CampusCode` là `HCM | HA_NOI | DA_NANG | CAN_THO | QUY_NHON | ONLINE`, không
+ *   phải bộ mã viết tắt `HL/DN/CT/QNH` mà tài liệu ghi.
+ * - Ba field `boolean` NGUYÊN THUỶ đặt tên `isX` trong lớp Lombok `@Data`
+ *   (`isExpected`, `isOther`, `isAlumni`) có getter là `isX()`, nên Jackson
+ *   phát chúng ra JSON với tên BỎ tiền tố: `expected`, `other`, `alumni`. Bản web
+ *   (`models/auth.ts`) cũng đọc `expected`. Đọc `isAlumni` sẽ ra `undefined` mà
+ *   không có lỗi kiểu nào chặn.
+ * - `createdAt`/`updatedAt` là `LocalDateTime` — lên dây KHÔNG có offset.
+ *
+ * Request thì ngược lại: `StudentProfileRequest.isAlumni` là `Boolean` ĐÓNG HỘP,
+ * getter `getIsAlumni()`, nên khoá JSON khi GỬI lên đúng là `isAlumni`.
  */
 
 /** Cơ sở FPT (§4.1) */
 export interface CampusResponse {
   id: string;
-  /** Mã cơ sở — backend chỉ phát ra đúng năm giá trị này; KHÔNG có 'HN' */
-  code: 'HCM' | 'HL' | 'DN' | 'CT' | 'QNH';
+  /** `CampusCode.java` */
+  code: 'HCM' | 'HA_NOI' | 'DA_NANG' | 'CAN_THO' | 'QUY_NHON' | 'ONLINE';
   /** Ví dụ: "FPT University Hồ Chí Minh" */
   name: string;
   /** Ví dụ: "Hồ Chí Minh" */
@@ -33,8 +46,10 @@ export interface SpecializationResponse {
   code: string;
   nameVi: string;
   nameEn: string;
-  isExpected: boolean;
-  isOther: boolean;
+  /** Java `isExpected` — Jackson bỏ tiền tố `is` */
+  expected: boolean;
+  /** Java `isOther` — Jackson bỏ tiền tố `is` */
+  other: boolean;
 }
 
 /**
@@ -55,9 +70,33 @@ export interface StudentProfileResponse {
   /** Học kỳ 0–9 (§5.2) — `0` là giá trị HỢP LỆ, không phải "chưa có" */
   semester: number | null;
   intakeYear: number | null;
-  isAlumni: boolean;
+  /** Java `isAlumni` (boolean nguyên thuỷ) — lên dây là `alumni` */
+  alumni: boolean;
   graduationYear: number | null;
   bio: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * `StudentProfileRequest.java` — body của `PUT /api/me/student-profile` (tạo mới
+ * HOẶC cập nhật, cùng một endpoint).
+ */
+export interface StudentProfileRequest {
+  /** `^[HSDQC][ESA](0[1-9]|1[0-9]|2[0-2])\d{4}$`, không phân biệt hoa thường */
+  studentCode: string;
+  /** Rỗng thì backend giữ tên từ Google */
+  displayName: string | null;
+  campusId: string;
+  programId: string;
+  /** BẮT BUỘC và phải thuộc `programId` */
+  specializationId: string;
+  /** 0–9; cựu sinh viên thì backend tự ghi 9 */
+  semester: number;
+  /** 2000 – năm hiện tại */
+  intakeYear: number;
+  isAlumni: boolean;
+  /** Bắt buộc khi `isAlumni`; ≥ `intakeYear + 2` */
+  graduationYear: number | null;
+  bio: string | null;
 }

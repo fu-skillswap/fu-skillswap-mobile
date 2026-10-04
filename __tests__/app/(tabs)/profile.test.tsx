@@ -103,7 +103,7 @@ const HO_SO = {
   studentCode: 'HE180001',
   displayName: 'Nguyễn Văn A',
   avatarUrl: null,
-  campus: { id: 'c1', code: 'HL', name: 'FPT University Hà Nội', city: 'Hà Nội' },
+  campus: { id: 'c1', code: 'HA_NOI', name: 'FPT University Hà Nội', city: 'Hà Nội' },
   program: {
     id: 'p1',
     code: 'CNTT',
@@ -113,10 +113,10 @@ const HO_SO = {
   specialization: null,
   semester: 5,
   intakeYear: 2022,
-  isAlumni: false,
+  alumni: false,
   graduationYear: null,
   bio: 'Thích backend',
-  createdAt: '2026-01-01T00:00:00Z',
+  createdAt: '2026-01-01T07:00:00',
   updatedAt: '2026-09-01T00:00:00Z',
 };
 
@@ -242,6 +242,31 @@ describe('ProfileScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Chưa có hồ sơ sinh viên')).toBeTruthy());
     expect(screen.queryByText('Hệ thống đang bận')).toBeNull();
+    await doiHoSoXong();
+  });
+
+  it('CHƯA có hồ sơ: nút "Hoàn thiện hồ sơ" mở màn onboarding', async () => {
+    server.use(chuaCoHoSo());
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Hoàn thiện hồ sơ')).toBeTruthy());
+
+    await fireEvent.press(screen.getByText('Hoàn thiện hồ sơ'));
+
+    expect(mockPush).toHaveBeenCalledWith('/onboarding');
+    expect(screen.queryByTestId('nut-sua-ho-so')).toBeNull();
+    await doiHoSoXong();
+  });
+
+  it('ĐÃ có hồ sơ: nút "Chỉnh sửa" mở cùng màn đó để sửa', async () => {
+    server.use(http.get(`${BASE}/api/me/student-profile`, () => HttpResponse.json(envelope(HO_SO))));
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-sua-ho-so')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-sua-ho-so'));
+
+    expect(mockPush).toHaveBeenCalledWith('/onboarding');
     await doiHoSoXong();
   });
 

@@ -6,7 +6,13 @@
 
 import { apiClient } from '@/core/api/client';
 import { ApiClientError } from '@/core/api/errors';
-import type { StudentProfileResponse } from '@/features/profile/types';
+import type {
+  AcademicProgramResponse,
+  CampusResponse,
+  SpecializationResponse,
+  StudentProfileRequest,
+  StudentProfileResponse,
+} from '@/features/profile/types';
 
 export const profileRepo = {
   /**
@@ -26,5 +32,24 @@ export const profileRepo = {
       }
       throw error;
     }
+  },
+
+  /** Tạo mới HOẶC cập nhật hồ sơ — cùng một `PUT` (`StudentProfileController`) */
+  saveStudentProfile(input: StudentProfileRequest) {
+    return apiClient<StudentProfileResponse>('/api/me/student-profile', { method: 'PUT', body: input });
+  },
+
+  /** Danh mục cơ sở đang hoạt động (`AcademicController`) */
+  getCampuses() {
+    return apiClient<CampusResponse[]>('/api/campuses');
+  },
+
+  getAcademicPrograms() {
+    return apiClient<AcademicProgramResponse[]>('/api/academic-programs');
+  },
+
+  /** Chuyên ngành của MỘT ngành — backend từ chối cặp ngành/chuyên ngành lệch nhau */
+  getSpecializations(programId: string) {
+    return apiClient<SpecializationResponse[]>(`/api/academic-programs/${programId}/specializations`);
   },
 };
