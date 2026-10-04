@@ -190,7 +190,18 @@ describe('BookingSlotScreen', () => {
     await renderScreen();
 
     // Ngày có lịch đầu tiên (T3 06/10) được chọn sẵn và lưới giờ hiện ngay.
-    await waitFor(() => expect(screen.getByTestId('khung-19:00')).toBeTruthy());
+    //
+    // Nới timeout cho RIÊNG lần chờ này, không phải cho cả file: đây là test đầu
+    // tiên của một file test component, nên nó gánh toàn bộ chi phí nạp module
+    // React Native, VÀ màn hình phải đi ba lượt gọi mạng nối tiếp trước khi lưới
+    // giờ xuất hiện (hồ sơ mentor → lịch tuần hiện tại, rỗng nên tự sang tuần
+    // sau → lưới giờ của slot). Mặc định của `waitFor` là 1 giây: chạy riêng file
+    // thì đủ (4s cả file), nhưng dưới tải song song của `npm test` thì không —
+    // đỏ 3/3 lần với "Unable to find an element with testID: khung-19:00" trong
+    // khi chạy riêng xanh. Không phải flake ngẫu nhiên, mà là hạn chờ quá chặt.
+    await waitFor(() => expect(screen.getByTestId('khung-19:00')).toBeTruthy(), {
+      timeout: 10_000,
+    });
     expect(screen.getByText('Tháng 10, 2026')).toBeTruthy();
     expect(screen.getByTestId('nut-tiep-tuc')).toBeDisabled();
 
