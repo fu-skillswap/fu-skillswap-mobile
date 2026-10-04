@@ -106,11 +106,28 @@ Hai cái bẫy đã gặp thật:
 - **Nguyên thuỷ vs đóng hộp**: `boolean` trong Java là không-null, `Boolean` là
   có thể null. Card và detail của mentor khác nhau đúng ở chỗ này.
 
-**Mốc thời gian**: gần như mọi trường thời gian của BE là `LocalDateTime`, lên
-dây **không có offset** (`"2026-06-22T21:20:25"`). `new Date()` của JS đọc chuỗi
-đó là **giờ địa phương của máy** — đúng trên điện thoại UTC+7 một cách tình cờ,
-sai ở mọi múi khác. DTO nào có cả trường `Instant` song song (ví dụ
-`ServiceSlotCandidateItemResponse.startAt`) thì dùng trường `Instant`.
+**Mốc thời gian — có HAI khuôn, đừng đoán, hãy mở file Java ra xem.**
+
+- Phần lớn DTO dùng `LocalDateTime`, lên dây **không có offset**
+  (`"2026-06-22T21:20:25"`). Đọc bằng `core/time/localDateTime.ts`.
+- **Nhánh booking là ngoại lệ**: mọi trường thời gian của `BookingResponse.java`
+  là `OffsetDateTime`, dựng bởi `BookingTime.toOffsetDateTime()` với
+  `BUSINESS_ZONE = Asia/Ho_Chi_Minh`, nên lên dây **có** offset
+  (`"2026-10-04T20:30:00+07:00"`). Đọc bằng `core/time/offsetDateTime.ts`.
+
+Hai helper tồn tại song song **có chủ ý**. `docLocalDateTime()` cố ý từ chối hậu
+tố offset nên đưa chuỗi booking vào nó sẽ trả `null` và màn hình không in được
+ngày nào. **Đừng gộp hai file, đừng nới khuôn của file kia.**
+
+Trong cả hai trường hợp, **đừng đưa chuỗi thẳng vào `new Date()`**: với chuỗi
+không offset, JS đọc thành giờ địa phương của máy — đúng trên điện thoại UTC+7
+một cách tình cờ, lệch 7 tiếng trong CI. DTO nào có trường `Instant` song song
+(ví dụ `ServiceSlotCandidateItemResponse.startAt`) thì ưu tiên trường `Instant`.
+
+**Nhãn trạng thái có thể là trạng thái SUY RA, không phải giá trị enum.** Ví dụ
+đã gặp: `NO_SHOW_MENTOR` vẫn mang `bookingStatus = COMPLETED`, nên gắn nhãn "Đã
+hoàn thành" cho nó là nói sai với người dùng — nhãn "Vắng mặt" phải thắng. Xem
+`features/booking/bookingStatus.ts`.
 
 ## 6. Luật kỹ thuật của repo
 
