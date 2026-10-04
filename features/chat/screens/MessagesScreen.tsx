@@ -37,6 +37,11 @@ import type { ConversationResponse } from '@/features/chat/types';
 export interface MessagesScreenProps {
   /** Chu kỳ tải lại hộp thư; test truyền `false` */
   thamDoMs?: number | false;
+  /**
+   * Có thì hiện nút quay lại. Chỉ route `/chat` (mở từ menu "Thêm" của chế độ
+   * Mentor) truyền nó — ở tab Tin nhắn của Mentee không có gì để quay lại.
+   */
+  onBack?: () => void;
 }
 
 /** Tên hiển thị của hội thoại — nhóm khoá học thì lấy tên khoá học */
@@ -48,7 +53,7 @@ function boDau(chuoi: string): string {
   return chuoi.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
 }
 
-export function MessagesScreen({ thamDoMs = THAM_DO_HOP_THU_MS }: MessagesScreenProps) {
+export function MessagesScreen({ thamDoMs = THAM_DO_HOP_THU_MS, onBack }: MessagesScreenProps) {
   const router = useRouter();
   const query = useConversations(thamDoMs);
   const [tuKhoa, setTuKhoa] = useState('');
@@ -69,7 +74,7 @@ export function MessagesScreen({ thamDoMs = THAM_DO_HOP_THU_MS }: MessagesScreen
     <Screen testID="man-hinh-tin-nhan">
       <OfflineBanner />
       <View className="gap-4 px-gutter pb-3 pt-2">
-        <ScreenHeader title="Tin nhắn" size="lg" />
+        <ScreenHeader title="Tin nhắn" size="lg" onBack={onBack} />
         <View
           className="flex-row items-center gap-2.5 rounded-full border border-line bg-surface px-4"
           style={{ height: 48 }}

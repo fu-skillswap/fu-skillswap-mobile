@@ -301,22 +301,40 @@ describe('MentorMoreScreen', () => {
   }, 15_000);
 });
 
-describe('MentorMoreScreen — các hàng menu CỐ Ý bỏ', () => {
-  /*
-    TEST CANH cho từng hàng. Năm hàng của thiết kế dẫn tới màn hình chưa tồn
-    tại, nên chúng là nút chết. Khi dựng xong màn tương ứng thì xoá dòng canh VÀ
-    thêm hàng vào màn hình — đừng chỉ xoá dòng canh.
-  */
+describe('MentorMoreScreen — các hàng menu dẫn tới màn có thật', () => {
   beforeEach(() => {
     server.use(hoSoOk());
   });
 
-  it('KHÔNG có "Dịch vụ của tôi" — MentorServices chưa dựng', async () => {
+  it('"Dịch vụ của tôi" mở tab Lịch dạy ở phần Dịch vụ', async () => {
     await renderScreen();
     await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
 
-    expect(screen.queryByText('Dịch vụ của tôi')).toBeNull();
+    await fireEvent.press(screen.getByTestId('hang-dich-vu'));
+
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/(tabs)/mentor-schedule', params: { phan: 'dich-vu' } });
     await doiXong();
+  });
+
+  it('"Tin nhắn" mở hộp thư ngoài thanh tab, không mở tab ẩn của Mentee', async () => {
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('hang-tin-nhan'));
+
+    expect(mockPush).toHaveBeenCalledWith('/chat');
+    await doiXong();
+  });
+});
+
+describe('MentorMoreScreen — các hàng menu CỐ Ý bỏ', () => {
+  /*
+    TEST CANH cho từng hàng. Các hàng này của thiết kế dẫn tới màn hình chưa
+    tồn tại, nên chúng là nút chết. Khi dựng xong màn tương ứng thì xoá dòng canh VÀ
+    thêm hàng vào màn hình — đừng chỉ xoá dòng canh.
+  */
+  beforeEach(() => {
+    server.use(hoSoOk());
   });
 
   it('KHÔNG có "Khóa học của tôi" — MentorCourses chưa dựng', async () => {
@@ -335,15 +353,6 @@ describe('MentorMoreScreen — các hàng menu CỐ Ý bỏ', () => {
     await doiXong();
   });
 
-  it('KHÔNG có hàng "Tin nhắn" — tab Tin nhắn vẫn là vỏ rỗng', async () => {
-    // Dẫn sang một vỏ rỗng là một nút chết đi đường vòng.
-    await renderScreen();
-    await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
-
-    expect(screen.queryByText('Tin nhắn')).toBeNull();
-    await doiXong();
-  });
-
   it('KHÔNG có "Trợ giúp & điều khoản" — chính thiết kế để href="#"', async () => {
     await renderScreen();
     await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
@@ -353,8 +362,8 @@ describe('MentorMoreScreen — các hàng menu CỐ Ý bỏ', () => {
   });
 
   it('KHÔNG có con số đếm nào cạnh các hàng — không endpoint nào được nối', async () => {
-    // Thiết kế in "3" cạnh "Dịch vụ của tôi" và "3" cạnh "Tin nhắn". Không có
-    // endpoint nào trả hai con số đó, nên chúng sẽ là số bịa.
+    // Thiết kế in "3" cạnh "Dịch vụ của tôi" và "3" cạnh "Tin nhắn". Dịch vụ
+    // không có endpoint đếm; số tin chưa đọc đã hiện ngay trong hộp thư.
     await renderScreen();
     await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
 

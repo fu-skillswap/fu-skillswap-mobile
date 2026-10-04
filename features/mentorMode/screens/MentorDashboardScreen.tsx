@@ -63,11 +63,10 @@
  * Dẫn sang màn Thông báo (`/notifications`). Chấm cam đọc từ
  * `/api/me/notifications/unread-count` — xem `ChuongThongBao`.
  *
- * ## 5. Dòng "Đặt chỗ sắp tới" KHÔNG bấm được
+ * ## 5. Dòng "Đặt chỗ sắp tới" mở chi tiết booking
  *
- * Thiết kế cho mỗi dòng dẫn sang `MentorBookingDetail` — màn hình chưa thuộc
- * đợt này. Dòng vẫn hiện (thông tin có thật và hữu ích) nhưng không phải nút.
- * Lối "Xem tất cả" thì giữ, vì tab Booking CÓ THẬT.
+ * Đúng thiết kế: mỗi dòng dẫn sang `MentorBookingDetail` (`/mentor-booking/<id>`).
+ * Lối "Xem tất cả" dẫn sang tab Booking.
  *
  * ## 6. Dải cảnh báo bị treo quyền nhận booking được THÊM
  *
@@ -108,15 +107,18 @@ import {
 const SO_DONG_SAP_TOI = 3;
 
 /** Một dòng booking gọn, theo khối "Đặt chỗ sắp tới" của thiết kế */
-function DongBookingGon({ booking }: { booking: BookingResponse }) {
+function DongBookingGon({ booking, onPress }: { booking: BookingResponse; onPress: () => void }) {
   const ngay = nhanNgayNgan(booking.selectedStartTime);
   const gio = dinhDangGio(booking.selectedStartTime);
   const tenMentee = booking.menteeDisplayName ?? 'Mentee';
   const moTa = booking.serviceTitle ?? booking.learningGoalTitle;
 
   return (
-    <View
+    <Pressable
       testID={`dong-sap-toi-${booking.bookingId}`}
+      accessibilityRole="button"
+      accessibilityLabel={`${tenMentee}${moTa ? `, ${moTa}` : ''}${ngay ? `, ${ngay}` : ''}${gio ? ` ${gio}` : ''}`}
+      onPress={onPress}
       className="flex-row items-center gap-3 border border-line bg-surface px-3.5 py-3"
       style={{ borderRadius: 20 }}
     >
@@ -160,7 +162,8 @@ function DongBookingGon({ booking }: { booking: BookingResponse }) {
           {moTa}
         </Text>
       </View>
-    </View>
+      <ChevronRight size={18} color={colors.inkMuted} strokeWidth={2} />
+    </Pressable>
   );
 }
 
@@ -369,7 +372,11 @@ export function MentorDashboardScreen() {
           ) : (
             <View className="gap-2.5">
               {sapToi.bookings.slice(0, SO_DONG_SAP_TOI).map((booking) => (
-                <DongBookingGon key={booking.bookingId} booking={booking} />
+                <DongBookingGon
+                  key={booking.bookingId}
+                  booking={booking}
+                  onPress={() => router.push(`/mentor-booking/${booking.bookingId}`)}
+                />
               ))}
             </View>
           )}

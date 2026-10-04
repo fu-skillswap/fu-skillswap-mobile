@@ -25,7 +25,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, ChevronRight, Plus, RefreshCw } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -76,10 +76,27 @@ const SO_TUAN_TOI_DA = 3;
 export interface MentorScheduleScreenProps {
   /** Đồng hồ cho test; mặc định giờ thật */
   bayGioMs?: number;
+  /**
+   * Phần cần mở, từ tham số `?phan=` của route (menu "Thêm" → "Dịch vụ của tôi"
+   * mở thẳng phần Dịch vụ). Giá trị lạ thì bỏ qua.
+   */
+  phanYeuCau?: string;
 }
 
-export function MentorScheduleScreen({ bayGioMs }: MentorScheduleScreenProps) {
-  const [phan, setPhan] = useState<Phan>('lich');
+function laPhan(gt: string | undefined): gt is Phan {
+  return gt === 'lich' || gt === 'dich-vu';
+}
+
+export function MentorScheduleScreen({ bayGioMs, phanYeuCau }: MentorScheduleScreenProps) {
+  const [phan, setPhan] = useState<Phan>(laPhan(phanYeuCau) ? phanYeuCau : 'lich');
+
+  // Màn tab SỐNG LÂU: lần thứ hai được mở bằng `?phan=dich-vu` thì component đã
+  // dựng sẵn, `useState` không đọc lại giá trị đầu. Phải theo dõi tham số.
+  useEffect(() => {
+    if (laPhan(phanYeuCau)) {
+      setPhan(phanYeuCau);
+    }
+  }, [phanYeuCau]);
 
   return (
     <Screen testID="man-hinh-lich-day">

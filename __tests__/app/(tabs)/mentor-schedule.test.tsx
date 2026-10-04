@@ -83,4 +83,40 @@ describe('MentorScheduleScreen', () => {
     await fireEvent.press(screen.getByTestId('nut-tao-dich-vu'));
     expect(__push).toHaveBeenCalledWith('/mentor-service/new');
   });
+
+  it('mở bằng ?phan=dich-vu (từ menu Thêm) thì vào thẳng phần Dịch vụ', async () => {
+    await render(
+      <QueryClientProvider client={queryClient}>
+        <MentorScheduleScreen phanYeuCau="dich-vu" />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('dich-vu-msv1')).toBeTruthy());
+  });
+
+  it('màn tab đã dựng sẵn vẫn chuyển sang Dịch vụ khi tham số đổi', async () => {
+    // Màn tab sống lâu: lần mở thứ hai bằng `?phan=dich-vu` chỉ đổi prop, không
+    // dựng lại component, nên giá trị đầu của `useState` không đủ.
+    const cay = (phan?: string) => (
+      <QueryClientProvider client={queryClient}>
+        <MentorScheduleScreen phanYeuCau={phan} />
+      </QueryClientProvider>
+    );
+    const { rerender } = await render(cay());
+    await waitFor(() => expect(screen.getByTestId('the-lich-google')).toBeTruthy());
+
+    await rerender(cay('dich-vu'));
+
+    await waitFor(() => expect(screen.getByTestId('dich-vu-msv1')).toBeTruthy());
+  });
+
+  it('giá trị lạ của ?phan bị bỏ qua, mở phần Lịch như thường', async () => {
+    await render(
+      <QueryClientProvider client={queryClient}>
+        <MentorScheduleScreen phanYeuCau="khong-co" />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('the-lich-google')).toBeTruthy());
+  });
 });

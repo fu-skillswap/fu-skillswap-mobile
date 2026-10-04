@@ -1,5 +1,8 @@
+import { useLocalSearchParams } from 'expo-router';
+
 import { MentorScheduleScreen } from '@/features/mentorMode';
 
 export default function MentorScheduleRoute() {
-  return <MentorScheduleScreen />;
+  const { phan } = useLocalSearchParams<{ phan?: string }>();
+  return <MentorScheduleScreen phanYeuCau={typeof phan === 'string' ? phan : undefined} />;
 }

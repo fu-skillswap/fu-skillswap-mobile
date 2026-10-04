@@ -7,21 +7,24 @@
  * PHẦN CỦA THIẾT KẾ BỊ BỎ, VÀ VÌ SAO
  * ================================================================
  *
- * Thiết kế có hai khối `<nav>` với 6 hàng. Năm trong số đó dẫn tới màn hình
- * **chưa tồn tại trong repo**, nên bị bỏ hẳn (mục 6 của quy ước: nút chưa nối
- * được việc gì thì đừng dựng):
+ * Thiết kế có hai khối `<nav>` với 6 hàng. Hai hàng dẫn tới màn CÓ THẬT nên
+ * được dựng:
  *
- * - **Dịch vụ của tôi** → `MentorServices.dc.html`, chưa dựng. Con số "3" bên
- *   phải hàng đó cũng không có endpoint nào được nối.
+ * - **Dịch vụ của tôi** → tab Lịch dạy, mở thẳng phần Dịch vụ
+ *   (`/(tabs)/mentor-schedule?phan=dich-vu`).
+ * - **Tin nhắn** → hộp thư ngoài thanh tab (`/chat`). Thanh Mentor không có mục
+ *   Tin nhắn nên đây là lối duy nhất để mentor trả lời mentee.
+ *
+ * Bỏ, vì chưa có màn hoặc chưa có đích:
+ *
  * - **Khóa học của tôi** → `MentorCourses.dc.html`, chưa dựng.
  * - **Bài viết của tôi** → `MentorPosts.dc.html`, chưa dựng. (Diễn đàn trong repo
  *   là `features/forum`, một nhánh khác hẳn — `MeBlogController` /
  *   `MentorBlogController` của backend là blog, không phải diễn đàn.)
- * - **Tin nhắn** → tab Tin nhắn của thanh Mentee hiện vẫn là **vỏ rỗng**. Dẫn
- *   sang một vỏ rỗng là một nút chết đi đường vòng. Con số "3" (tin chưa đọc)
- *   cũng không có endpoint nào được nối.
  * - **Trợ giúp & điều khoản** → thiết kế để `href="#"`, tức chính thiết kế cũng
  *   chưa có đích.
+ * - **Con số "3"** cạnh hai hàng trên: thiết kế vẽ, nhưng dịch vụ không có
+ *   endpoint đếm, và số tin chưa đọc đã hiện ngay trong hộp thư.
  *
  * `MentorMoreScreen.test.tsx` có test canh cho từng mục trên. Khi dựng xong màn
  * tương ứng thì xoá dòng canh VÀ thêm hàng vào đây — đừng chỉ xoá dòng canh.
@@ -41,7 +44,7 @@
  */
 
 import { useRouter } from 'expo-router';
-import { ArrowLeftRight, LogOut } from 'lucide-react-native';
+import { ArrowLeftRight, BriefcaseBusiness, LogOut, MessageSquare } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { trangThaiTai } from '@/core/api/queryState';
@@ -174,6 +177,24 @@ export function MentorMoreScreen() {
             {noiDungHoSo}
           </Card>
         )}
+
+        <Card flush>
+          <ListRow
+            label="Dịch vụ của tôi"
+            icon={<BriefcaseBusiness size={20} color={colors.accent} strokeWidth={2} />}
+            chevron
+            onPress={() => router.push({ pathname: '/(tabs)/mentor-schedule', params: { phan: 'dich-vu' } })}
+            testID="hang-dich-vu"
+          />
+          <ListRow
+            label="Tin nhắn"
+            icon={<MessageSquare size={20} color={colors.accent} strokeWidth={2} />}
+            chevron
+            divider
+            onPress={() => router.push('/chat')}
+            testID="hang-tin-nhan"
+          />
+        </Card>
 
         {coHaiVaiTro ? (
           <Pressable

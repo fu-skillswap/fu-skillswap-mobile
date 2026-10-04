@@ -392,9 +392,7 @@ describe('MentorDashboardScreen', () => {
     await doiXong();
   });
 
-  it('dòng "Đặt chỗ sắp tới" KHÔNG dẫn đi đâu — MentorBookingDetail chưa có', async () => {
-    // TEST CANH. Thiết kế cho mỗi dòng dẫn sang `MentorBookingDetail.dc.html`;
-    // màn đó chưa thuộc đợt này.
+  it('chạm dòng "Đặt chỗ sắp tới" mở chi tiết booking của mentor', async () => {
     server.use(...duLieuDayDu());
 
     await renderScreen();
@@ -403,7 +401,7 @@ describe('MentorDashboardScreen', () => {
 
     await fireEvent.press(screen.getByTestId('dong-sap-toi-mb1'));
 
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/mentor-booking/mb1');
     await doiXong();
   });
 

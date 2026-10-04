@@ -20,10 +20,16 @@ jest.mock('@/features/mentorMode', () => {
   return {
     MentorDashboardScreen: () => <Text>MÀN TỔNG QUAN MENTOR</Text>,
     MentorMoreScreen: () => <Text>MÀN THÊM CỦA MENTOR</Text>,
-    MentorScheduleScreen: () => <Text>MÀN LỊCH DẠY</Text>,
+    MentorScheduleScreen: ({ phanYeuCau }: { phanYeuCau?: string }) => (
+      <Text>{`MÀN LỊCH DẠY${phanYeuCau ? ` · ${phanYeuCau}` : ''}`}</Text>
+    ),
     MentorWalletScreen: () => <Text>MÀN VÍ MENTOR</Text>,
   };
 });
+
+// Route Lịch dạy đọc `?phan=` (menu "Thêm" mở thẳng phần Dịch vụ).
+let mockThamSo: Record<string, string | string[] | undefined> = {};
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => mockThamSo }));
 
 jest.mock('@/features/booking', () => {
   const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
@@ -92,11 +98,31 @@ describe('route app/(tabs)/mentor-more.tsx', () => {
 });
 
 describe('route app/(tabs)/mentor-schedule.tsx và mentor-wallet.tsx', () => {
+  beforeEach(() => {
+    mockThamSo = {};
+  });
+
   it('Lịch dạy nối màn thật, KHÔNG còn vỏ "Đang hoàn thiện"', async () => {
     await render(<MentorScheduleRoute />);
 
     expect(screen.getByText('MÀN LỊCH DẠY')).toBeTruthy();
     expect(screen.queryByText('Đang hoàn thiện')).toBeNull();
+  });
+
+  it('Lịch dạy chuyền tham số ?phan= xuống màn hình', async () => {
+    mockThamSo = { phan: 'dich-vu' };
+
+    await render(<MentorScheduleRoute />);
+
+    expect(screen.getByText('MÀN LỊCH DẠY · dich-vu')).toBeTruthy();
+  });
+
+  it('Lịch dạy bỏ qua ?phan= dạng mảng thay vì đoán phần tử nào', async () => {
+    mockThamSo = { phan: ['dich-vu', 'lich'] };
+
+    await render(<MentorScheduleRoute />);
+
+    expect(screen.getByText('MÀN LỊCH DẠY')).toBeTruthy();
   });
 
   it('Ví nối màn thật (chỉ xem số dư + giao dịch)', async () => {

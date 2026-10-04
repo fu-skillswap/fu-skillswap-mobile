@@ -161,6 +161,36 @@ describe('MessagesScreen', () => {
   });
 });
 
+describe('MessagesScreen — mở ngoài thanh tab (chế độ Mentor)', () => {
+  it('có onBack thì hiện nút quay lại và bấm được', async () => {
+    server.use(hopThu([]));
+    const quayLai = jest.fn();
+
+    await render(
+      <QueryClientProvider client={queryClient}>
+        <MessagesScreen thamDoMs={false} onBack={quayLai} />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('Chưa có cuộc trò chuyện nào')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-quay-lai'));
+    expect(quayLai).toHaveBeenCalled();
+  });
+
+  it('ở tab Tin nhắn (không có onBack) thì không có nút quay lại', async () => {
+    server.use(hopThu([]));
+
+    await render(
+      <QueryClientProvider client={queryClient}>
+        <MessagesScreen thamDoMs={false} />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('Chưa có cuộc trò chuyện nào')).toBeTruthy());
+
+    expect(screen.queryByTestId('nut-quay-lai')).toBeNull();
+  });
+});
+
 describe('ChatScreen', () => {
   async function moChat() {
     return render(
