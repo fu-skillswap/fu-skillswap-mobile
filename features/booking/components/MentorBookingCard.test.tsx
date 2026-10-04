@@ -235,6 +235,22 @@ describe('MentorBookingCard', () => {
     expect(screen.queryByText('Từ chối')).toBeNull();
   });
 
+  it('yêu cầu đang chờ có nút "Xem và phản hồi" dẫn sang màn chi tiết', async () => {
+    const xuLy = jest.fn();
+    await render(
+      <MentorBookingCard
+        booking={taoBooking({ bookingId: 'b7', canAccept: true, canReject: true, bookingStatus: 'REQUESTED' })}
+        onCheckIn={jest.fn()}
+        onMoPhongHoc={jest.fn()}
+        onXuLy={xuLy}
+      />,
+    );
+
+    await fireEvent.press(screen.getByTestId('nut-xu-ly-b7'));
+
+    expect(xuLy).toHaveBeenCalledWith(expect.objectContaining({ bookingId: 'b7' }));
+  });
+
   it('KHÔNG dựng lối thanh toán nào, kể cả khi canPay đúng', async () => {
     // Mục 4.1 của quy ước: bản mobile chỉ xem và tiêu.
     await renderCard({

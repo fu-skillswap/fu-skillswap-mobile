@@ -33,7 +33,8 @@ import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenHeader } from '@/core/ui/ScreenHeader';
-import { colors, fonts, radius, shadows, spacing } from '@/core/ui/theme';
+import { WeekStrip } from '@/core/ui/WeekStrip';
+import { colors, fonts, spacing } from '@/core/ui/theme';
 import { BookingSteps } from '@/features/booking/components/BookingSteps';
 import { useAvailabilitySlots, useSlotCandidates } from '@/features/booking/hooks/useDatLich';
 import {
@@ -270,52 +271,15 @@ export function BookingSlotScreen({ mentorUserId, serviceId, bayGioMs }: Booking
             </View>
 
             {/* Dải 7 ngày */}
-            <View className="flex-row" style={{ gap: 6 }}>
-              {cacNgay.map((o) => {
-                const coLich = (theoNgay.get(o.iso)?.length ?? 0) > 0;
-                const chon = o.iso === ngay;
-                const daQua = o.iso < isoNgay(homNay);
-                const tat = !coLich || daQua;
-                return (
-                  <Pressable
-                    key={o.iso}
-                    testID={`ngay-${o.iso}`}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${o.tenThu} ${o.ngay} tháng ${o.thang}${tat ? ', không có lịch' : ''}`}
-                    accessibilityState={{ selected: chon, disabled: tat }}
-                    disabled={tat}
-                    onPress={() => {
-                      setNgayChon(o.iso);
-                      setKhungChon(null);
-                    }}
-                    className={`flex-1 items-center justify-center ${
-                      chon
-                        ? 'border border-accent bg-accent'
-                        : tat
-                          ? 'border border-dashed border-line'
-                          : 'border border-line bg-surface'
-                    }`}
-                    style={[
-                      { height: 64, borderRadius: radius.md, gap: 2, opacity: tat ? 0.6 : 1 },
-                      chon ? shadows.button : null,
-                    ]}
-                  >
-                    <Text
-                      className={chon ? 'text-on-accent' : tat ? 'text-ink-muted' : 'text-ink'}
-                      style={{ fontFamily: fonts.semibold, fontSize: 11 }}
-                    >
-                      {o.nhanThu}
-                    </Text>
-                    <Text
-                      className={chon ? 'text-on-accent' : tat ? 'text-ink-muted' : 'text-ink'}
-                      style={{ fontFamily: fonts.bold, fontSize: 17 }}
-                    >
-                      {String(o.ngay).padStart(2, '0')}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <WeekStrip
+              days={cacNgay}
+              selected={ngay}
+              onSelect={(iso) => {
+                setNgayChon(iso);
+                setKhungChon(null);
+              }}
+              isDisabled={(o) => (theoNgay.get(o.iso)?.length ?? 0) === 0 || o.iso < isoNgay(homNay)}
+            />
 
             {/* Lưới khung giờ */}
             <View className="flex-row items-baseline justify-between">

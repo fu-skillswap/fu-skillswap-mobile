@@ -35,6 +35,7 @@ import { MOCK_USER } from '@/core/auth/mocks/handlers';
 import { getEnv } from '@/core/config/env';
 import { jsonMock } from '@/core/dev/jsonMock';
 import { taoHoSoMentor, taoViMentor } from '@/features/mentorMode/mocks/mentorModeFixture';
+import { studioMockHandlers } from '@/features/mentorMode/mocks/studioMock';
 import type { MentorProfileResponse, MentorWalletResponse } from '@/features/mentorMode/types';
 
 const base = getEnv().apiUrl;
@@ -63,4 +64,5 @@ export const MOCK_MENTOR_WALLET: MentorWalletResponse = taoViMentor();
 export const mentorModeMockHandlers = [
   http.get(`${base}/api/me/mentor-profile`, () => jsonMock(envelope(MOCK_MENTOR_PROFILE))),
   http.get(`${base}/api/me/mentor-wallet`, () => jsonMock(envelope(MOCK_MENTOR_WALLET))),
+  ...studioMockHandlers,
 ];

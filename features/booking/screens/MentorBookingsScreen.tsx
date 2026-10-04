@@ -40,10 +40,11 @@
  *
  * ## Xác nhận / Từ chối: xem JSDoc của `MentorBookingCard`
  *
- * Hai thao tác đó cần dữ liệu mà màn này không có chỗ nhập, và chỗ nhập nằm ở
- * `MentorBookingDetail` — màn hình chưa thuộc đợt này.
+ * Hai thao tác đó cần dữ liệu mà màn này không có chỗ nhập; nút "Xem và phản
+ * hồi" của thẻ mở `MentorBookingDetail` (`/mentor-booking/<id>`), nơi có chỗ nhập.
  */
 
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, FlatList, Linking, Pressable, Text, View } from 'react-native';
 
@@ -101,6 +102,7 @@ const MO_TA_RONG: Record<TabBookingMentor, string> = {
 };
 
 export function MentorBookingsScreen() {
+  const router = useRouter();
   const [tab, setTab] = useState<TabBookingMentor>('TAT_CA');
   const [loiMoPhongHoc, setLoiMoPhongHoc] = useState(false);
 
@@ -183,6 +185,7 @@ export function MentorBookingsScreen() {
               onCheckIn={(booking) => checkIn.mutate({ bookingId: booking.bookingId })}
               onMoPhongHoc={moPhongHoc}
               dangCheckIn={checkIn.isPending ? checkIn.variables?.bookingId ?? null : null}
+              onXuLy={(booking) => router.push(`/mentor-booking/${booking.bookingId}`)}
             />
           )}
           // `grow` để EmptyState (flex-1) căn giữa được theo chiều dọc; lề và gap

@@ -11,6 +11,7 @@
 
 export { BookingConfirmScreen } from '@/features/booking/screens/BookingConfirmScreen';
 export { BookingSlotScreen } from '@/features/booking/screens/BookingSlotScreen';
+export { MentorBookingDetailScreen } from '@/features/booking/screens/MentorBookingDetailScreen';
 export { MentorBookingsScreen } from '@/features/booking/screens/MentorBookingsScreen';
 export { MyBookingsScreen } from '@/features/booking/screens/MyBookingsScreen';
 export {

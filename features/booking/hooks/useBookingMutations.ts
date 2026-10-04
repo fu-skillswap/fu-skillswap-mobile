@@ -40,7 +40,11 @@ import { useMemo } from 'react';
 import { createIdempotencyStore } from '@/core/api/idempotency';
 import { bookingRepo } from '@/features/booking/bookingRepo';
 import { bookingKeys } from '@/features/booking/queryKeys';
-import type { CancelBookingRequest } from '@/features/booking/types';
+import type {
+  AcceptBookingRequest,
+  CancelBookingRequest,
+  RejectBookingRequest,
+} from '@/features/booking/types';
 
 /** Tham số của một lần hủy: booking nào, vì lý do gì */
 export interface HuyLichInput extends CancelBookingRequest {
@@ -119,6 +123,42 @@ export function useCheckInBooking() {
       void queryClient.invalidateQueries({ queryKey: bookingKeys.listsAll() });
       void queryClient.invalidateQueries({ queryKey: bookingKeys.countsAll() });
       void queryClient.invalidateQueries({ queryKey: bookingKeys.detail(bookingId) });
+    },
+  });
+}
+
+/** Mentor chấp nhận một yêu cầu đặt lịch */
+export function useAcceptBooking() {
+  const queryClient = useQueryClient();
+  const khoKhoa = useMemo(() => createIdempotencyStore(), []);
+
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: ({ bookingId, ...input }: AcceptBookingRequest & { bookingId: string }) =>
+      bookingRepo.acceptBooking(bookingId, input, khoKhoa.keyFor(`accept-${bookingId}`, input)),
+    onSuccess: (data, { bookingId }) => {
+      khoKhoa.release(`accept-${bookingId}`);
+      queryClient.setQueryData(bookingKeys.detail(bookingId), data);
+      void queryClient.invalidateQueries({ queryKey: bookingKeys.listsAll() });
+      void queryClient.invalidateQueries({ queryKey: bookingKeys.countsAll() });
+    },
+  });
+}
+
+/** Mentor từ chối một yêu cầu đặt lịch */
+export function useRejectBooking() {
+  const queryClient = useQueryClient();
+  const khoKhoa = useMemo(() => createIdempotencyStore(), []);
+
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: ({ bookingId, ...input }: RejectBookingRequest & { bookingId: string }) =>
+      bookingRepo.rejectBooking(bookingId, input, khoKhoa.keyFor(`reject-${bookingId}`, input)),
+    onSuccess: (data, { bookingId }) => {
+      khoKhoa.release(`reject-${bookingId}`);
+      queryClient.setQueryData(bookingKeys.detail(bookingId), data);
+      void queryClient.invalidateQueries({ queryKey: bookingKeys.listsAll() });
+      void queryClient.invalidateQueries({ queryKey: bookingKeys.countsAll() });
     },
   });
 }

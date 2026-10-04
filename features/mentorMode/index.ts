@@ -10,6 +10,9 @@
 
 export { MentorDashboardScreen } from '@/features/mentorMode/screens/MentorDashboardScreen';
 export { MentorMoreScreen } from '@/features/mentorMode/screens/MentorMoreScreen';
+export { MentorScheduleScreen } from '@/features/mentorMode/screens/MentorScheduleScreen';
+export { MentorServiceEditScreen } from '@/features/mentorMode/screens/MentorServiceEditScreen';
+export { MentorWalletScreen } from '@/features/mentorMode/screens/MentorWalletScreen';
 export { mentorModeRepo } from '@/features/mentorMode/mentorModeRepo';
 export { mentorModeKeys } from '@/features/mentorMode/queryKeys';
 export {

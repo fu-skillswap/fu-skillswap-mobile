@@ -474,3 +474,33 @@ export const MUC_TIEU_TIEU_DE_TOI_DA = 200;
 
 /** Giới hạn `@Size(max = 2000)` của `CreateBookingRequest.learningGoalDescription` */
 export const MUC_TIEU_MO_TA_TOI_DA = 2000;
+
+// ---------------------------------------------------------------------------
+// Mentor xử lý yêu cầu đặt lịch
+// ---------------------------------------------------------------------------
+
+/**
+ * `dto/request/AcceptBookingRequest.java`.
+ *
+ * Khi mentor CHƯA kết nối Google Calendar thì `meetingPlatform` là bắt buộc, và
+ * kèm `meetingLink` (hoặc `location` khi `OFFLINE`) —
+ * `BookingDecisionService.acceptBooking()`. Đã kết nối thì để trống được, Google
+ * Meet tự tạo.
+ */
+export interface AcceptBookingRequest {
+  mentorResponseNote?: string | null;
+  meetingPlatform?: MeetingPlatform | null;
+  meetingLink?: string | null;
+  location?: string | null;
+}
+
+/** `dto/request/RejectBookingRequest.java`; `rejectReason` là `@NotBlank` ≤ 2000 */
+export interface RejectBookingRequest {
+  rejectReason: string;
+  mentorResponseNote?: string | null;
+}
+
+/** `@Size(max = 1000)` của `meetingLink`, `@Size(max = 500)` của `location` */
+export const LINK_PHONG_HOC_TOI_DA = 1000;
+export const DIA_DIEM_TOI_DA = 500;
+export const LY_DO_TU_CHOI_TOI_DA = 2000;

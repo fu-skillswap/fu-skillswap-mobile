@@ -20,6 +20,8 @@ jest.mock('@/features/mentorMode', () => {
   return {
     MentorDashboardScreen: () => <Text>MÀN TỔNG QUAN MENTOR</Text>,
     MentorMoreScreen: () => <Text>MÀN THÊM CỦA MENTOR</Text>,
+    MentorScheduleScreen: () => <Text>MÀN LỊCH DẠY</Text>,
+    MentorWalletScreen: () => <Text>MÀN VÍ MENTOR</Text>,
   };
 });
 
@@ -89,48 +91,22 @@ describe('route app/(tabs)/mentor-more.tsx', () => {
   });
 });
 
-describe('vỏ rỗng của hai tab chưa dựng', () => {
-  it('Lịch dạy nói thẳng là đang hoàn thiện', async () => {
+describe('route app/(tabs)/mentor-schedule.tsx và mentor-wallet.tsx', () => {
+  it('Lịch dạy nối màn thật, KHÔNG còn vỏ "Đang hoàn thiện"', async () => {
     await render(<MentorScheduleRoute />);
 
-    expect(screen.getByTestId('vo-rong-lich-day')).toBeTruthy();
-    expect(screen.getByText('Lịch dạy')).toBeTruthy();
-    expect(screen.getByText('Đang hoàn thiện')).toBeTruthy();
+    expect(screen.getByText('MÀN LỊCH DẠY')).toBeTruthy();
+    expect(screen.queryByText('Đang hoàn thiện')).toBeNull();
   });
 
-  it('Lịch dạy KHÔNG có nút nào — không dựng nút chết', async () => {
-    // TEST CANH. Màn thật cần `GET /api/mentor/availability-slots`, các template
-    // khả dụng và luồng kết nối Google Calendar; không có cái nào thuộc đợt này.
-    const { root } = await render(<MentorScheduleRoute />);
-
-    expect(root).toBeTruthy();
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
-  });
-
-  it('Ví nói thẳng là đang hoàn thiện và chỉ sang nơi xem được số dư', async () => {
+  it('Ví nối màn thật (chỉ xem số dư + giao dịch)', async () => {
     await render(<MentorWalletRoute />);
 
-    expect(screen.getByTestId('vo-rong-vi-mentor')).toBeTruthy();
-    expect(screen.getByText('Đang hoàn thiện')).toBeTruthy();
-    expect(screen.getByText('Số dư khả dụng của bạn đang hiện ở tab Tổng quan.')).toBeTruthy();
+    expect(screen.getByText('MÀN VÍ MENTOR')).toBeTruthy();
+    expect(screen.queryByText('Đang hoàn thiện')).toBeNull();
   });
 
-  it('Ví KHÔNG có nút nào — không nạp (bị cấm) và không rút (chưa được phép)', async () => {
-    // TEST CANH, hai lý do khác nhau:
-    // - Nạp tiền bị cấm thẳng ở mục 4.1 của quy ước (bản mobile là
-    //   consumption-only, và chính lối nạp là thứ làm app bị gỡ khỏi Play).
-    // - Rút tiền (payout) là luồng khác, KHÔNG nằm trong lệnh cấm đó, nhưng phải
-    //   hỏi chủ sản phẩm trước — câu trả lời chưa có, nên màn này không tự quyết.
-    await render(<MentorWalletRoute />);
-
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
-    expect(screen.queryByText('Nạp')).toBeNull();
-    expect(screen.queryByText('Thêm S-coins')).toBeNull();
-    expect(screen.queryByText('Yêu cầu rút')).toBeNull();
-    expect(screen.queryByText('Rút tiền')).toBeNull();
-  });
-
-  it('hai vỏ rỗng KHÔNG nhận tham số nào', () => {
+  it('hai route KHÔNG nhận tham số nào', () => {
     expect(MentorScheduleRoute).toHaveLength(0);
     expect(MentorWalletRoute).toHaveLength(0);
   });

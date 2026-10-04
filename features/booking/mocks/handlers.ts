@@ -62,7 +62,12 @@ import {
   taoLichRanh,
 } from '@/features/booking/mocks/datLichFixture';
 import { MOCK_MENTOR_DETAILS } from '@/features/mentor/mocks/handlers';
-import type { BookingResponse, CreateBookingRequest } from '@/features/booking/types';
+import type {
+  AcceptBookingRequest,
+  BookingResponse,
+  CreateBookingRequest,
+  RejectBookingRequest,
+} from '@/features/booking/types';
 
 const base = getEnv().apiUrl;
 
@@ -906,5 +911,82 @@ export const bookingMockHandlers = [
     });
     MOCK_BOOKINGS = [moi, ...MOCK_BOOKINGS];
     return jsonMock({ ...envelope(moi), status: 201, code: 'SUCCESS_0201' }, { status: 201 });
+  }),
+
+  /**
+   * Mentor chấp nhận. Người dùng mock CHƯA kết nối Google Calendar
+   * (`MOCK_USER.googleCalendarConnected = false`), nên luật 400 của
+   * `BookingDecisionService.acceptBooking()` áp dụng nguyên vẹn ở đây.
+   */
+  http.post(`${base}/api/mentor/bookings/:bookingId/accept`, async ({ params, request }) => {
+    const khoa = request.headers.get('Idempotency-Key');
+    if (khoa === null || !KHUON_KHOA.test(khoa)) {
+      return loi(400, 'SYS_0002', 'IDEMPOTENCY_KEY_REQUIRED');
+    }
+    const id = String(params.bookingId);
+    const hienTai = MOCK_MENTOR_BOOKINGS.find((b) => b.bookingId === id);
+    if (!hienTai) {
+      return loi(404, 'SYS_0003', 'Không tìm thấy booking');
+    }
+    if (!hienTai.canAccept) {
+      return loi(409, 'BOOK_4092', 'Booking không còn ở trạng thái chờ xác nhận');
+    }
+    const body = (await request.json()) as AcceptBookingRequest;
+    const nenTang = body.meetingPlatform ?? null;
+    const link = body.meetingLink?.trim() || null;
+    const diaDiem = body.location?.trim() || null;
+    if (nenTang === null) {
+      return loi(400, 'SYS_0001', 'Vui lòng chọn nền tảng phòng học (Google Meet, Zoom, Discord, MS Teams, Offline, Khác)');
+    }
+    if (nenTang !== 'OFFLINE' && !link) {
+      return loi(400, 'SYS_0001', 'Link phòng học là bắt buộc khi mentor chưa kết nối Google Calendar');
+    }
+    if (nenTang === 'OFFLINE' && !diaDiem && !link) {
+      return loi(400, 'SYS_0001', 'Địa điểm hoặc thông tin gặp mặt là bắt buộc đối với hình thức Offline');
+    }
+    const mienPhi = hienTai.serviceIsFreeSnapshot === true;
+    const daNhan: BookingResponse = {
+      ...hienTai,
+      bookingStatus: mienPhi ? 'CONFIRMED' : 'WAITING_PAYMENT',
+      status: mienPhi ? 'PAID' : 'ACCEPTED_AWAITING_PAYMENT',
+      paymentStatus: mienPhi ? 'NOT_REQUIRED' : 'PENDING',
+      displayState: mienPhi ? 'UPCOMING' : 'PAYMENT_REQUIRED',
+      meetingPlatform: nenTang,
+      meetingLink: link,
+      location: diaDiem,
+      mentorResponseNote: body.mentorResponseNote?.trim() || null,
+      canAccept: false,
+      canReject: false,
+      conversationId: hienTai.conversationId ?? `c-${id}`,
+    };
+    MOCK_MENTOR_BOOKINGS = MOCK_MENTOR_BOOKINGS.map((b) => (b.bookingId === id ? daNhan : b));
+    return jsonMock(envelope(daNhan));
+  }),
+
+  http.post(`${base}/api/mentor/bookings/:bookingId/reject`, async ({ params, request }) => {
+    const id = String(params.bookingId);
+    const hienTai = MOCK_MENTOR_BOOKINGS.find((b) => b.bookingId === id);
+    if (!hienTai) {
+      return loi(404, 'SYS_0003', 'Không tìm thấy booking');
+    }
+    const body = (await request.json()) as Partial<RejectBookingRequest>;
+    if (!body.rejectReason || body.rejectReason.trim() === '') {
+      return loi(400, 'SYS_0001', 'rejectReason không được để trống');
+    }
+    if (!hienTai.canReject) {
+      return loi(409, 'BOOK_4092', 'Booking không còn ở trạng thái chờ xác nhận');
+    }
+    const daTuChoi: BookingResponse = {
+      ...hienTai,
+      bookingStatus: 'REJECTED_BY_MENTOR',
+      status: 'REJECTED',
+      displayState: 'CANCELED_OR_EXPIRED',
+      rejectReason: body.rejectReason.trim(),
+      canAccept: false,
+      canReject: false,
+      canCancel: false,
+    };
+    MOCK_MENTOR_BOOKINGS = MOCK_MENTOR_BOOKINGS.map((b) => (b.bookingId === id ? daTuChoi : b));
+    return jsonMock(envelope(daTuChoi));
   }),
 ];

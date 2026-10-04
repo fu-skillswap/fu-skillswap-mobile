@@ -30,8 +30,8 @@
  *   hộp nhập lý do.
  *
  * Chỗ chọn nền tảng và hộp nhập lý do nằm ở màn `MentorBookingDetail` — chính
- * thiết kế cũng trỏ nút "Xác nhận" sang đó (`<a href="MentorBookingDetail.dc.html">`),
- * và màn đó KHÔNG thuộc đợt này. `MentorBookingCard.test.tsx` có test canh để
+ * thiết kế cũng trỏ nút "Xác nhận" sang đó (`<a href="MentorBookingDetail.dc.html">`).
+ * Thẻ chỉ có MỘT nút "Xem và phản hồi" dẫn sang màn đó. `MentorBookingCard.test.tsx` có test canh để
  * không ai thêm lại hai nút đó mà quên chỗ nhập dữ liệu.
  *
  * ## Nút được dựng, và vì sao
@@ -68,6 +68,11 @@ export interface MentorBookingCardProps {
   onMoPhongHoc: (booking: BookingResponse) => void;
   /** Booking nào đang gửi check-in; `null` khi không có */
   dangCheckIn?: string | null;
+  /**
+   * Mở màn chi tiết để XỬ LÝ yêu cầu (chọn phòng học rồi xác nhận, hoặc từ chối
+   * kèm lý do). Nút chỉ hiện khi backend cho `canAccept` hoặc `canReject`.
+   */
+  onXuLy?: (booking: BookingResponse) => void;
 }
 
 export function MentorBookingCard({
@@ -75,12 +80,14 @@ export function MentorBookingCard({
   onCheckIn,
   onMoPhongHoc,
   dangCheckIn = null,
+  onXuLy,
 }: MentorBookingCardProps) {
   // Nhãn trạng thái dùng CHUNG `bookingStatus.ts` với phía mentee: nó đọc
   // `bookingStatus` + `displayState` + `completionOutcome`, cả ba đều không phụ
   // thuộc góc nhìn. Đặc biệt `NO_SHOW_MENTOR` vẫn mang `bookingStatus = COMPLETED`
   // nên nhãn "Vắng mặt" phải thắng — và nó phải thắng ở cả hai phía.
   const trangThai = nhanTrangThaiBooking(booking);
+  const coTheXuLy = !!onXuLy && (booking.canAccept || booking.canReject);
   // `menteeDisplayName` là `null` khi mapper của backend không tra được user.
   const tenMentee = booking.menteeDisplayName ?? 'Mentee';
   // Thiết kế in tên dịch vụ. `serviceTitle` nullable thật (booking không gắn
@@ -185,6 +192,15 @@ export function MentorBookingCard({
               {diaDiem}
             </Text>
           </View>
+        ) : null}
+
+        {coTheXuLy ? (
+          <Button
+            label="Xem và phản hồi"
+            onPress={() => onXuLy?.(booking)}
+            size="sm"
+            testID={`nut-xu-ly-${booking.bookingId}`}
+          />
         ) : null}
 
         {hienCheckIn || hienMoPhongHoc ? (

@@ -29,7 +29,20 @@
  */
 
 import { apiClient } from '@/core/api/client';
-import type { MentorProfileResponse, MentorWalletResponse } from '@/features/mentorMode/types';
+import { idempotencyHeaders } from '@/core/api/idempotency';
+import type {
+  CreateMentorServiceRequest,
+  CreateSlotRequest,
+  DeactivateSlotRequest,
+  GoogleCalendarStatusResponse,
+  MentorManagedSlotResponse,
+  MentorProfileResponse,
+  MentorServiceActiveRequest,
+  MentorServiceConstraintsResponse,
+  MentorServiceManagementResponse,
+  MentorWalletResponse,
+  UpdateMentorServiceRequest,
+} from '@/features/mentorMode/types';
 
 export const mentorModeRepo = {
   /**
@@ -49,5 +62,66 @@ export const mentorModeRepo = {
    */
   getMyMentorWallet() {
     return apiClient<MentorWalletResponse>('/api/me/mentor-wallet');
+  },
+
+  /** Slot của chính mentor trong khoảng ngày (`LocalDate` `"2026-10-05"`) */
+  getMySlots(fromDate: string, toDate: string) {
+    return apiClient<MentorManagedSlotResponse[]>('/api/me/availability-slots', {
+      params: { fromDate, toDate, isActive: true },
+    });
+  },
+
+  createSlot(input: CreateSlotRequest) {
+    return apiClient<MentorManagedSlotResponse>('/api/me/availability-slots', {
+      method: 'POST',
+      body: input,
+    });
+  },
+
+  /** Ngừng nhận booking cho slot — endpoint mang `@Idempotent` */
+  deactivateSlot(slotId: string, input: DeactivateSlotRequest, idempotencyKey: string) {
+    return apiClient<MentorManagedSlotResponse>(`/api/me/availability-slots/${slotId}/deactivate`, {
+      method: 'POST',
+      headers: idempotencyHeaders(idempotencyKey),
+      body: input,
+    });
+  },
+
+  getGoogleCalendarStatus() {
+    return apiClient<GoogleCalendarStatusResponse>('/api/me/google-calendar/status');
+  },
+
+  /** Mọi dịch vụ của mentor, kể cả đã tắt (`active=all` là mặc định của backend) */
+  getMyServices() {
+    return apiClient<MentorServiceManagementResponse[]>('/api/me/mentor-services');
+  },
+
+  getMyService(serviceId: string) {
+    return apiClient<MentorServiceManagementResponse>(`/api/me/mentor-services/${serviceId}`);
+  },
+
+  getServiceConstraints() {
+    return apiClient<MentorServiceConstraintsResponse>('/api/me/mentor-services/constraints');
+  },
+
+  createService(input: CreateMentorServiceRequest) {
+    return apiClient<MentorServiceManagementResponse>('/api/me/mentor-services', {
+      method: 'POST',
+      body: input,
+    });
+  },
+
+  updateService(serviceId: string, input: UpdateMentorServiceRequest) {
+    return apiClient<MentorServiceManagementResponse>(`/api/me/mentor-services/${serviceId}`, {
+      method: 'PUT',
+      body: input,
+    });
+  },
+
+  setServiceActive(serviceId: string, input: MentorServiceActiveRequest) {
+    return apiClient<MentorServiceManagementResponse>(`/api/me/mentor-services/${serviceId}/active`, {
+      method: 'PATCH',
+      body: input,
+    });
   },
 };

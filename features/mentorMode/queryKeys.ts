@@ -9,4 +9,11 @@ export const mentorModeKeys = {
   profile: () => [...mentorModeKeys.all, 'profile'] as const,
   /** Ví settlement của mentor (`GET /api/me/mentor-wallet`) */
   wallet: () => [...mentorModeKeys.all, 'wallet'] as const,
+  /** Slot của mentor trong một khoảng ngày */
+  slots: (fromDate: string, toDate: string) => [...mentorModeKeys.all, 'slots', fromDate, toDate] as const,
+  /** Trạng thái kết nối Google Calendar */
+  calendar: () => [...mentorModeKeys.all, 'calendar'] as const,
+  services: () => [...mentorModeKeys.all, 'services'] as const,
+  service: (serviceId: string) => [...mentorModeKeys.all, 'service', serviceId] as const,
+  serviceConstraints: () => [...mentorModeKeys.all, 'service-constraints'] as const,
 };

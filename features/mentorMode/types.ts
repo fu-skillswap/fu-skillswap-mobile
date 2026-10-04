@@ -233,3 +233,150 @@ export interface MentorWalletResponse {
   availableScoin: number;
   recentTransactions: WalletTransactionResponse[];
 }
+
+// ---------------------------------------------------------------------------
+// Lịch dạy, dịch vụ và Google Calendar của mentor
+// ---------------------------------------------------------------------------
+
+/** `booking/dto/response/SlotMutationCapabilityResponse.java` */
+export interface SlotMutationCapabilityResponse {
+  mode: 'ALLOWED' | 'REQUIRES_PENDING_REJECTION' | 'BLOCKED_BY_LOCKING_BOOKING';
+  restrictionCode: string | null;
+  affectedPendingBookingCount: number;
+}
+
+/** Dịch vụ gắn vào một slot (`AvailabilitySlotServiceBasicResponse.java`) */
+export interface SlotServiceBasic {
+  serviceId: string;
+  title: string;
+  durationMinutes: number;
+  isFree: boolean;
+  priceScoin: number | null;
+  bindingRemoval: SlotMutationCapabilityResponse | null;
+}
+
+/**
+ * `booking/dto/response/MentorManagedAvailabilitySlotResponse.java` — một slot
+ * nhìn từ phía chủ của nó.
+ *
+ * `startAt`/`endAt` là `Instant` (UTC, hậu tố `Z`) — KHÁC với slot phía mentee
+ * (`MentorAvailabilitySlotResponse` dùng `LocalDateTime`). Đổi sang giờ Việt Nam
+ * trước khi in, xem `features/mentorMode/lichDay.ts`.
+ */
+export interface MentorManagedSlotResponse {
+  slotId: string;
+  startAt: string;
+  endAt: string;
+  timezone: string;
+  isActive: boolean;
+  note: string | null;
+  services: SlotServiceBasic[];
+  version: number | null;
+  pendingBookingCount: number;
+  lockingBookingCount: number;
+  hasLockingBooking: boolean;
+  timeMutation: SlotMutationCapabilityResponse | null;
+  deactivation: SlotMutationCapabilityResponse | null;
+  canEditNote: boolean;
+}
+
+/** `booking/dto/request/CreateAvailabilitySlotRequest.java` (các trường FE dùng) */
+export interface CreateSlotRequest {
+  /** `Instant` UTC */
+  startAt: string;
+  endAt: string;
+  /** ≤ 200 ký tự */
+  note?: string | null;
+  /** `@NotEmpty` */
+  serviceIds: string[];
+}
+
+/** `booking/dto/request/DeactivateAvailabilitySlotRequest.java` */
+export interface DeactivateSlotRequest {
+  expectedVersion: number;
+}
+
+/** `mentor/domain/MentorServiceDeliveryMode.java` */
+export type ServiceDeliveryMode = 'ONE_TO_ONE' | 'GROUP';
+
+/**
+ * `mentor/dto/response/MentorServiceManagementResponse.java` — dịch vụ nhìn từ
+ * phía mentor, có đủ ba con số giá: giá mentor đặt (`basePriceScoin`), giá
+ * mentee thấy (`publicPriceScoin`, đã gồm phụ phí) và thu nhập ước tính
+ * (`estimatedMentorPayoutScoin`). Không tự tính — backend là nguồn.
+ */
+export interface MentorServiceManagementResponse {
+  serviceId: string;
+  mentorUserId: string;
+  title: string;
+  description: string;
+  expectedOutcome: string;
+  durationMinutes: number;
+  isFree: boolean;
+  basePriceScoin: number | null;
+  publicPriceScoin: number | null;
+  estimatedMentorPayoutScoin: number | null;
+  isActive: boolean;
+  maintainPostSessionChat: boolean;
+  deliveryMode: ServiceDeliveryMode;
+  coverAssetId: string | null;
+  coverImageUrl: string | null;
+  version: number;
+  /** `LocalDateTime` — không offset */
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** `mentor/dto/response/MentorServiceConstraintsResponse.java` — FE không được ghi cứng */
+export interface MentorServiceConstraintsResponse {
+  allowedDurationMinutes: number[];
+  minimumPriceScoinPerMinute: number;
+  maximumPriceScoinPerMinute: number;
+}
+
+/** `mentor/dto/request/CreateMentorServiceRequest.java` */
+export interface CreateMentorServiceRequest {
+  title: string;
+  description: string;
+  expectedOutcome: string;
+  durationMinutes: number;
+  isFree: boolean;
+  priceScoin: number;
+  maintainPostSessionChat: boolean;
+  deliveryMode: ServiceDeliveryMode;
+}
+
+/** `mentor/dto/request/UpdateMentorServiceRequest.java` — thời lượng KHÔNG sửa được */
+export interface UpdateMentorServiceRequest {
+  title: string;
+  description: string;
+  expectedOutcome: string;
+  isFree: boolean;
+  priceScoin: number;
+  maintainPostSessionChat: boolean;
+  expectedVersion: number;
+}
+
+/** `mentor/dto/request/MentorServiceActiveRequest.java` */
+export interface MentorServiceActiveRequest {
+  isActive: boolean;
+  expectedVersion: number;
+}
+
+/** Giới hạn `@Size` của ba trường chữ của dịch vụ */
+export const TIEU_DE_DICH_VU_TOI_DA = 200;
+export const MO_TA_DICH_VU_TOI_DA = 1000;
+
+/** `identity/dto/response/GoogleCalendarStatusResponse.java` */
+export interface GoogleCalendarStatusResponse {
+  connected: boolean;
+  syncEnabled: boolean;
+  email: string | null;
+  grantedScopes: string[] | null;
+  needsReconnect: boolean;
+  lastSyncStatus: string | null;
+  /** `OffsetDateTime` — có offset */
+  lastSyncAt: string | null;
+  lastSyncErrorCode: string | null;
+  lastSyncErrorMessage: string | null;
+}

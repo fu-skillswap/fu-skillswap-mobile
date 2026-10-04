@@ -37,6 +37,7 @@ import { apiClient } from '@/core/api/client';
 import { idempotencyHeaders } from '@/core/api/idempotency';
 import type { PageResponse } from '@/core/api/pagination';
 import type {
+  AcceptBookingRequest,
   BookingQuoteRequest,
   BookingQuoteResponse,
   BookingResponse,
@@ -45,6 +46,7 @@ import type {
   CancelBookingRequest,
   CreateBookingRequest,
   MentorAvailabilitySlotResponse,
+  RejectBookingRequest,
   ServiceSlotCandidatesResponse,
 } from '@/features/booking/types';
 
@@ -186,5 +188,23 @@ export const bookingRepo = {
   /** Chi tiết một booking — người gọi phải là mentee HOẶC mentor của nó */
   getBooking(bookingId: string) {
     return apiClient<BookingResponse>(`/api/me/bookings/${bookingId}`);
+  },
+
+  /** Mentor chấp nhận yêu cầu (`MentorBookingController`, có `@Idempotent`) */
+  acceptBooking(bookingId: string, input: AcceptBookingRequest, idempotencyKey: string) {
+    return apiClient<BookingResponse>(`/api/mentor/bookings/${bookingId}/accept`, {
+      method: 'POST',
+      headers: idempotencyHeaders(idempotencyKey),
+      body: input,
+    });
+  },
+
+  /** Mentor từ chối yêu cầu kèm lý do */
+  rejectBooking(bookingId: string, input: RejectBookingRequest, idempotencyKey: string) {
+    return apiClient<BookingResponse>(`/api/mentor/bookings/${bookingId}/reject`, {
+      method: 'POST',
+      headers: idempotencyHeaders(idempotencyKey),
+      body: input,
+    });
   },
 };
