@@ -392,6 +392,46 @@ describe('MentorDashboardScreen', () => {
     await doiXong();
   });
 
+  it('buổi ĐÃ DIỄN RA không nằm trong "Đặt chỗ sắp tới"', async () => {
+    // Gặp thật trên máy ảo 05/10/2026: khối này hiện một dòng "Hôm qua 20:30".
+    // Chế độ dashboard của `GET /api/me/bookings` cố định khoảng 7 ngày trước →
+    // 90 ngày tới, nên trang đầu CÓ buổi đã diễn ra; không lọc thì tiêu đề "sắp
+    // tới" nói sai về chính dữ liệu bên dưới nó.
+    const hom_qua = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const ngay_mai = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    server.use(
+      ...duLieuDayDu({
+        sapToi: [
+          taoBooking({ bookingId: 'mb-cu', selectedStartTime: hom_qua }),
+          taoBooking({ bookingId: 'mb-moi', selectedStartTime: ngay_mai }),
+        ],
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('dong-sap-toi-mb-moi')).toBeTruthy());
+
+    expect(screen.queryByTestId('dong-sap-toi-mb-cu')).toBeNull();
+    await doiXong();
+  });
+
+  it('mọi buổi đều đã diễn ra thì nói chưa có ai đặt, KHÔNG hiện dòng rỗng', async () => {
+    const hom_qua = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    server.use(
+      ...duLieuDayDu({ sapToi: [taoBooking({ bookingId: 'mb-cu', selectedStartTime: hom_qua })] }),
+    );
+
+    await renderScreen();
+    await waitFor(() =>
+      expect(screen.getByText('Chưa có mentee nào đặt lịch với bạn.')).toBeTruthy(),
+    );
+
+    expect(screen.queryByTestId('dong-sap-toi-mb-cu')).toBeNull();
+    await doiXong();
+  });
+
   it('chạm dòng "Đặt chỗ sắp tới" mở chi tiết booking của mentor', async () => {
     server.use(...duLieuDayDu());
 

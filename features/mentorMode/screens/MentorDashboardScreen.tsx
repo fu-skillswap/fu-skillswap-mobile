@@ -84,7 +84,7 @@ import { trangThaiTai } from '@/core/api/queryState';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { phanCachNghin } from '@/core/format/soLuong';
 import { dinhDangNgayGio } from '@/core/time/localDateTime';
-import { dinhDangGio, nhanNgayNgan } from '@/core/time/offsetDateTime';
+import { dinhDangGio, docOffsetDateTime, nhanNgayNgan } from '@/core/time/offsetDateTime';
 import { Avatar } from '@/core/ui/Avatar';
 import { Card } from '@/core/ui/Card';
 import { EmptyState } from '@/core/ui/EmptyState';
@@ -105,6 +105,15 @@ import {
 
 /** Số dòng "Đặt chỗ sắp tới" hiện trên màn Tổng quan; phần còn lại ở tab Booking */
 const SO_DONG_SAP_TOI = 3;
+
+/**
+ * Số booking xin về để còn đủ sau khi lọc bỏ buổi đã qua.
+ *
+ * Chế độ dashboard của `GET /api/me/bookings` cố định khoảng **7 ngày trước →
+ * 90 ngày tới**, nên trang đầu CÓ buổi đã diễn ra. Xin đúng 3 rồi lọc sẽ ra một
+ * danh sách ngắn hơn 3, có khi rỗng, trong khi mentor vẫn còn lịch phía sau.
+ */
+const SO_DONG_XIN_VE = 12;
 
 /** Một dòng booking gọn, theo khối "Đặt chỗ sắp tới" của thiết kế */
 function DongBookingGon({ booking, onPress }: { booking: BookingResponse; onPress: () => void }) {
@@ -174,7 +183,28 @@ export function MentorDashboardScreen() {
   const hoSo = useMyMentorProfile();
   const vi = useMyMentorWallet();
   const dangCho = useMentorBookingCount('PENDING');
-  const sapToi = useMentorBookings({ size: SO_DONG_SAP_TOI });
+  const sapToi = useMentorBookings({ size: SO_DONG_XIN_VE });
+
+  /**
+   * Chỉ giữ buổi CHƯA diễn ra.
+   *
+   * Khối này tên là "Đặt chỗ sắp tới", nhưng backend trả cả buổi trong 7 ngày
+   * trước (xem `SO_DONG_XIN_VE`), nên không lọc thì mentor thấy buổi **hôm qua**
+   * nằm dưới tiêu đề "sắp tới" — gặp thật trên máy ảo 05/10/2026.
+   *
+   * So bằng `mocMs` của `docOffsetDateTime()` chứ không `new Date(chuỗi)`: với
+   * chuỗi CÓ offset thì cả hai cho cùng thời điểm, nhưng đi qua một đường đã có
+   * test thì không ai phải nhớ lại là chuỗi nào có offset chuỗi nào không.
+   * Booking thiếu `selectedStartTime` bị loại — một buổi không có giờ thì không
+   * thể là "sắp tới".
+   */
+  const bayGio = Date.now();
+  const danhSachSapToi = sapToi.bookings
+    .filter((booking) => {
+      const moc = docOffsetDateTime(booking.selectedStartTime);
+      return moc != null && moc.mocMs >= bayGio;
+    })
+    .slice(0, SO_DONG_SAP_TOI);
 
   const trangThaiHoSo = trangThaiTai({
     isPaused: hoSo.isPaused,
@@ -363,7 +393,7 @@ export function MentorDashboardScreen() {
                 Chưa tải được danh sách đặt chỗ. Mở tab Booking để xem đầy đủ.
               </Text>
             </Card>
-          ) : sapToi.bookings.length === 0 ? (
+          ) : danhSachSapToi.length === 0 ? (
             <Card>
               <Text className="text-caption-lg text-ink-muted" style={{ fontFamily: fonts.medium }}>
                 Chưa có mentee nào đặt lịch với bạn.
@@ -371,7 +401,7 @@ export function MentorDashboardScreen() {
             </Card>
           ) : (
             <View className="gap-2.5">
-              {sapToi.bookings.slice(0, SO_DONG_SAP_TOI).map((booking) => (
+              {danhSachSapToi.map((booking) => (
                 <DongBookingGon
                   key={booking.bookingId}
                   booking={booking}
