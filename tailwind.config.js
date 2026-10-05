@@ -55,8 +55,9 @@ module.exports = {
         warning: '#F59E0B',
         'warning-ink': '#B45309',
         'warning-soft': '#FEF3C7',
-        /** Thiết kế chỉ khai màu CHỮ cho lỗi (#B42318), không có nền danger */
         danger: '#B42318',
+        /** Nền khối lỗi — không có trong `tokens.json`, xem JSDoc ở `core/ui/theme.ts` */
+        'danger-soft': '#FEE4E2',
         'neutral-soft': '#EEF2FA',
       },
       fontFamily: {

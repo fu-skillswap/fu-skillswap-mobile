@@ -3,36 +3,53 @@
  * @description Ảnh nhận diện SkillSwap, gom một chỗ để màn hình không phải viết
  * `require('../../assets/brand/...')` rải rác.
  *
- * ## Nguồn và vì sao phải thu nhỏ
+ * ## Nguồn
  *
- * Lấy từ `fu-skillswap-fe-2/public/images` (04/10/2026) và **thu nhỏ trước khi
- * đưa vào repo**, không chép nguyên bản. Bản web được dựng cho màn hình lớn:
- * `SkillSwapLogo.png` là **7292×7292**. React Native giải nén PNG ra bitmap đầy
- * đủ trong RAM, nên một ảnh như vậy chiếm ~212 MB (7292² × 4 byte) chỉ để vẽ ra
- * một ô 40px — đủ làm app chết vì hết bộ nhớ trên máy yếu.
+ * Lấy từ **design system SkillSwap** (artifact `JdRibYbgqWBM1rbimeRXeR`, nhóm
+ * `Mascot` và `Logos`, bản 05/10/2026) — đây là nguồn chính thức. Trước đó bộ
+ * ảnh lấy tạm từ `fu-skillswap-fe-2/public/images`, nơi **không có** ba tư thế
+ * Koko mà thiết kế dùng; chúng có đủ trong design system.
  *
- * Kích thước đích lấy bằng cỡ lớn nhất thiết kế dùng, nhân 3 cho màn hình @3x.
- * Tổng bộ ảnh: 3,76 MB → 337 KB.
+ * ## Vì sao phải thu nhỏ trước khi đưa vào repo
  *
- * ## Ba biến thể Koko trong thiết kế KHÔNG tồn tại
+ * React Native giải nén PNG ra bitmap đầy đủ trong RAM, không theo kích thước
+ * ô hiển thị. Bản gốc của design system cao 1252px; bản trong repo web còn tệ
+ * hơn (`SkillSwapLogo.png` là 7292×7292 — ~212 MB bitmap cho một ô 40px). Mọi
+ * file ở đây đã thu về cạnh dài tối đa **512** cho mascot và **256/540** cho
+ * logo, bằng cỡ lớn nhất thiết kế dùng nhân 3 cho màn hình @3x.
  *
- * `HANDOFF.md` mục 3 nhắc `koko-happy.png`, `koko-laptop.png`,
- * `koko-reading.png` và nói "lấy từ design system SkillSwap". Repo web chỉ có
- * `Koko.png` (tư thế chuẩn) và `Koko_404.png`. Mọi chỗ cần Koko dùng `koko`;
- * khi nào có file thật thì thêm vào đây, màn hình không phải sửa.
+ * Tổng bộ ảnh: 1423 KB → 521 KB.
+ *
+ * **Khi thêm ảnh mới, thu nhỏ trước.** Chép thẳng file gốc vào đây là một quả
+ * bom hẹn giờ trên máy yếu, và nó sẽ không lộ ra trong bất kỳ test nào.
  */
 
-/**
- * Mascot Koko, tư thế chuẩn. Dùng cho khối hero màn Welcome, card trợ lý AI ở
- * Bảng tin, và minh hoạ của `EmptyState`.
- */
+/** Koko tư thế chuẩn — dùng khi không có tư thế nào hợp hơn */
 export const KOKO = require('../../assets/brand/koko.png') as number;
 
-/** Koko dáng "không tìm thấy" — dành cho trạng thái rỗng/lỗi nặng */
+/** Koko ngồi máy tính — card trợ lý AI ở Bảng tin, màn KokoChat */
+export const KOKO_LAPTOP = require('../../assets/brand/koko-laptop.png') as number;
+
+/** Koko đang đọc — khối rỗng của danh sách bài viết, hồ sơ */
+export const KOKO_READING = require('../../assets/brand/koko-reading.png') as number;
+
+/** Koko vui — màn chào mừng, trạng thái thành công */
+export const KOKO_HAPPY = require('../../assets/brand/koko-happy.png') as number;
+
+/** Koko dáng "không tìm thấy" — khối rỗng nặng, màn lỗi */
 export const KOKO_404 = require('../../assets/brand/koko-404.png') as number;
 
-/** Dấu hiệu (logo không chữ), dùng ở ô 40px đầu màn Bảng tin */
+/** Dấu hiệu (logo không chữ) trên nền SÁNG — ô 40px đầu màn Bảng tin */
 export const LOGO_MARK = require('../../assets/brand/skillswap-mark.png') as number;
 
-/** Logo đầy đủ có chữ, dùng ở màn Welcome */
+/**
+ * Dấu hiệu trên nền TỐI — chỉ dùng trên `brand-deep`/`navy`.
+ *
+ * Bản thường có nét màu navy, đặt lên nền navy sẽ biến mất. Đây là lý do design
+ * system giữ hai bản riêng chứ không đổi màu bằng `tintColor`.
+ */
+export const LOGO_MARK_NEGATIVE =
+  require('../../assets/brand/skillswap-mark-negative.png') as number;
+
+/** Logo đầy đủ có chữ, nền sáng — màn Welcome */
 export const LOGO_FULL = require('../../assets/brand/skillswap-logo-full.png') as number;

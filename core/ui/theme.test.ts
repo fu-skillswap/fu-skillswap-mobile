@@ -63,6 +63,7 @@ describe('design token', () => {
       warningInk: '#B45309',
       warningSoft: '#FEF3C7',
       danger: '#B42318',
+      dangerSoft: '#FEE4E2',
       neutralSoft: '#EEF2FA',
     });
     expect(radius).toEqual({ sm: 8, md: 16, lg: 24, input: 12, full: 9999 });
@@ -96,6 +97,7 @@ describe('design token', () => {
       warningInk: tailwindColors['warning-ink'],
       warningSoft: tailwindColors['warning-soft'],
       danger: tailwindColors.danger,
+      dangerSoft: tailwindColors['danger-soft'],
       neutralSoft: tailwindColors['neutral-soft'],
     };
 

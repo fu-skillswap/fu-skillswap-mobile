@@ -49,8 +49,24 @@ export const colors = {
   warning: '#F59E0B',
   warningInk: '#B45309',
   warningSoft: '#FEF3C7',
-  /** Thiết kế chỉ khai màu CHỮ cho lỗi, không có nền danger */
   danger: '#B42318',
+  /**
+   * Nền cho khối lỗi. KHÔNG có trong `tokens.json` — do tôi chọn, chủ sản phẩm
+   * uỷ quyền ngày 05/10/2026.
+   *
+   * Thiết kế có cặp `success`/`success-soft` và `warning`/`warning-soft` nhưng
+   * bỏ trống bạn của `danger`. Chọn theo đúng quy luật của hai cặp kia (một
+   * tint rất nhạt cùng tông) và đo tương phản thật:
+   *
+   *   #15803D trên #DCFCE7 = 4,57:1   (success, có sẵn)
+   *   #B45309 trên #FEF3C7 = 4,51:1   (warning, có sẵn)
+   *   #B42318 trên #FEE4E2 = 5,45:1   (danger, chọn ở đây)
+   *
+   * Hai cặp có sẵn nằm SÁT ngưỡng AA 4,5:1, nên bản này cố ý lấy dư biên để
+   * không trượt chuẩn khi ai đó chỉnh nhẹ màu chữ. Nếu bên thiết kế bổ sung
+   * token thật vào `tokens.json` thì thay giá trị ở đây cho khớp.
+   */
+  dangerSoft: '#FEE4E2',
   neutralSoft: '#EEF2FA',
 } as const;
 
