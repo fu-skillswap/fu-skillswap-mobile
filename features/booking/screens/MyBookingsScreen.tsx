@@ -48,6 +48,8 @@ import { useState } from 'react';
 import { ActivityIndicator, FlatList, Linking, Pressable, Text, View } from 'react-native';
 
 import { trangThaiTai } from '@/core/api/queryState';
+import { KOKO_READING } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { FilterTabs } from '@/core/ui/FilterTabs';
@@ -273,6 +275,12 @@ export function MyBookingsScreen() {
             <EmptyState
               title="Chưa có lịch nào ở đây"
               description={MO_TA_RONG[tab]}
+              // `MyBookings.dc.html` dòng 35: blob `2fb2a1e7…` = `koko-reading.png`
+              // ở cỡ 140×140. Đây là khối rỗng DUY NHẤT thiết kế vẽ kèm số đo,
+              // nên 140 trở thành cỡ chuẩn cho mọi `EmptyState` của repo.
+              illustration={
+                <BrandImage source={KOKO_READING} size={140} testID="minh-hoa-rong-lich-hen" />
+              }
               // Nút này có thật trong thiết kế (`href="Mentors.dc.html"`) và màn
               // đích CÓ TỒN TẠI — tab 2 đã dựng xong.
               actionLabel="Tìm Mentor"

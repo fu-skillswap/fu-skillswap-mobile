@@ -8,6 +8,8 @@ import type { UserMeResponse } from '@/core/auth/types';
 
 import { GoogleSignInCancelledError, GoogleSignInConfigError } from '@/core/auth/googleSignIn';
 
+import { KOKO, LOGO_FULL } from '@/core/ui/brand';
+
 import LoginScreen from '@/app/(auth)/login';
 
 // Bug gốc (Critical): trước khi sửa, màn hình này không đọc `status` và không
@@ -111,6 +113,27 @@ describe('LoginScreen', () => {
 
     expect(mockedRedirect).not.toHaveBeenCalled();
     expect(screen.getByText('Đăng nhập với Google')).toBeTruthy();
+  });
+
+  it('khối hero có mascot Koko và logo có chữ, cả hai lấy từ ảnh nhận diện', async () => {
+    // `Welcome.dc.html` dòng 19 (logo có chữ, cao 36) và dòng 25 (Koko, cao 290).
+    // Trước khi nối ảnh, khối hero chỉ có ba quả cầu và màn hình không có mascot.
+    mockedUseAuth.mockReturnValue(authValue({ status: 'unauthenticated' }));
+
+    await render(<LoginScreen />);
+
+    // Logo MANG thông tin (nó đứng thay cho tên sản phẩm) nên trình đọc màn hình
+    // phải đọc được nhãn; tìm bằng nhãn chứ bằng testID là tìm hụt mất điều đó.
+    expect(screen.getByLabelText('SkillSwap').props.source).toBe(LOGO_FULL);
+
+    // Mascot là ảnh trang trí nên bị ẩn khỏi trình đọc màn hình — RNTL chỉ thấy
+    // nó khi được yêu cầu kể cả phần tử ẩn.
+    const mascot = screen.getByTestId('mascot-koko', { includeHiddenElements: true });
+    // Tư thế CHUẨN, và cỡ 204×290 = chiều cao 290 của thiết kế nhân tỉ lệ 360/512
+    // của koko.png. Khẳng định bằng đồng nhất với hằng, không bằng giá trị
+    // `require()` (xem ghi chú đầu file).
+    expect(mascot.props.source).toBe(KOKO);
+    expect(mascot.props.style).toMatchObject({ width: 204, height: 290 });
   });
 
   it('người dùng huỷ: KHÔNG hiện lỗi nào', async () => {

@@ -7,6 +7,7 @@ import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
+import { KOKO, KOKO_404 } from '@/core/ui/brand';
 import { taoBooking } from '@/features/booking/mocks/bookingFixture';
 import { ChatScreen, MessagesScreen } from '@/features/chat';
 
@@ -156,8 +157,39 @@ describe('MessagesScreen', () => {
     );
 
     await waitFor(() => expect(screen.getByText('Chưa có cuộc trò chuyện nào')).toBeTruthy());
-    // Không có hàng Koko: chưa có API trợ lý AI nào để nối.
+    // Không có hàng Koko dẫn sang KokoChat: chưa có màn đó và chưa có API trợ lý
+    // AI nào để nối. Minh hoạ Koko trong khối rỗng là chuyện khác — nó không
+    // bấm được và không dẫn đi đâu.
     expect(screen.queryByText(/Koko/)).toBeNull();
+    expect(
+      screen.getByTestId('minh-hoa-rong-hoi-thoai', { includeHiddenElements: true }).props.source,
+    ).toBe(KOKO);
+  });
+
+  it('tìm mà không thấy hội thoại nào thì dùng tư thế "404", không dùng tư thế chuẩn', async () => {
+    server.use(hopThu([hoiThoai('c1', 'Trần Minh Quân')]));
+
+    await render(
+      <QueryClientProvider client={queryClient}>
+        <MessagesScreen thamDoMs={false} />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
+
+    await fireEvent.changeText(screen.getByTestId('o-tim-hoi-thoai'), 'khong-ton-tai');
+
+    expect(screen.getByText('Không tìm thấy')).toBeTruthy();
+    /*
+      Hai khối rỗng của màn này KHÔNG được dùng cùng một tư thế: tìm-mà-không-thấy
+      là "404", còn hộp thư trống là tư thế chuẩn. Hai testID riêng khoá lại điều đó.
+    */
+    expect(
+      screen.getByTestId('minh-hoa-khong-thay-hoi-thoai', { includeHiddenElements: true }).props
+        .source,
+    ).toBe(KOKO_404);
+    expect(
+      screen.queryByTestId('minh-hoa-rong-hoi-thoai', { includeHiddenElements: true }),
+    ).toBeNull();
   });
 });
 

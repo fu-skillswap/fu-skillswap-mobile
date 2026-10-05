@@ -7,6 +7,7 @@ import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
+import { KOKO_READING } from '@/core/ui/brand';
 import { MentorPostEditScreen, MentorPostsScreen } from '@/features/mentorBlog';
 import { __resetMentorBlogMockForTests, mentorBlogMockHandlers } from '@/features/mentorBlog/mocks/handlers';
 import { studioMockHandlers } from '@/features/mentorMode/mocks/studioMock';
@@ -111,6 +112,13 @@ describe('MentorPostsScreen', () => {
 
     await boc(<MentorPostsScreen />);
     await waitFor(() => expect(screen.getByText('Bạn chưa có bài viết nào.')).toBeTruthy());
+
+    // Khối rỗng của một danh sách BÀI VIẾT → Koko đang đọc. Ảnh trang trí nên bị
+    // ẩn khỏi trình đọc màn hình.
+    expect(
+      screen.getByTestId('minh-hoa-rong-bai-viet-mentor', { includeHiddenElements: true }).props
+        .source,
+    ).toBe(KOKO_READING);
 
     await fireEvent.press(screen.getByText('Tạo bài viết đầu tiên'));
     expect(mockRouter.push).toHaveBeenCalledWith('/mentor-posts/new');

@@ -7,6 +7,7 @@ import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
+import { KOKO_READING } from '@/core/ui/brand';
 import { OnboardingScreen } from '@/features/profile';
 import { __resetProfileMockForTests, profileMockHandlers } from '@/features/profile/mocks/handlers';
 import { donHangDoiDanhSach } from '@/test-utils/nhuongNhip';
@@ -85,6 +86,16 @@ describe('OnboardingScreen — người chưa có hồ sơ', () => {
     await moMan();
 
     await waitFor(() => expect(screen.getByText('BƯỚC CUỐI')).toBeTruthy());
+    /*
+      `Onboarding.dc.html` dòng 27 đặt `koko-reading.png` ở cỡ 92×92 cạnh đầu
+      trang. Ảnh trang trí nên bị ẩn khỏi trình đọc màn hình.
+    */
+    const minhHoa = screen.getByTestId('minh-hoa-hoan-thien-ho-so', {
+      includeHiddenElements: true,
+    });
+    expect(minhHoa.props.style).toMatchObject({ width: 92, height: 92 });
+    // Tư thế ĐANG ĐỌC đúng blob `2fb2a1e7…`, không phải tư thế chuẩn.
+    expect(minhHoa.props.source).toBe(KOKO_READING);
     expect(screen.getByTestId('o-ten-hien-thi').props.value).toBe('Nguyễn Thu Hà');
     expect(screen.getByTestId('nut-luu-ho-so')).toBeDisabled();
     expect(screen.getByTestId('ghi-chu-ho-so')).toHaveTextContent(/Còn thiếu mã số sinh viên/);

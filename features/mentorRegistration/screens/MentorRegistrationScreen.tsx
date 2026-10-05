@@ -28,7 +28,6 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -41,7 +40,8 @@ import { toUserMessage } from '@/core/api/errors';
 import { useRoleMode } from '@/core/roleMode/RoleModeProvider';
 import { dinhDangNgayGio } from '@/core/time/localDateTime';
 import { BottomBar } from '@/core/ui/BottomBar';
-import { KOKO } from '@/core/ui/brand';
+import { KOKO, KOKO_HAPPY } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { Button } from '@/core/ui/Button';
 import { Chip } from '@/core/ui/Chip';
 import { ErrorView } from '@/core/ui/ErrorView';
@@ -141,7 +141,16 @@ export function MentorRegistrationScreen() {
           <ScreenHeader title="Đăng ký làm Mentor" onBack={roiMan} />
         </View>
         <View className="flex-1 items-center justify-center gap-2 px-10">
-          <Image source={KOKO} style={{ width: 140, height: 140 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+          {/*
+            Thiết kế không vẽ khối này nên tư thế do ngữ cảnh quyết định: đã được
+            duyệt là tin vui (tư thế vui), còn đang chờ duyệt thì chưa có gì để
+            vui nên giữ tư thế chuẩn.
+          */}
+          <BrandImage
+            source={choDuyet ? KOKO : KOKO_HAPPY}
+            size={140}
+            testID="minh-hoa-tinh-trang-mentor"
+          />
           <Text testID="tieu-de-tinh-trang" className="text-center text-section-title text-ink" style={{ fontFamily: fonts.bold }}>
             {choDuyet ? 'Hồ sơ đang chờ duyệt' : 'Bạn đã là Mentor'}
           </Text>

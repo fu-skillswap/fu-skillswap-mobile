@@ -7,6 +7,7 @@ import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { createQueryClient } from '@/core/api/queryClient';
+import { KOKO, KOKO_READING } from '@/core/ui/brand';
 import { ProfileScreen } from '@/features/profile';
 
 const BASE = 'https://api.skillswap.asia';
@@ -242,6 +243,10 @@ describe('ProfileScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Chưa có hồ sơ sinh viên')).toBeTruthy());
     expect(screen.queryByText('Hệ thống đang bận')).toBeNull();
+    // Minh hoạ Koko của khối rỗng; ảnh trang trí nên bị ẩn khỏi trình đọc màn hình.
+    expect(
+      screen.getByTestId('minh-hoa-rong-ho-so', { includeHiddenElements: true }).props.source,
+    ).toBe(KOKO);
     await doiHoSoXong();
   });
 
@@ -444,6 +449,18 @@ describe('ProfileScreen — lối chuyển sang chế độ Mentor', () => {
 
     await renderScreen();
     await doiHoSoXong();
+
+    /*
+      `Profile.dc.html` dòng 45 đặt `koko-reading.png` ở cỡ 64×64 trong card này.
+      Kiểm cả số đo: trước đây màn hình dùng tư thế chuẩn ở cỡ 56, lệch thiết kế
+      cả tư thế lẫn kích thước mà không test nào bắt.
+    */
+    const minhHoa = screen.getByTestId('minh-hoa-tro-thanh-mentor', {
+      includeHiddenElements: true,
+    });
+    expect(minhHoa.props.style).toMatchObject({ width: 64, height: 64 });
+    expect(minhHoa.props.source).toBe(KOKO_READING);
+
     await fireEvent.press(screen.getByTestId('nut-tro-thanh-mentor'));
 
     expect(mockPush).toHaveBeenCalledWith('/mentor-registration');

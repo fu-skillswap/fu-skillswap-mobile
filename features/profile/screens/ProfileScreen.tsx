@@ -31,13 +31,14 @@
 
 import { useRouter } from 'expo-router';
 import { ArrowLeftRight, ChevronRight, LogOut } from 'lucide-react-native';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { trangThaiTai } from '@/core/api/queryState';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { useRoleMode } from '@/core/roleMode/RoleModeProvider';
 import { Avatar } from '@/core/ui/Avatar';
-import { KOKO } from '@/core/ui/brand';
+import { KOKO, KOKO_READING } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { Card } from '@/core/ui/Card';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
@@ -173,6 +174,11 @@ export function ProfileScreen() {
               description="Hoàn thành hồ sơ để mentor biết bạn đang học ngành nào."
               actionLabel="Hoàn thiện hồ sơ"
               onAction={() => router.push('/onboarding')}
+              // Tư thế chuẩn: chưa có gì để đọc và cũng chưa tìm gì không thấy —
+              // đây chỉ là một việc chưa làm.
+              illustration={
+                <BrandImage source={KOKO} size={140} testID="minh-hoa-rong-ho-so" />
+              }
             />
           ) : (
             <View>
@@ -224,7 +230,12 @@ export function ProfileScreen() {
             className="flex-row items-center gap-3 bg-surface-tint px-4 py-3.5"
             style={{ borderRadius: radius.lg }}
           >
-            <Image source={KOKO} style={{ width: 56, height: 56 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+            {/*
+              `Profile.dc.html` dòng 45: blob `2fb2a1e7…` = `koko-reading.png`,
+              cỡ 64×64. Trước đây chỗ này dùng tư thế chuẩn ở cỡ 56 — cả tư thế
+              lẫn số đo đều lệch thiết kế.
+            */}
+            <BrandImage source={KOKO_READING} size={64} testID="minh-hoa-tro-thanh-mentor" />
             <View className="min-w-0 flex-1">
               <Text className="text-body-lg text-ink" style={{ fontFamily: fonts.bold }}>
                 Trở thành Mentor

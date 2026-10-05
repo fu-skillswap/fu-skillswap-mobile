@@ -7,6 +7,7 @@ import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
+import { KOKO, KOKO_404 } from '@/core/ui/brand';
 import { MentorDiscoveryScreen } from '@/features/mentor';
 import { DO_TRE_TIM_KIEM_MS } from '@/features/mentor/screens/MentorDiscoveryScreen';
 import { donHangDoiDanhSach, nhuongChoDebounce } from '@/test-utils/nhuongNhip';
@@ -357,6 +358,42 @@ describe('MentorDiscoveryScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Chưa có gợi ý nào')).toBeTruthy());
     expect(screen.queryByText('Thử lại')).toBeNull();
+
+    /*
+      CHƯA tìm gì thì dùng tư thế chuẩn, KHÔNG dùng tư thế "404": chưa có gợi ý
+      không phải là tìm-mà-không-thấy. Hai testID khác nhau nên test này cũng
+      khoá luôn việc không được dùng một tư thế cho cả hai cảnh.
+    */
+    expect(
+      screen.getByTestId('minh-hoa-chua-co-goi-y', { includeHiddenElements: true }).props.source,
+    ).toBe(KOKO);
+    expect(
+      screen.queryByTestId('minh-hoa-khong-thay-mentor', { includeHiddenElements: true }),
+    ).toBeNull();
+    await donHangDoiDanhSach();
+  });
+
+  it('tìm mà không thấy mentor nào thì dùng tư thế "404", không dùng tư thế chuẩn', async () => {
+    server.use(
+      goiYOk([{ mentor: QUAN, matchScore: 95.5, matchReasons: ['Cùng chuyên ngành của bạn'] }]),
+      http.get(`${BASE}/api/mentors`, () => HttpResponse.json(envelope(trang([])))),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
+
+    await fireEvent.changeText(screen.getByLabelText('Tìm mentor'), 'khong-ton-tai');
+    await nhuongChoDebounce(DO_TRE_TIM_KIEM_MS);
+
+    await waitFor(() => expect(screen.getByText('Không tìm thấy mentor nào')).toBeTruthy(), {
+      timeout: 3_000,
+    });
+    expect(
+      screen.getByTestId('minh-hoa-khong-thay-mentor', { includeHiddenElements: true }).props.source,
+    ).toBe(KOKO_404);
+    expect(
+      screen.queryByTestId('minh-hoa-chua-co-goi-y', { includeHiddenElements: true }),
+    ).toBeNull();
     await donHangDoiDanhSach();
   });
 

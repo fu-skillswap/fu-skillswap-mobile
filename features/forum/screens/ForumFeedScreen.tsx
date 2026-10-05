@@ -6,10 +6,12 @@
  * (ErrorView chiếm màn hình), lỗi khi ĐÃ có dữ liệu (banner, giữ nguyên danh
  * sách), và rỗng (EmptyState — gọi API thành công nhưng không có bài nào).
  *
- * `Main.dc.html` vẽ màn này thành một dashboard: lời chào + ô tìm mentor + card
- * Koko + carousel "Mentor nổi bật" + danh sách bài. Lần này CHỈ dựng phần có dữ
- * liệu thật — lời chào (tên từ `useAuth()`) và danh sách bài theo đúng kiểu thẻ
- * của thiết kế. Ba khối còn lại bị bỏ qua có chủ ý, lý do ghi ngay tại chỗ.
+ * `Main.dc.html` vẽ màn này thành một dashboard: logo + lời chào + ô tìm mentor
+ * + card Koko + carousel "Mentor nổi bật" + danh sách bài. Lần này CHỈ dựng
+ * phần có dữ liệu thật — logo, lời chào (tên từ `useAuth()`) và danh sách bài
+ * theo đúng kiểu thẻ của thiết kế. Các khối còn lại bị bỏ qua có chủ ý, lý do
+ * ghi ngay tại chỗ; card Koko dẫn sang màn `KokoChat` chưa tồn tại nên không
+ * dựng (luật "đừng dựng nút chết").
  */
 
 import { useRouter } from 'expo-router';
@@ -20,6 +22,8 @@ import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'r
 import { trangThaiTai } from '@/core/api/queryState';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { useDebouncedValue } from '@/core/hooks/useDebouncedValue';
+import { KOKO_READING, LOGO_MARK } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { IconButton } from '@/core/ui/IconButton';
@@ -112,11 +116,22 @@ export function ForumFeedScreen() {
 
       <View className="gap-4 px-gutter pb-3 pt-2">
         {/*
-          Lời chào bên trái, chuông thông báo bên phải. Lời chào chỉ hiện khi đã
-          biết người dùng là ai; chuông luôn có. Thiết kế còn có logo 40 bên trái —
-          bỏ để đầu trang không chật trên máy hẹp.
+          Logo 40 bên trái, lời chào ở giữa, chuông thông báo bên phải — đúng
+          `<header>` của `Main.dc.html` dòng 22 (`width: 40px; height: 40px;
+          object-fit: contain`). Lời chào chỉ hiện khi đã biết người dùng là ai;
+          logo và chuông luôn có.
+
+          Nền ở đây là `surface-page` (SÁNG) nên dùng `LOGO_MARK`, không phải
+          `LOGO_MARK_NEGATIVE`: bản negative là nét trắng, trên nền sáng nó biến
+          mất hẳn.
+
+          Logo là ảnh trang trí ở màn này — tên sản phẩm không phải thông tin
+          người dùng cần nghe lại mỗi lần mở tab Bảng tin, và lời chào ngay cạnh
+          đã nói họ đang ở đâu. Thiết kế đặt `alt="SkillSwap"` cho bản web, nơi
+          logo cũng là nút về trang chủ; ở đây nó không bấm được.
         */}
         <View className="flex-row items-center gap-3">
+          <BrandImage source={LOGO_MARK} size={40} testID="logo-bang-tin" />
           <View className="min-w-0 flex-1">
             {user ? (
               <>
@@ -235,6 +250,12 @@ export function ForumFeedScreen() {
             <EmptyState
               title="Chưa có bài viết nào"
               description="Hãy là người đầu tiên bắt đầu một cuộc thảo luận."
+              // Koko đang ĐỌC: khối rỗng này nói về bài viết. Cỡ 140 lấy từ khối
+              // rỗng duy nhất mà thiết kế vẽ ra số đo (`MyBookings.dc.html`
+              // dòng 35) — mọi `EmptyState` dùng cùng một cỡ cho khỏi lệch nhau.
+              illustration={
+                <BrandImage source={KOKO_READING} size={140} testID="minh-hoa-rong-dien-dan" />
+              }
             />
           }
         />

@@ -7,6 +7,7 @@ import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
+import { KOKO } from '@/core/ui/brand';
 import { ChuongThongBao, NotificationsScreen } from '@/features/notification';
 import { donHangDoiDanhSach } from '@/test-utils/nhuongNhip';
 
@@ -212,6 +213,10 @@ describe('NotificationsScreen', () => {
     await moMan();
 
     await waitFor(() => expect(screen.getByText('Chưa có thông báo nào')).toBeTruthy());
+    // Minh hoạ Koko của khối rỗng; ảnh trang trí nên bị ẩn khỏi trình đọc màn hình.
+    expect(
+      screen.getByTestId('minh-hoa-rong-thong-bao', { includeHiddenElements: true }).props.source,
+    ).toBe(KOKO);
     await donHangDoiDanhSach();
   });
 

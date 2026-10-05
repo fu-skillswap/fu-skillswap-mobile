@@ -8,6 +8,7 @@ import { Linking } from 'react-native';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
+import { KOKO_READING } from '@/core/ui/brand';
 import { MyBookingsScreen } from '@/features/booking';
 import { taoBooking } from '@/features/booking/mocks/bookingFixture';
 import { donHangDoiDanhSach } from '@/test-utils/nhuongNhip';
@@ -324,6 +325,19 @@ describe('MyBookingsScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Chưa có lịch nào ở đây')).toBeTruthy());
     expect(screen.queryByText('Thử lại')).toBeNull();
+
+    /*
+      Minh hoạ Koko 140×140 của `MyBookings.dc.html` dòng 35. Ảnh trang trí nên
+      bị ẩn khỏi trình đọc màn hình, vì vậy phải xin RNTL kể cả phần tử ẩn —
+      truy vấn thường sẽ không thấy nó.
+    */
+    const minhHoa = screen.getByTestId('minh-hoa-rong-lich-hen', {
+      includeHiddenElements: true,
+    });
+    expect(minhHoa.props.style).toMatchObject({ width: 140, height: 140 });
+    // Tư thế ĐANG ĐỌC đúng blob `2fb2a1e7…` của thiết kế. Khẳng định bằng đồng
+    // nhất với hằng của `core/ui/brand.ts`, không bằng giá trị `require()`.
+    expect(minhHoa.props.source).toBe(KOKO_READING);
 
     await fireEvent.press(screen.getByText('Tìm Mentor'));
     expect(mockPush).toHaveBeenCalledWith('/(tabs)/mentors');

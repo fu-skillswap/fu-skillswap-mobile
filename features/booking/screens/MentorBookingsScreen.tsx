@@ -49,6 +49,8 @@ import { useState } from 'react';
 import { ActivityIndicator, FlatList, Linking, Pressable, Text, View } from 'react-native';
 
 import { trangThaiTai } from '@/core/api/queryState';
+import { KOKO_READING } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { FilterTabs } from '@/core/ui/FilterTabs';
@@ -270,6 +272,11 @@ export function MentorBookingsScreen() {
             <EmptyState
               title="Chưa có booking nào ở đây"
               description={MO_TA_RONG[tab]}
+              // Cùng khối rỗng danh sách lịch như phía mentee, nên cùng tư thế và
+              // cùng cỡ 140 của `MyBookings.dc.html` dòng 35.
+              illustration={
+                <BrandImage source={KOKO_READING} size={140} testID="minh-hoa-rong-booking-mentor" />
+              }
               /*
                 KHÔNG có nút hành động: thiết kế không vẽ nút nào ở trạng thái
                 rỗng của màn này, và mọi màn có thể nhận nút đó (MentorServices

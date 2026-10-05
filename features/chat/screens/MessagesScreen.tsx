@@ -24,6 +24,8 @@ import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'r
 
 import { trangThaiTai } from '@/core/api/queryState';
 import { Avatar } from '@/core/ui/Avatar';
+import { KOKO, KOKO_404 } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
@@ -142,13 +144,25 @@ export function MessagesScreen({ thamDoMs = THAM_DO_HOP_THU_MS, onBack }: Messag
           }
           ListEmptyComponent={
             tuKhoa.trim() !== '' ? (
-              <EmptyState title="Không tìm thấy" description="Không có cuộc trò chuyện nào khớp tên này." />
+              <EmptyState
+                title="Không tìm thấy"
+                description="Không có cuộc trò chuyện nào khớp tên này."
+                // Tìm mà không thấy — đúng ngữ cảnh của tư thế "404", khác hẳn
+                // khối rỗng bên dưới (chưa có gì để tìm).
+                illustration={
+                  <BrandImage source={KOKO_404} size={140} testID="minh-hoa-khong-thay-hoi-thoai" />
+                }
+              />
             ) : (
               <EmptyState
                 title="Chưa có cuộc trò chuyện nào"
                 description="Phòng chat với mentor tự mở khi mentor chấp nhận lịch hẹn của bạn."
                 actionLabel="Tìm Mentor"
                 onAction={() => router.push('/(tabs)/mentors')}
+                // Tư thế chuẩn: không có gì bị mất và cũng không có gì để đọc.
+                illustration={
+                  <BrandImage source={KOKO} size={140} testID="minh-hoa-rong-hoi-thoai" />
+                }
               />
             )
           }

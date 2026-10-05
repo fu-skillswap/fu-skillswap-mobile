@@ -8,6 +8,7 @@ import { Linking } from 'react-native';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
+import { KOKO_READING } from '@/core/ui/brand';
 import { MentorBookingsScreen } from '@/features/booking';
 import { taoBooking } from '@/features/booking/mocks/bookingFixture';
 import type { BookingResponse } from '@/features/booking/types';
@@ -320,6 +321,11 @@ describe('MentorBookingsScreen', () => {
     expect(
       screen.getByText('Chưa có mentee nào đặt lịch trong khoảng 7 ngày trước đến 90 ngày tới.'),
     ).toBeTruthy();
+    // Minh hoạ Koko của khối rỗng; ảnh trang trí nên bị ẩn khỏi trình đọc màn hình.
+    expect(
+      screen.getByTestId('minh-hoa-rong-booking-mentor', { includeHiddenElements: true }).props
+        .source,
+    ).toBe(KOKO_READING);
 
     await fireEvent.press(screen.getByTestId('loc-booking-mentor-PENDING'));
     await waitFor(() =>

@@ -28,7 +28,6 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -39,7 +38,8 @@ import {
 import { toUserMessage } from '@/core/api/errors';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { BottomBar } from '@/core/ui/BottomBar';
-import { KOKO } from '@/core/ui/brand';
+import { KOKO_READING } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { Button } from '@/core/ui/Button';
 import { Chip } from '@/core/ui/Chip';
 import { ErrorView } from '@/core/ui/ErrorView';
@@ -160,7 +160,12 @@ export function OnboardingScreen({ namHienTai = new Date().getFullYear() }: Onbo
                   Hồ sơ đầy đủ giúp bạn kết nối với mentor phù hợp hơn.
                 </Text>
               </View>
-              <Image source={KOKO} style={{ width: 92, height: 92 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+              {/*
+                `Onboarding.dc.html` dòng 27 dùng blob `2fb2a1e7…`, bảng asset ở
+                mục 3 của HANDOFF.md ánh xạ nó sang `koko-reading.png` — tư thế
+                ĐANG ĐỌC, không phải tư thế chuẩn. Cỡ 92×92 lấy đúng thiết kế.
+              */}
+              <BrandImage source={KOKO_READING} size={92} testID="minh-hoa-hoan-thien-ho-so" />
             </View>
           )}
 

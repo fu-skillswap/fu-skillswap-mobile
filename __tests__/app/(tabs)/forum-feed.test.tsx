@@ -7,6 +7,7 @@ import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
+import { KOKO_READING, LOGO_MARK, LOGO_MARK_NEGATIVE } from '@/core/ui/brand';
 import { ForumFeedScreen } from '@/features/forum';
 import { DO_TRE_TIM_KIEM_MS, loiChao } from '@/features/forum/screens/ForumFeedScreen';
 import { donHangDoiDanhSach, nhuongChoDebounce } from '@/test-utils/nhuongNhip';
@@ -175,6 +176,45 @@ describe('ForumFeedScreen', () => {
     await renderScreen();
 
     await waitFor(() => expect(screen.getByText('Chưa có bài viết nào')).toBeTruthy());
+    await donHangDoiDanhSach();
+  });
+
+  it('đầu trang có logo nhận diện 40×40 bên trái lời chào', async () => {
+    // `Main.dc.html` dòng 22: `width: 40px; height: 40px; object-fit: contain`.
+    // Logo là ảnh trang trí nên bị ẩn khỏi trình đọc màn hình — phải xin RNTL
+    // kể cả phần tử ẩn mới thấy.
+    server.use(
+      topicsOk(),
+      http.get(`${BASE}/api/forum/feed`, () => HttpResponse.json(envelope(cursorPage([POST])))),
+    );
+
+    await renderScreen();
+
+    const logo = await screen.findByTestId('logo-bang-tin', { includeHiddenElements: true });
+    expect(logo.props.style).toMatchObject({ width: 40, height: 40 });
+    /*
+      Nền của màn này là `surface-page` (SÁNG) nên phải là bản THƯỜNG. Bản
+      negative là nét trắng, đặt lên nền sáng thì biến mất hẳn mà không test nào
+      biết — trừ dòng dưới đây.
+    */
+    expect(logo.props.source).toBe(LOGO_MARK);
+    expect(logo.props.source).not.toBe(LOGO_MARK_NEGATIVE);
+    await donHangDoiDanhSach();
+  });
+
+  it('khối rỗng của feed có minh hoạ Koko đang đọc', async () => {
+    server.use(
+      topicsOk(),
+      http.get(`${BASE}/api/forum/feed`, () => HttpResponse.json(envelope(cursorPage([])))),
+    );
+
+    await renderScreen();
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('minh-hoa-rong-dien-dan', { includeHiddenElements: true }).props.source,
+      ).toBe(KOKO_READING),
+    );
     await donHangDoiDanhSach();
   });
 

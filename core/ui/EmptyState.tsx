@@ -6,10 +6,15 @@
  * Giá trị theo khối rỗng của `MyBookings`: padding 32/16, gap 8, tiêu đề
  * 16/700 màu `ink`, mô tả 13 màu `ink-muted`, nút phụ cao 44 nền `surface-tint`.
  *
- * `illustration` là prop chứ không phải ảnh Koko dựng cứng: bộ asset Koko
- * (`koko-reading.png`…) CHƯA có trong `assets/` của repo này — mục 3 của
- * HANDOFF.md nói phải lấy từ design system. Khi có ảnh thì màn hình truyền
- * `<Image …>` vào đây, không phải sửa component.
+ * `illustration` là prop chứ không phải ảnh Koko dựng cứng, và nó phải ở lại như
+ * vậy: thiết kế dùng TƯ THẾ KHÁC NHAU theo ngữ cảnh (đang đọc cho danh sách bài
+ * viết, "404" cho tìm-mà-không-thấy, tư thế chuẩn cho việc chưa làm). Dựng cứng
+ * một tư thế vào đây là buộc mọi khối rỗng của app nói cùng một câu.
+ *
+ * Màn hình truyền `<BrandImage source={KOKO_READING} size={140} … />` vào đây;
+ * `core/ui/BrandImage.tsx` lo kích thước tường minh, `resizeMode="contain"` và
+ * việc ẩn ảnh trang trí khỏi trình đọc màn hình. Cỡ 140 là cỡ của khối rỗng duy
+ * nhất mà thiết kế vẽ kèm số đo (`MyBookings.dc.html` dòng 35).
  */
 
 import type { ReactNode } from 'react';

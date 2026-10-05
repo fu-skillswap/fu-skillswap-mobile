@@ -32,6 +32,8 @@ import { ActivityIndicator, Pressable, SectionList, Text, View } from 'react-nat
 
 import { trangThaiTai } from '@/core/api/queryState';
 import { useRoleMode } from '@/core/roleMode/RoleModeProvider';
+import { KOKO } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
@@ -183,6 +185,9 @@ export function NotificationsScreen({ thamDoMs = THAM_DO_THONG_BAO_MS }: Notific
             <EmptyState
               title="Chưa có thông báo nào"
               description="Khi mentor xác nhận lịch, có người bình luận bài của bạn hay có tin nhắn mới, bạn sẽ thấy ở đây."
+              // Tư thế chuẩn: hộp thông báo trống là chuyện bình thường, không
+              // phải "không tìm thấy".
+              illustration={<BrandImage source={KOKO} size={140} testID="minh-hoa-rong-thong-bao" />}
             />
           }
         />

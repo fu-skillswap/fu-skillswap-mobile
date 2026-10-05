@@ -35,6 +35,8 @@ import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'r
 
 import { trangThaiTai } from '@/core/api/queryState';
 import { useDebouncedValue } from '@/core/hooks/useDebouncedValue';
+import { KOKO, KOKO_404 } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { FilterTabs } from '@/core/ui/FilterTabs';
@@ -254,6 +256,18 @@ export function MentorDiscoveryScreen() {
                 dungTimKiem
                   ? 'Thử từ khoá khác, hoặc chọn lại "Gợi ý cho bạn" để xem mentor theo ngành học.'
                   : 'Hoàn thành hồ sơ sinh viên để chúng tôi gợi ý mentor phù hợp hơn.'
+              }
+              /*
+                Hai ngữ cảnh khác nhau nên hai tư thế khác nhau: tìm-mà-không-thấy
+                là tư thế "404", còn chưa-có-gợi-ý là tư thế chuẩn — chưa tìm gì
+                thì chưa mất gì.
+              */
+              illustration={
+                dungTimKiem ? (
+                  <BrandImage source={KOKO_404} size={140} testID="minh-hoa-khong-thay-mentor" />
+                ) : (
+                  <BrandImage source={KOKO} size={140} testID="minh-hoa-chua-co-goi-y" />
+                )
               }
             />
           }

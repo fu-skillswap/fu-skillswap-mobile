@@ -7,6 +7,7 @@ import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
+import { KOKO_HAPPY } from '@/core/ui/brand';
 import { BookingConfirmScreen } from '@/features/booking';
 import { taoBooking } from '@/features/booking/mocks/bookingFixture';
 
@@ -178,6 +179,15 @@ describe('BookingConfirmScreen', () => {
     await fireEvent.press(screen.getByTestId('nut-gui-dat-lich'));
 
     await waitFor(() => expect(screen.getByTestId('man-hinh-da-gui-dat-lich')).toBeTruthy());
+    /*
+      Trạng thái THÀNH CÔNG dùng Koko VUI, đúng vai mà `core/ui/brand.ts` giao
+      cho tư thế đó. Ảnh trang trí nên bị ẩn khỏi trình đọc màn hình — chữ "Đã
+      gửi yêu cầu" ngay cạnh đã nói hết.
+    */
+    expect(
+      screen.getByTestId('minh-hoa-dat-lich-thanh-cong', { includeHiddenElements: true }).props
+        .source,
+    ).toBe(KOKO_HAPPY);
     // `startAt` đi NGUYÊN từ bước 2; tiêu đề đã cắt khoảng trắng; mô tả trống
     // thì không gửi trường đó.
     expect(body).toEqual({

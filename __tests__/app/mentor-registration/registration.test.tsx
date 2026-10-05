@@ -8,6 +8,7 @@ import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
+import { KOKO, KOKO_HAPPY } from '@/core/ui/brand';
 import type { MentorProfileResponse } from '@/features/mentorMode/types';
 import { taoHoSoMentor, taoHoSoMentorRong } from '@/features/mentorMode/mocks/mentorModeFixture';
 import { MentorRegistrationScreen } from '@/features/mentorRegistration';
@@ -196,6 +197,11 @@ describe('MentorRegistrationScreen — đã nộp', () => {
 
     await moMan();
     await waitFor(() => expect(screen.getByTestId('nut-rut-ho-so')).toBeTruthy());
+    // Nhánh CHỜ DUYỆT dùng tư thế chuẩn: chưa có gì để vui. Hai nhánh của
+    // ternary vì vậy đều có test riêng.
+    expect(
+      screen.getByTestId('minh-hoa-tinh-trang-mentor', { includeHiddenElements: true }).props.source,
+    ).toBe(KOKO);
     await fireEvent.press(screen.getByTestId('nut-rut-ho-so'));
 
     await waitFor(() => expect(screen.getByTestId('o-tieu-de-mentor')).toBeTruthy());
@@ -208,6 +214,11 @@ describe('MentorRegistrationScreen — đã nộp', () => {
 
     await moMan();
     await waitFor(() => expect(screen.getByTestId('tieu-de-tinh-trang')).toHaveTextContent('Bạn đã là Mentor'));
+    // Đã được duyệt là tin vui nên màn này dùng Koko VUI. Ảnh trang trí nên bị
+    // ẩn khỏi trình đọc màn hình.
+    expect(
+      screen.getByTestId('minh-hoa-tinh-trang-mentor', { includeHiddenElements: true }).props.source,
+    ).toBe(KOKO_HAPPY);
     await fireEvent.press(screen.getByTestId('nut-mo-che-do-mentor'));
 
     expect(mockChuyenCheDo).toHaveBeenCalledWith('MENTOR');

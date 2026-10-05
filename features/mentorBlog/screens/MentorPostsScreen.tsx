@@ -24,6 +24,8 @@ import { ActivityIndicator, FlatList, Modal, Pressable, Text, View } from 'react
 import { toUserMessage } from '@/core/api/errors';
 import { trangThaiTai } from '@/core/api/queryState';
 import { dinhDangNgay } from '@/core/time/localDateTime';
+import { KOKO_READING } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { Button } from '@/core/ui/Button';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
@@ -99,6 +101,11 @@ export function MentorPostsScreen() {
               description="Chia sẻ kinh nghiệm, kiến thức hoặc góc nhìn của bạn với mentee."
               actionLabel="Tạo bài viết đầu tiên"
               onAction={taoMoi}
+              // Khối rỗng của một danh sách BÀI VIẾT nên dùng Koko đang đọc, đúng
+              // như `MentorCourses.dc.html` dòng 30 làm với khối rỗng khoá học.
+              illustration={
+                <BrandImage source={KOKO_READING} size={140} testID="minh-hoa-rong-bai-viet-mentor" />
+              }
             />
           }
         />

@@ -23,14 +23,15 @@
 import { useRouter } from 'expo-router';
 import { CircleCheck, ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
 import { phanCachNghin } from '@/core/format/soLuong';
 import { dinhDangKhoangGio, dinhDangNgayCoOffset, dinhDangGio, nhanNgayNgan } from '@/core/time/offsetDateTime';
 import { Avatar } from '@/core/ui/Avatar';
 import { BottomBar } from '@/core/ui/BottomBar';
-import { KOKO } from '@/core/ui/brand';
+import { KOKO_HAPPY } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { Button } from '@/core/ui/Button';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
@@ -373,7 +374,12 @@ function DaGui({ booking, onXemLichHen }: { booking: BookingResponse; onXemLichH
           className="items-center justify-center rounded-full bg-surface-tint"
           style={{ width: 200, height: 200 }}
         >
-          <Image source={KOKO} accessibilityIgnoresInvertColors style={{ width: 160, height: 160 }} resizeMode="contain" />
+          {/*
+            Đây là trạng thái THÀNH CÔNG ("Đã gửi yêu cầu"), và `core/ui/brand.ts`
+            dành tư thế vui cho đúng cảnh này. Thiết kế không vẽ khối này nên 160
+            trong vòng tròn 200 là số của repo, giữ nguyên.
+          */}
+          <BrandImage source={KOKO_HAPPY} size={160} testID="minh-hoa-dat-lich-thanh-cong" />
         </View>
         <View className="flex-row items-center gap-2 pt-2">
           <CircleCheck size={20} color={colors.successInk} strokeWidth={2.4} />

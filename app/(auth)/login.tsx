@@ -7,6 +7,8 @@ import { toUserMessage } from '@/core/api/errors';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { resolveAuthRoute } from '@/core/auth/authRoute';
 import { GoogleSignInCancelledError, GoogleSignInConfigError } from '@/core/auth/googleSignIn';
+import { KOKO, LOGO_FULL } from '@/core/ui/brand';
+import { BrandImage } from '@/core/ui/BrandImage';
 import { Button } from '@/core/ui/Button';
 import { fonts } from '@/core/ui/theme';
 
@@ -74,19 +76,34 @@ export default function LoginScreen() {
     <SafeAreaView className="flex-1 bg-surface-page">
       {/* `Welcome.dc.html`: padding 56/24/40 — phần trên đã do safe area lo. */}
       <View className="flex-1 px-6 pb-10 pt-6">
-        <Text className="text-2xl text-ink" style={{ fontFamily: fonts.extrabold }}>
-          SkillSwap
-        </Text>
+        {/*
+          `Welcome.dc.html` dòng 19: logo có chữ, `height: 36px; width: auto;
+          align-self: flex-start`. 540×174 là cỡ file trong repo, nên bề rộng
+          tương ứng chiều cao 36 là 36 × 540 / 174 ≈ 112. Phải khai cả hai số:
+          `width: auto` không có trong React Native. Bề rộng tường minh cũng là
+          `align-self: flex-start` của thiết kế: `alignItems: stretch` (mặc định
+          của cột) chỉ giãn con nào để cỡ ngang `auto`.
+
+          Đây là ảnh MANG thông tin — nó đứng thay cho chữ "SkillSwap" trước đây
+          là tên sản phẩm duy nhất trên màn này — nên có `accessibilityLabel`.
+        */}
+        <BrandImage
+          source={LOGO_FULL}
+          width={112}
+          height={36}
+          label="SkillSwap"
+          testID="logo-skillswap"
+        />
 
         {/*
-          Khối hero bo 32 nền `surface-tint` với ba quả cầu trang trí. Thiết kế đặt
-          mascot Koko ở giữa khối này, nhưng repo mobile CHƯA có file ảnh nào của
-          Koko (`assets/images/` chỉ có icon app và logo Expo mặc định), nên ở đây
-          chỉ dựng khối và các quả cầu — xem báo cáo. Không hard-code chiều rộng
-          390 của khung thiết kế: khối tự co theo màn hình.
+          Khối hero bo 32 nền `surface-tint`: ba quả cầu trang trí và mascot Koko
+          ở giữa. Thiết kế dùng `align-items: flex-end; justify-content: center`
+          nên Koko đứng trên đáy khối, căn giữa ngang — đó là `items-center
+          justify-end` ở đây. Không hard-code chiều rộng 390 của khung thiết kế:
+          khối tự co theo màn hình.
         */}
         <View
-          className="mt-6 overflow-hidden bg-surface-tint"
+          className="mt-6 items-center justify-end overflow-hidden bg-surface-tint"
           style={{ height: 330, borderRadius: 32 }}
         >
           {/*
@@ -106,6 +123,20 @@ export default function LoginScreen() {
             className="absolute rounded-full bg-sky-blue"
             style={{ width: 22, height: 22, bottom: 120, right: 70 }}
           />
+
+          {/*
+            `Welcome.dc.html` dòng 25: Koko tư thế chuẩn, `height: 290px; width:
+            auto; object-fit: contain`. koko.png trong repo là 360×512, nên bề
+            rộng của chiều cao 290 là 290 × 360 / 512 ≈ 204.
+
+            Đứng SAU ba quả cầu trong cây: React Native vẽ theo thứ tự con, nên
+            Koko nằm trên chúng — đúng `position: relative` mà thiết kế đặt lên
+            thẻ `<img>` để nhấc nó khỏi nền.
+
+            Trang trí, không có nhãn: tiêu đề và đoạn mô tả ngay dưới đã nói hết
+            nội dung màn hình, đọc thêm "mascot cú Koko" chỉ làm dài thêm.
+          */}
+          <BrandImage source={KOKO} width={204} height={290} testID="mascot-koko" />
         </View>
 
         <View className="mt-8 gap-3">
