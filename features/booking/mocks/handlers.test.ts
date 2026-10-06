@@ -17,6 +17,7 @@ import { getNextPageNumber } from '@/core/api/pagination';
 import { docOffsetDateTime } from '@/core/time/offsetDateTime';
 import { MOCK_USER } from '@/core/auth/mocks/handlers';
 import { bookingRepo } from '@/features/booking/bookingRepo';
+import { mentorBookingRepo } from '@/features/booking/mentorBookingRepo';
 import { nhanTrangThaiBooking } from '@/features/booking/bookingStatus';
 import { bookingMockHandlers } from '@/features/booking/mocks/handlers';
 
@@ -471,5 +472,70 @@ describe('handler mock của nhánh booking — góc nhìn MENTOR', () => {
     const lai = await bookingRepo.checkIn('mb1', 'khoa-checkin-2');
 
     expect(lai.attendance.currentUserCheckedIn).toBe(true);
+  });
+});
+
+describe('handler mock — việc của MENTEE sau buổi học', () => {
+  it('có booking để xem được nút "Điểm danh" và "Xác nhận đã học" trên máy', async () => {
+    const trang = await bookingRepo.getMyBookings({ page: 0, size: 50 });
+
+    expect(trang.content.some((b) => b.attendance.canCheckIn)).toBe(true);
+    expect(trang.content.some((b) => b.canConfirmByMentee)).toBe(true);
+  });
+
+  it('mentee check-in b1: tắt canCheckIn, ghi giờ của MENTEE, gửi lại vẫn êm', async () => {
+    const daCheckIn = await bookingRepo.checkIn('b1', 'khoa-mentee-checkin');
+
+    expect(daCheckIn.attendance.canCheckIn).toBe(false);
+    expect(daCheckIn.attendance.menteeCheckedInAt).not.toBeNull();
+    const lai = await bookingRepo.checkIn('b1', 'khoa-mentee-checkin');
+    expect(lai.attendance.currentUserCheckedIn).toBe(true);
+  });
+
+  it('xác nhận đã học: thiếu key thì 400, đủ key thì COMPLETED và danh sách đổi thật', async () => {
+    const thieuKhoa = await bookingRepo.confirmByMentee('b5', {}, '').then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect((thieuKhoa as ApiClientError).status).toBe(400);
+
+    const daXacNhan = await bookingRepo.confirmByMentee('b5', {}, 'khoa-xac-nhan');
+    expect(daXacNhan.bookingStatus).toBe('COMPLETED');
+    expect(daXacNhan.canConfirmByMentee).toBe(false);
+
+    const sau = await bookingRepo.getMyBookings({ page: 0, size: 50 });
+    expect(sau.content.find((b) => b.bookingId === 'b5')?.status).toBe('COMPLETED');
+  });
+
+  it('xác nhận một booking không ở trạng thái chờ thì 409', async () => {
+    const loi = await bookingRepo.confirmByMentee('b2', {}, 'khoa-xac-nhan-b2').then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect((loi as ApiClientError).status).toBe(409);
+  });
+});
+
+describe('handler mock: mentor hoàn tất / huỷ', () => {
+  it('hoàn tất buổi "Chờ bạn xác nhận" chuyển sang chờ mentee, gửi lại vẫn thành công', async () => {
+    const xong = await mentorBookingRepo.completeBooking('mb5', {}, 'khoa-hoan-tat-1');
+    expect(xong.status).toBe('AWAITING_MENTEE_CONFIRMATION');
+    expect(xong.canCompleteByMentor).toBe(false);
+
+    const lai = await mentorBookingRepo.completeBooking('mb5', {}, 'khoa-hoan-tat-2');
+    expect(lai.status).toBe('AWAITING_MENTEE_CONFIRMATION');
+  });
+
+  it('hoàn tất booking không ở AWAITING_MENTOR_COMPLETION thì 409', async () => {
+    await expect(mentorBookingRepo.completeBooking('mb2', {}, 'khoa-hoan-tat-3')).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('huỷ thiếu lý do thì 400; có lý do thì booking sang mentor huỷ', async () => {
+    await expect(mentorBookingRepo.cancelBooking('mb4', { cancelReason: ' ' }, 'khoa-huy-1')).rejects.toBeInstanceOf(
+      ApiClientError,
+    );
+    const daHuy = await mentorBookingRepo.cancelBooking('mb4', { cancelReason: 'Ốm' }, 'khoa-huy-2');
+    expect(daHuy.bookingStatus).toBe('CANCELED_BY_MENTOR');
+    expect(daHuy.canCancel).toBe(false);
   });
 });

@@ -20,7 +20,7 @@
 
 import { useRouter } from 'expo-router';
 import { Heart, MessageCircle, SendHorizontal } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -37,6 +37,7 @@ import { toUserMessage } from '@/core/api/errors';
 import { trangThaiTai } from '@/core/api/queryState';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { Avatar } from '@/core/ui/Avatar';
+import { useBuTruBanPhimDuoiHeader } from '@/core/ui/banPhim';
 import { Button } from '@/core/ui/Button';
 import { Chip } from '@/core/ui/Chip';
 import { EmptyState } from '@/core/ui/EmptyState';
@@ -47,6 +48,7 @@ import { Screen } from '@/core/ui/Screen';
 import { colors, fonts, spacing } from '@/core/ui/theme';
 import { resolveReplyTarget } from '@/features/forum/commentTree';
 import { CommentItem } from '@/features/forum/components/CommentItem';
+import { CommentReplies } from '@/features/forum/components/CommentReplies';
 import { ReportSheet } from '@/features/forum/components/ReportSheet';
 import type { ReportTarget } from '@/features/forum/components/ReportSheet';
 import {
@@ -84,6 +86,8 @@ export function PostDetailScreen({ postId }: { postId: string }) {
   const xoaBai = useDeletePost();
   const guiBinhLuan = useCreateComment(postId);
   const baoCao = useReport();
+  // Màn này nằm DƯỚI thanh tiêu đề native của Stack (`app/forum/_layout.tsx`).
+  const buTruBanPhim = useBuTruBanPhimDuoiHeader();
 
   /**
    * Bình luận đang được trả lời, `null` là đang viết một bình luận gốc.
@@ -95,6 +99,20 @@ export function PostDetailScreen({ postId }: { postId: string }) {
   const [draft, setDraft] = useState('');
   /** Đối tượng đang bị báo cáo; `null` là chưa mở hộp báo cáo */
   const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+  /** Những bình luận gốc đang mở luồng reply */
+  const [luongDangMo, setLuongDangMo] = useState<ReadonlySet<string>>(() => new Set());
+
+  const doiLuongPhanHoi = (rootId: string) => {
+    setLuongDangMo((cu) => {
+      const moi = new Set(cu);
+      if (moi.has(rootId)) {
+        moi.delete(rootId);
+      } else {
+        moi.add(rootId);
+      }
+      return moi;
+    });
+  };
 
   const guiBinhLuanDuoc = draft.trim().length > 0 && draft.length <= COMMENT_MAX;
 
@@ -102,20 +120,23 @@ export function PostDetailScreen({ postId }: { postId: string }) {
     if (!guiBinhLuanDuoc) {
       return;
     }
+    // Luật 1 cấp: trả lời một reply VẪN phải trỏ về bình luận GỐC, nếu không
+    // backend trả 400 "Chỉ hỗ trợ trả lời bình luận 1 cấp".
+    // `resolveReplyTarget` là nơi duy nhất biết luật này.
+    const gocId = replyTo ? resolveReplyTarget(replyTo) : null;
     guiBinhLuan.mutate(
-      {
-        content: draft.trim(),
-        // Luật 1 cấp: trả lời một reply VẪN phải trỏ về bình luận GỐC, nếu không
-        // backend trả 400 "Chỉ hỗ trợ trả lời bình luận 1 cấp".
-        // `resolveReplyTarget` là nơi duy nhất biết luật này.
-        replyToCommentId: replyTo ? resolveReplyTarget(replyTo) : null,
-      },
+      { content: draft.trim(), replyToCommentId: gocId },
       {
         // Chỉ dọn ô nhập KHI backend đã nhận. Dọn trước thì một lần 429 (hạn mức
         // 20 bình luận/10 phút) làm mất trắng thứ người dùng vừa gõ.
         onSuccess: () => {
           setDraft('');
           setReplyTo(null);
+          // Reply không nằm trong danh sách bình luận của bài: không mở sẵn luồng
+          // của gốc thì người dùng gửi xong mà không thấy câu mình vừa viết.
+          if (gocId) {
+            setLuongDangMo((cu) => (cu.has(gocId) ? cu : new Set(cu).add(gocId)));
+          }
         },
       },
     );
@@ -152,20 +173,6 @@ export function PostDetailScreen({ postId }: { postId: string }) {
   // việc kiểm tra của backend.
   const laTacGia = Boolean(user && post.data && user.publicId === post.data.authorUserId);
 
-  /**
-   * Chốt chặn ĐỒNG BỘ cho việc tải trang bình luận kế — y hệt lý do đã ghi ở
-   * ForumFeedScreen: FlatList bắn `onEndReached` nhiều lần trong cùng một frame,
-   * cả hai lần cùng đọc `isFetchingNextPage === false` của lần render cũ nên
-   * cùng một cursor bị gửi đi hai lượt và trang đó bị nối vào hai lần.
-   */
-  const dangTaiTrangKe = useRef(false);
-  const taiTrangKe = () => {
-    if (dangTaiTrangKe.current || !comments.hasNextPage || comments.isFetchingNextPage) return;
-    dangTaiTrangKe.current = true;
-    void comments.fetchNextPage().finally(() => {
-      dangTaiTrangKe.current = false;
-    });
-  };
 
   const taiLai = () => {
     void post.refetch();
@@ -231,6 +238,9 @@ export function PostDetailScreen({ postId }: { postId: string }) {
         testID="vung-tranh-ban-phim"
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // `KeyboardAvoidingView` đo mình so với khung CHA, nên phải cộng phần nằm
+        // trên khung đó (thanh tiêu đề native) — xem `core/ui/banPhim.ts`.
+        keyboardVerticalOffset={buTruBanPhim}
       >
       <FlatList
         testID="danh-sach-binh-luan"
@@ -376,36 +386,28 @@ export function PostDetailScreen({ postId }: { postId: string }) {
         }
         renderItem={({ item }) => (
           <View>
-            {/*
-              `buildCommentTree` nâng reply mồ côi — reply mà bình luận gốc của nó
-              nằm ở trang trước — lên làm gốc để nó không biến mất. Nhưng nó vẫn
-              LÀ một reply, nên phải giữ dòng "Trả lời ai"; bỏ đi thì người đọc
-              thấy một câu cụt lủn không hiểu đang nói với ai.
-            */}
+            {/* Danh sách của bài chỉ có bình luận GỐC — backend không trả reply ở đây. */}
             <CommentItem
               comment={item}
-              isReply={Boolean(item.replyToCommentId)}
               onReply={setReplyTo}
               onToggleLike={thaTimBinhLuan}
               onReport={baoCaoBinhLuan}
             />
-            {item.replies.map((reply) => (
-              <CommentItem
-                key={reply.commentId}
-                comment={reply}
-                isReply
-                // `setReplyTo` nhận nguyên bình luận được bấm, KỂ CẢ khi đó là
-                // một reply: việc quy về bình luận gốc là của `resolveReplyTarget`
-                // lúc gửi, không phải của chỗ này.
-                onReply={setReplyTo}
-                onToggleLike={thaTimBinhLuan}
-                onReport={baoCaoBinhLuan}
-              />
-            ))}
+            <CommentReplies
+              postId={postId}
+              root={item}
+              expanded={luongDangMo.has(item.commentId)}
+              onToggle={doiLuongPhanHoi}
+              onReply={setReplyTo}
+              onToggleLike={thaTimBinhLuan}
+              onReport={baoCaoBinhLuan}
+            />
           </View>
         )}
+        // Chốt chặn bấm trùng nằm trong `useForumComments` (mục 6 của quy ước).
+        extraData={luongDangMo}
         onEndReachedThreshold={0.5}
-        onEndReached={taiTrangKe}
+        onEndReached={comments.taiTrangKe}
         // Cả hai query cùng tải lại, nên spinner chỉ được tắt khi cả hai xong.
         refreshing={post.isRefetching || comments.isRefetching}
         onRefresh={taiLai}

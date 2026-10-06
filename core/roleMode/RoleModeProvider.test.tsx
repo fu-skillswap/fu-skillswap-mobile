@@ -48,6 +48,7 @@ function phien(roles: BackendRole[] | null): AuthContextValue {
     user: roles ? nguoiDung(roles) : null,
     signInWithGoogle: jest.fn(),
     signOut: jest.fn(),
+    taiLaiNguoiDung: jest.fn(),
   };
 }
 
@@ -197,5 +198,41 @@ describe('RoleModeProvider', () => {
     await rerender({});
 
     expect(result.current.cheDoKhaDung).toBe(truoc);
+  });
+
+  it('đăng xuất thì QUÊN chế độ Mentor: tài khoản hai vai kế tiếp mở ở Mentee', async () => {
+    // Lựa chọn lưu theo máy. Không dọn khi đăng xuất thì người đăng nhập sau
+    // trên cùng máy mở thẳng vào thanh Mentor của người trước.
+    kho.getItemAsync.mockResolvedValue('MENTOR');
+    mockedUseAuth.mockReturnValue(phien(['MENTEE', 'MENTOR']));
+
+    const { result, rerender } = await dungHook();
+    expect(result.current.cheDo).toBe('MENTOR');
+
+    mockedUseAuth.mockReturnValue(phien(null));
+    await rerender({});
+
+    expect(kho.deleteItemAsync).toHaveBeenCalledWith(KHOA_CHE_DO_VAI_TRO);
+
+    const nguoiKhac = phien(['MENTEE', 'MENTOR']);
+    mockedUseAuth.mockReturnValue({
+      ...nguoiKhac,
+      user: nguoiKhac.user && { ...nguoiKhac.user, publicId: 'u-2' },
+    });
+    await rerender({});
+
+    expect(result.current.cheDo).toBe('MENTEE');
+  });
+
+  it('khởi động nguội (chưa có người dùng → có người dùng) KHÔNG xoá lựa chọn', async () => {
+    kho.getItemAsync.mockResolvedValue('MENTOR');
+    mockedUseAuth.mockReturnValue({ ...phien(null), status: 'loading' });
+
+    const { result, rerender } = await dungHook();
+    mockedUseAuth.mockReturnValue(phien(['MENTEE', 'MENTOR']));
+    await rerender({});
+
+    expect(result.current.cheDo).toBe('MENTOR');
+    expect(kho.deleteItemAsync).not.toHaveBeenCalled();
   });
 });

@@ -127,6 +127,19 @@ describe('BookingConfirmScreen', () => {
     expect(screen.queryByText(/Nạp/)).toBeNull();
   });
 
+  it('ô mục tiêu và nút gửi nằm trong lớp tránh bàn phím', async () => {
+    // Chốt cấu trúc: jest không đo được bàn phím; nó giữ cho lớp này không bị gỡ.
+    server.use(
+      hoSoKhongCo,
+      http.post(`${BASE}/api/bookings/quote`, () => HttpResponse.json(envelope(baoGia()))),
+    );
+
+    await renderScreen();
+
+    await waitFor(() => expect(screen.getByTestId('o-muc-tieu')).toBeTruthy());
+    expect(screen.getByTestId('vung-tranh-ban-phim-dat-lich')).toBeTruthy();
+  });
+
   it('gửi khi chưa viết mục tiêu thì báo lỗi và KHÔNG gọi API tạo booking', async () => {
     const taoBookingSpy = jest.fn();
     server.use(

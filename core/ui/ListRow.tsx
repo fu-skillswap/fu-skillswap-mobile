@@ -13,7 +13,7 @@
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { colors, fonts, spacing } from '@/core/ui/theme';
 
@@ -30,6 +30,11 @@ export interface ListRowProps {
   /** Hàng phá huỷ (Đăng xuất…): nhãn màu `danger` */
   destructive?: boolean;
   onPress?: () => void;
+  /**
+   * Việc của hàng đang chạy (ví dụ đang đăng xuất): hiện vòng quay ở cuối hàng
+   * và KHOÁ hàng, để một cú chạm nữa không gửi thêm một request.
+   */
+  busy?: boolean;
   testID?: string;
 }
 
@@ -41,6 +46,7 @@ export function ListRow({
   divider = false,
   destructive = false,
   onPress,
+  busy = false,
   testID,
 }: ListRowProps) {
   const noiDung = (
@@ -57,7 +63,12 @@ export function ListRow({
           {value}
         </Text>
       ) : null}
-      {chevron ? (
+      {busy ? (
+        <ActivityIndicator
+          testID={testID ? `${testID}-dang-chay` : undefined}
+          color={destructive ? colors.danger : colors.accent}
+        />
+      ) : chevron ? (
         <Ionicons name="chevron-forward" size={18} color={colors.inkMuted} />
       ) : null}
     </>
@@ -79,6 +90,8 @@ export function ListRow({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled: busy, busy }}
+      disabled={busy}
       onPress={onPress}
       testID={testID}
       className={lop}

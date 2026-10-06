@@ -361,6 +361,12 @@ export interface UpdateMentorServiceRequest {
 export interface MentorServiceActiveRequest {
   isActive: boolean;
   expectedVersion: number;
+  /**
+   * Chỉ hợp lệ khi TẮT dịch vụ (bật kèm cờ này → 400). `true` = đồng ý để backend
+   * tự từ chối mọi yêu cầu PENDING tương lai của dịch vụ; thiếu thì 409
+   * `SERVICE_HAS_PENDING_BOOKINGS` khi còn yêu cầu như vậy.
+   */
+  rejectPendingBookings?: boolean;
 }
 
 /** Giới hạn `@Size` của ba trường chữ của dịch vụ */

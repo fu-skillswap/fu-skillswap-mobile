@@ -42,6 +42,7 @@ jest.mock('@/core/auth/AuthProvider', () => ({
     },
     signInWithGoogle: jest.fn(),
     signOut: jest.fn(),
+    taiLaiNguoiDung: jest.fn(),
   }),
 }));
 
@@ -416,7 +417,7 @@ describe('MentorDashboardScreen', () => {
     await doiXong();
   });
 
-  it('mọi buổi đều đã diễn ra thì nói chưa có ai đặt, KHÔNG hiện dòng rỗng', async () => {
+  it('mọi buổi đều đã diễn ra thì nói "không có buổi nào sắp tới", KHÔNG nói chưa ai đặt', async () => {
     const hom_qua = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     server.use(
@@ -424,11 +425,35 @@ describe('MentorDashboardScreen', () => {
     );
 
     await renderScreen();
-    await waitFor(() =>
-      expect(screen.getByText('Chưa có mentee nào đặt lịch với bạn.')).toBeTruthy(),
+    await waitFor(() => expect(screen.getByText('Không có buổi nào sắp tới.')).toBeTruthy());
+
+    expect(screen.queryByText('Chưa có mentee nào đặt lịch với bạn.')).toBeNull();
+    expect(screen.queryByTestId('dong-sap-toi-mb-cu')).toBeNull();
+    await doiXong();
+  });
+
+  it('buổi ĐÃ HUỶ / bị từ chối không phải "sắp tới"; sắp theo giờ bắt đầu chứ không theo thứ tự backend', async () => {
+    // Chế độ dashboard của backend xếp theo nhóm việc-cần-làm (PENDING trước) rồi
+    // mới tới giờ, và trả cả booking đã kết thúc.
+    const sau = (gio: number) => new Date(Date.now() + gio * 60 * 60 * 1000).toISOString();
+    server.use(
+      ...duLieuDayDu({
+        sapToi: [
+          taoBooking({ bookingId: 'mb-xa', status: 'PENDING', selectedStartTime: sau(72) }),
+          taoBooking({ bookingId: 'mb-gan', status: 'PAID', selectedStartTime: sau(2) }),
+          taoBooking({ bookingId: 'mb-huy', status: 'CANCELLED_BY_MENTEE', selectedStartTime: sau(1) }),
+          taoBooking({ bookingId: 'mb-tu-choi', status: 'REJECTED', selectedStartTime: sau(1) }),
+        ],
+      }),
     );
 
-    expect(screen.queryByTestId('dong-sap-toi-mb-cu')).toBeNull();
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('dong-sap-toi-mb-gan')).toBeTruthy());
+
+    expect(screen.queryByTestId('dong-sap-toi-mb-huy')).toBeNull();
+    expect(screen.queryByTestId('dong-sap-toi-mb-tu-choi')).toBeNull();
+    const thuTu = screen.getAllByTestId(/^dong-sap-toi-/).map((n) => n.props.testID);
+    expect(thuTu).toEqual(['dong-sap-toi-mb-gan', 'dong-sap-toi-mb-xa']);
     await doiXong();
   });
 

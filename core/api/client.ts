@@ -89,6 +89,17 @@ export const setUnauthenticatedHandler = (handler?: () => void): void => {
   unauthenticatedHandler = handler;
 };
 
+/** Thân phản hồi có phải envelope `ApiResponse<T>` của backend không */
+function laEnvelope(body: unknown): body is ApiResponse<unknown> {
+  // Nhận diện theo `code` + (`status` hoặc `timestamp`) chứ KHÔNG theo `data`:
+  // backend bỏ hẳn khoá `data` khi nó null (`@JsonInclude(NON_NULL)`). Còn JSON
+  // trần không bọc envelope — AI service `/v1/chat` trả `{ content, requestId,
+  // sourcesUsed }` — không có `code` nên đi thẳng qua, không bị bóc nhầm.
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
+  const obj = body as Record<string, unknown>;
+  return typeof obj.code === 'string' && (typeof obj.status === 'number' || 'timestamp' in obj);
+}
+
 /** Các path không được tự refresh khi gặp 401, tránh vòng lặp vô hạn */
 function canRefresh(path: string): boolean {
   return (
@@ -144,12 +155,15 @@ function getAxiosInstance(): AxiosInstance {
   instance.interceptors.response.use(
     (response) => {
       const envelope = response.data as ApiResponse<unknown> | null;
-      if (envelope && typeof envelope === 'object' && 'data' in envelope) {
+      if (laEnvelope(envelope)) {
         // `data` có thể là null hợp lệ với HTTP 2xx — không được coi là lỗi.
+        // `ApiResponse.java` có `@JsonInclude(NON_NULL)`, nên `data: null` lên
+        // dây là VẮNG HẲN khoá `data`: không quy về `null` thì nơi gọi nhận cả
+        // envelope và tưởng đó là payload.
         // Bắt buộc ép kiểu `any`: chữ ký interceptor của axios yêu cầu trả về
         // `AxiosResponse | Promise<AxiosResponse>`, nhưng interceptor này cố ý
         // trả thẳng payload đã bóc khỏi envelope (đổi hẳn kiểu trả về).
-        return envelope.data as any;
+        return (envelope.data ?? null) as any;
       }
       return response.data;
     },
@@ -167,9 +181,16 @@ function getAxiosInstance(): AxiosInstance {
         try {
           newToken = await refreshAccessToken();
         } catch (refreshError) {
-          // Không refresh được nữa (refresh token cũng hết hạn/bị thu hồi) — phiên
-          // đã chết thật sự, đây mới là lúc đăng xuất toàn app.
-          unauthenticatedHandler?.();
+          // CHỈ khi backend từ chối chính refresh token (401/403 — hết hạn, bị thu
+          // hồi, hoặc máy chưa lưu token nào) thì phiên mới chết thật, đây mới là
+          // lúc đăng xuất toàn app. Mất mạng, timeout, 5xx, 429 ở bước refresh là
+          // lỗi nhất thời: đăng xuất ở đây sẽ xoá luôn refresh token còn tốt, bắt
+          // người dùng đăng nhập lại bằng Google đúng lúc họ đang ở chỗ sóng yếu.
+          // Request gốc vẫn bị từ chối với lỗi của bước refresh, để màn hình hiện
+          // "Không có kết nối" và lần gọi sau thử refresh lại từ đầu.
+          if (refreshError instanceof ApiClientError && (refreshError.status === 401 || refreshError.status === 403)) {
+            unauthenticatedHandler?.();
+          }
           return Promise.reject(refreshError);
         }
 
@@ -189,10 +210,18 @@ function getAxiosInstance(): AxiosInstance {
 
       const envelope = error.response?.data;
       const payload = envelope?.data;
+      // AI service (FastAPI) không bọc envelope: lỗi của nó có dạng `{ "detail": "…" }`
+      // với `detail` là câu tiếng Việt viết sẵn cho người dùng ("Bạn đã hỏi khá
+      // nhiều trong một giờ qua…"). Đọc nó thay vì để lộ "Request failed with
+      // status code 429" của axios.
+      const chiTiet = (envelope as { detail?: unknown } | undefined)?.detail;
       throw new ApiClientError(
         status,
         envelope?.code ?? error.code ?? 'NETWORK_ERROR',
-        envelope?.message ?? error.message ?? `Gọi API thất bại (${status}).`,
+        envelope?.message ??
+          (typeof chiTiet === 'string' && chiTiet.trim() ? chiTiet : undefined) ??
+          error.message ??
+          `Gọi API thất bại (${status}).`,
         Array.isArray(payload) ? (payload as ValidationError[]) : null,
         envelope?.retryAfterSeconds,
       );

@@ -45,11 +45,13 @@
 
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Linking, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Linking, Modal, Pressable, Text, View } from 'react-native';
 
+import { ApiClientError, toUserMessage } from '@/core/api/errors';
 import { trangThaiTai } from '@/core/api/queryState';
 import { KOKO_READING } from '@/core/ui/brand';
 import { BrandImage } from '@/core/ui/BrandImage';
+import { Button } from '@/core/ui/Button';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { FilterTabs } from '@/core/ui/FilterTabs';
@@ -57,10 +59,14 @@ import type { FilterTabItem } from '@/core/ui/FilterTabs';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
 import { ScreenHeader } from '@/core/ui/ScreenHeader';
-import { colors, fonts } from '@/core/ui/theme';
+import { colors, fonts, spacing } from '@/core/ui/theme';
 import { BookingCard } from '@/features/booking/components/BookingCard';
 import { CancelBookingSheet } from '@/features/booking/components/CancelBookingSheet';
-import { useCancelBooking } from '@/features/booking/hooks/useBookingMutations';
+import {
+  useCancelBooking,
+  useCheckInBooking,
+  useConfirmBookingByMentee,
+} from '@/features/booking/hooks/useBookingMutations';
 import { useMyBookings } from '@/features/booking/hooks/useBookingQueries';
 import type { BookingResponse, BookingStatus } from '@/features/booking/types';
 
@@ -107,6 +113,20 @@ const MO_TA_RONG: Record<TabLichHen, string> = {
   COMPLETED: 'Chưa có buổi học nào hoàn thành.',
 };
 
+/**
+ * Câu mô tả lỗi cho điểm danh / xác nhận: ưu tiên NGUYÊN VĂN câu của backend.
+ *
+ * `toUserMessage` quy mọi 409 về một câu chung ("Dữ liệu đã được cập nhật…"),
+ * đúng cho phần lớn màn hình nhưng ở đây 409 mang lý do cụ thể mà người dùng cần
+ * đọc ("Đã hết giờ check-in", "Đã quá hạn xác nhận buổi học").
+ */
+function moTaLoi(error: unknown): string {
+  if (error instanceof ApiClientError && error.status !== 0 && error.status < 500 && error.message) {
+    return error.message;
+  }
+  return toUserMessage(error).description;
+}
+
 export function MyBookingsScreen() {
   const router = useRouter();
   const [tab, setTab] = useState<TabLichHen>('TAT_CA');
@@ -115,6 +135,10 @@ export function MyBookingsScreen() {
 
   const query = useMyBookings({ status: STATUS_THEO_TAB[tab] });
   const huyLich = useCancelBooking();
+  const diemDanh = useCheckInBooking();
+  const xacNhan = useConfirmBookingByMentee();
+  /** Booking đang được hỏi "Xác nhận đã học?"; `null` là hộp đang đóng */
+  const [dangHoiXacNhan, setDangHoiXacNhan] = useState<BookingResponse | null>(null);
 
   // Quy cờ của TanStack thành MỘT trạng thái — luật và hai cái bẫy nằm ở JSDoc
   // của `core/api/queryState.ts`, đừng tự suy diễn lại ở đây.
@@ -169,6 +193,39 @@ export function MyBookingsScreen() {
     huyLich.reset();
   };
 
+  /**
+   * Điểm danh không cần hỏi lại: backend chỉ GHI NHẬN việc tham gia, không giải
+   * ngân hay đổi kết quả booking, và gửi lại là an toàn (trả nguyên trạng).
+   */
+  const guiDiemDanh = (booking: BookingResponse) => {
+    if (diemDanh.isPending) {
+      return;
+    }
+    // Lỗi (thường là 409 — hết cửa sổ check-in) nghĩa là cờ trên thẻ đã cũ: tải
+    // lại để nút tự ẩn thay vì mời bấm tiếp vào một việc chắc chắn hỏng.
+    diemDanh.mutate({ bookingId: booking.bookingId }, { onError: () => void query.refetch() });
+  };
+
+  const dongHopXacNhan = () => {
+    setDangHoiXacNhan(null);
+    // Lỗi của lần trước không được dính sang lần mở hộp cho buổi khác.
+    xacNhan.reset();
+  };
+
+  const guiXacNhan = () => {
+    if (!dangHoiXacNhan || xacNhan.isPending) {
+      return;
+    }
+    xacNhan.mutate(
+      { bookingId: dangHoiXacNhan.bookingId },
+      // Chỉ đóng hộp khi backend ĐÃ nhận — cùng lý do như hộp hủy lịch.
+      {
+        onSuccess: () => setDangHoiXacNhan(null),
+        onError: () => void query.refetch(),
+      },
+    );
+  };
+
   return (
     <Screen testID="man-hinh-lich-hen">
       <OfflineBanner />
@@ -208,6 +265,12 @@ export function MyBookingsScreen() {
               onHuyLich={setDangHuy}
               onXemMentor={(mentorUserId) => router.push(`/mentor/${mentorUserId}`)}
               onNhanTin={(conversationId) => router.push(`/chat/${conversationId}`)}
+              onDiemDanh={guiDiemDanh}
+              dangDiemDanh={diemDanh.isPending && diemDanh.variables?.bookingId === item.bookingId}
+              onXacNhanDaHoc={(booking) => {
+                xacNhan.reset();
+                setDangHoiXacNhan(booking);
+              }}
             />
           )}
           // `grow` để EmptyState (flex-1) căn giữa được theo chiều dọc; lề và gap
@@ -230,6 +293,20 @@ export function MyBookingsScreen() {
                     Không tải được lịch hẹn mới. Chạm để thử lại.
                   </Text>
                 </Pressable>
+              ) : null}
+
+              {diemDanh.isError ? (
+                // Khối đứng yên, không nút thử lại: 409 "chưa đến giờ / đã hết
+                // giờ check-in" bấm lại vẫn hỏng. Cờ `canCheckIn` sẽ đúng lại sau
+                // lần tải lại kế tiếp.
+                <View testID="loi-diem-danh" className="gap-1 rounded-md bg-neutral-soft px-3 py-2">
+                  <Text className="text-caption-lg text-danger" style={{ fontFamily: fonts.semibold }}>
+                    {toUserMessage(diemDanh.error).title}
+                  </Text>
+                  <Text className="text-caption-lg text-danger" style={{ fontFamily: fonts.regular }}>
+                    {moTaLoi(diemDanh.error)}
+                  </Text>
+                </View>
               ) : null}
 
               {loiMoPhongHoc ? (
@@ -297,6 +374,68 @@ export function MyBookingsScreen() {
         busy={huyLich.isPending}
         error={huyLich.error}
       />
+
+      {/*
+        Hộp xác nhận TỰ VẼ (không `Alert.alert`) — cùng lý do như hộp xoá bài ở
+        `PostDetailScreen`: nằm trong cây React nên kiểm được bằng test.
+        Phải hỏi lại vì xác nhận KHÔNG hoàn tác được: booking thành "Đã hoàn
+        thành" và tiền được chuyển cho mentor.
+      */}
+      <Modal
+        testID="hop-thoai-xac-nhan-da-hoc"
+        visible={dangHoiXacNhan !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={dongHopXacNhan}
+      >
+        <View className="flex-1 items-center justify-center bg-black/40 px-8">
+          <View
+            testID="hop-xac-nhan-da-hoc"
+            className="w-full gap-3 rounded-lg bg-surface"
+            style={{ padding: spacing.card }}
+          >
+            <Text className="text-section-title text-ink" style={{ fontFamily: fonts.bold }}>
+              Xác nhận buổi học đã diễn ra?
+            </Text>
+            <Text
+              className="text-ink-body"
+              style={{ fontFamily: fonts.regular, fontSize: 14, lineHeight: 22 }}
+            >
+              Buổi học sẽ được đánh dấu hoàn thành và S-coins được chuyển cho mentor. Thao tác
+              này không hoàn tác được. Nếu buổi học có vấn đề, đừng xác nhận — hãy báo vấn đề
+              trên bản web.
+            </Text>
+
+            {xacNhan.isError ? (
+              <View testID="loi-xac-nhan-da-hoc" className="gap-1 rounded-md bg-neutral-soft p-3">
+                <Text className="text-body text-danger" style={{ fontFamily: fonts.semibold }}>
+                  {toUserMessage(xacNhan.error).title}
+                </Text>
+                <Text className="text-caption-lg text-danger" style={{ fontFamily: fonts.regular }}>
+                  {moTaLoi(xacNhan.error)}
+                </Text>
+              </View>
+            ) : null}
+
+            <View className="flex-row justify-end gap-2">
+              <Button
+                label="Để sau"
+                variant="secondary"
+                size="sm"
+                onPress={dongHopXacNhan}
+                testID="nut-huy-xac-nhan-da-hoc"
+              />
+              <Button
+                label="Xác nhận"
+                size="sm"
+                busy={xacNhan.isPending}
+                onPress={guiXacNhan}
+                testID="nut-gui-xac-nhan-da-hoc"
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }

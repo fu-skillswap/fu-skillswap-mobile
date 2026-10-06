@@ -20,6 +20,7 @@ function comment(overrides: Partial<ForumCommentResponse> = {}): ForumCommentRes
     createdAt: '2026-09-22T00:00:00Z',
     updatedAt: '2026-09-22T00:00:00Z',
     imageUrls: [],
+    replyCount: 0,
     ...overrides,
   };
 }

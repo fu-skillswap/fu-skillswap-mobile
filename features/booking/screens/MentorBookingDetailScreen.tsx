@@ -16,6 +16,13 @@
  *
  * Màn chốt các luật đó ngay ở nút để mentor không phải đợi một lỗi 400.
  *
+ * ## Sau khi xác nhận
+ *
+ * - "Hoàn tất buổi học" (cờ `canCompleteByMentor`): booking ở
+ *   `AWAITING_MENTOR_COMPLETION` — chip "Chờ bạn xác nhận" của tab Booking. Hỏi
+ *   lại trước khi gửi vì mentee chỉ còn 24 giờ để xác nhận hoặc khiếu nại.
+ * - "Huỷ buổi học" (cờ `canCancel`): bắt buộc lý do; backend phạt nếu huỷ sát giờ.
+ *
  * Ô "Thu nhập" của thiết kế đổi thành "Giá dịch vụ": `BookingResponse` không có
  * số mentor thực nhận (phí nền tảng do backend tính lúc quyết toán), và in giá
  * gốc dưới nhãn "Thu nhập" là nói sai.
@@ -23,7 +30,7 @@
 
 import { useRouter } from 'expo-router';
 import { MessageSquare } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -36,11 +43,13 @@ import {
 } from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
+import { trangThaiTai } from '@/core/api/queryState';
 import { dinhDangKhoangGio, dinhDangNgayCoOffset, nhanNgayNgan } from '@/core/time/offsetDateTime';
 import { Avatar } from '@/core/ui/Avatar';
 import { BottomBar } from '@/core/ui/BottomBar';
 import { Button } from '@/core/ui/Button';
 import { Chip } from '@/core/ui/Chip';
+import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { IconButton } from '@/core/ui/IconButton';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
@@ -53,13 +62,16 @@ import { moTaGiaBooking } from '@/features/booking/bookingPrice';
 import { nhanTrangThaiBooking } from '@/features/booking/bookingStatus';
 import {
   useAcceptBooking,
+  useCancelBookingByMentor,
   useCheckInBooking,
+  useCompleteBookingByMentor,
   useRejectBooking,
 } from '@/features/booking/hooks/useBookingMutations';
 import { useBookingDetail } from '@/features/booking/hooks/useBookingQueries';
 import {
   DIA_DIEM_TOI_DA,
   LINK_PHONG_HOC_TOI_DA,
+  LY_DO_HUY_TOI_DA,
   LY_DO_TU_CHOI_TOI_DA,
 } from '@/features/booking/types';
 import type { BookingResponse, MeetingPlatform } from '@/features/booking/types';
@@ -111,9 +123,13 @@ export function loiXacNhan(input: {
 export interface MentorBookingDetailScreenProps {
   bookingId: string;
   /**
-   * Mentor đã kết nối Google Calendar chưa (`UserMeResponse.googleCalendarConnected`).
-   * Route đọc từ phiên rồi truyền vào, để màn này không kéo theo `AuthProvider`
-   * (và module đăng nhập Google native) vào barrel của feature booking.
+   * Mentor đang có kết nối Google Calendar CÒN DÙNG ĐƯỢC hay không
+   * (`connected && !needsReconnect` của `GET /api/me/google-calendar/status`).
+   *
+   * KHÔNG lấy `UserMeResponse.googleCalendarConnected` của phiên: giá trị đó chỉ
+   * làm mới lúc đăng nhập, còn `acceptBooking()` kiểm kết nối SỐNG
+   * (`hasActiveConnection`). Route đọc trạng thái rồi truyền vào; giá trị có thể
+   * đổi từ `false` sang `true` khi truy vấn về sau lúc màn đã vẽ.
    */
   daNoiLich: boolean;
 }
@@ -124,12 +140,31 @@ export function MentorBookingDetailScreen({ bookingId, daNoiLich }: MentorBookin
   const xacNhan = useAcceptBooking();
   const tuChoi = useRejectBooking();
   const checkIn = useCheckInBooking();
+  const hoanTat = useCompleteBookingByMentor();
+  const huy = useCancelBookingByMentor();
 
   const [nenTang, setNenTang] = useState<MeetingPlatform | null>(daNoiLich ? 'GOOGLE_MEET' : null);
   const [link, setLink] = useState('');
   const [diaDiem, setDiaDiem] = useState('');
   const [moTuChoi, setMoTuChoi] = useState(false);
   const [lyDo, setLyDo] = useState('');
+  const [moHoanTat, setMoHoanTat] = useState(false);
+  const [moHuy, setMoHuy] = useState(false);
+  const [lyDoHuy, setLyDoHuy] = useState('');
+  const [loiMoPhong, setLoiMoPhong] = useState(false);
+
+  // Trạng thái Calendar về SAU lần vẽ đầu (route đọc nó bằng một truy vấn):
+  // chọn sẵn Google Meet như khi biết ngay từ đầu, trừ khi mentor đã tự chọn.
+  const daTuChon = useRef(false);
+  useEffect(() => {
+    if (daNoiLich && !daTuChon.current) {
+      setNenTang((cu) => cu ?? 'GOOGLE_MEET');
+    }
+  }, [daNoiLich]);
+  const chonNenTang = (gia: MeetingPlatform) => {
+    daTuChon.current = true;
+    setNenTang(gia);
+  };
 
   const roiDi = () => {
     if (router.canGoBack()) {
@@ -139,12 +174,37 @@ export function MentorBookingDetailScreen({ bookingId, daNoiLich }: MentorBookin
     router.replace('/(tabs)/mentor-bookings');
   };
 
-  if (booking.isPending && booking.fetchStatus !== 'idle') {
+  const trangThaiChiTiet = trangThaiTai({
+    isPaused: booking.isPaused,
+    isPending: booking.isPending,
+    isError: booking.isError,
+    coDuLieu: booking.data !== undefined,
+  });
+
+  if (trangThaiChiTiet === 'dang-tai') {
     return (
       <Screen testID="man-hinh-chi-tiet-lich-dat">
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator testID="dang-tai-chi-tiet" color={colors.accent} />
         </View>
+      </Screen>
+    );
+  }
+  if (trangThaiChiTiet === 'mat-ket-noi') {
+    // Mất mạng khi chưa có bản cache: TanStack HOÃN truy vấn (`isPaused`) và
+    // `isPending` bật mãi — trước đây vòng quay không bao giờ dừng.
+    return (
+      <Screen testID="man-hinh-chi-tiet-lich-dat">
+        <OfflineBanner />
+        <View className="px-gutter pt-2">
+          <ScreenHeader title="Chi tiết lịch đặt" onBack={roiDi} />
+        </View>
+        <EmptyState
+          title="Không có kết nối"
+          description="Chi tiết lịch đặt sẽ tải khi có mạng trở lại."
+          actionLabel="Thử lại"
+          onAction={() => void booking.refetch()}
+        />
       </Screen>
     );
   }
@@ -163,7 +223,9 @@ export function MentorBookingDetailScreen({ bookingId, daNoiLich }: MentorBookin
   const trangThai = nhanTrangThaiBooking(b);
   const gia = moTaGiaBooking(b);
   const loiNhap = loiXacNhan({ daNoiLich, nenTang, link, diaDiem });
-  const loiGui = xacNhan.error ?? tuChoi.error;
+  // Lỗi từ chối và lỗi huỷ in TRONG hộp thoại của chúng: hộp thoại phủ lên màn,
+  // in ở đây thì người dùng không thấy.
+  const loiGui = xacNhan.error ?? checkIn.error ?? hoanTat.error;
 
   const guiXacNhan = () => {
     if (loiNhap) {
@@ -184,6 +246,38 @@ export function MentorBookingDetailScreen({ bookingId, daNoiLich }: MentorBookin
     }
     tuChoi.mutate({ bookingId: b.bookingId, rejectReason: gon }, { onSuccess: () => setMoTuChoi(false) });
   };
+
+  const moHopTuChoi = (mo: boolean) => {
+    tuChoi.reset();
+    setMoTuChoi(mo);
+  };
+
+  const guiHoanTat = () => {
+    hoanTat.mutate({ bookingId: b.bookingId }, { onSettled: () => setMoHoanTat(false) });
+  };
+
+  const moHopHuy = (mo: boolean) => {
+    huy.reset();
+    setMoHuy(mo);
+  };
+
+  const guiHuy = () => {
+    const gon = lyDoHuy.trim();
+    if (!gon || gon.length > LY_DO_HUY_TOI_DA) {
+      return;
+    }
+    huy.mutate({ bookingId: b.bookingId, cancelReason: gon }, { onSuccess: () => setMoHuy(false) });
+  };
+
+  const moPhongHoc = (url: string) => {
+    setLoiMoPhong(false);
+    // `openURL` từ chối khi máy không có ứng dụng mở được link (hoặc link hỏng):
+    // không bắt thì thành unhandled rejection và nút bấm im lặng.
+    Linking.openURL(url).catch(() => setLoiMoPhong(true));
+  };
+
+  const coNutDuoi =
+    b.canAccept || b.canReject || b.canCompleteByMentor || b.attendance.canCheckIn || b.canCancel;
 
   return (
     <Screen testID="man-hinh-chi-tiet-lich-dat">
@@ -257,7 +351,7 @@ export function MentorBookingDetailScreen({ bookingId, daNoiLich }: MentorBookin
                     key={n.value}
                     label={n.label}
                     selected={nenTang === n.value}
-                    onPress={() => setNenTang(n.value)}
+                    onPress={() => chonNenTang(n.value)}
                     testID={`nen-tang-${n.value}`}
                   />
                 ))}
@@ -290,7 +384,12 @@ export function MentorBookingDetailScreen({ bookingId, daNoiLich }: MentorBookin
                 {[tenNenTang(b.meetingPlatform), b.location].filter(Boolean).join(' · ') || 'Online'}
               </Text>
               {b.meetingLink ? (
-                <Button label="Mở phòng học" variant="secondary" size="sm" onPress={() => void Linking.openURL(b.meetingLink ?? '')} testID="nut-mo-phong-hoc" />
+                <Button label="Mở phòng học" variant="secondary" size="sm" onPress={() => moPhongHoc(b.meetingLink ?? '')} testID="nut-mo-phong-hoc" />
+              ) : null}
+              {loiMoPhong ? (
+                <Text testID="loi-mo-phong-hoc" className="text-caption text-danger" style={{ fontFamily: fonts.medium }}>
+                  Không mở được link phòng học. Hãy sao chép link và mở bằng trình duyệt.
+                </Text>
               ) : null}
             </View>
           ) : null}
@@ -313,11 +412,11 @@ export function MentorBookingDetailScreen({ bookingId, daNoiLich }: MentorBookin
           ) : null}
         </ScrollView>
 
-        {b.canAccept || b.canReject ? (
+        {!coNutDuoi ? null : b.canAccept || b.canReject ? (
           <BottomBar
             secondary={
               b.canReject ? (
-                <Button label="Từ chối" variant="ghost" size="md" onPress={() => setMoTuChoi(true)} testID="nut-tu-choi" />
+                <Button label="Từ chối" variant="ghost" size="md" onPress={() => moHopTuChoi(true)} testID="nut-tu-choi" />
               ) : undefined
             }
             primary={
@@ -335,22 +434,42 @@ export function MentorBookingDetailScreen({ bookingId, daNoiLich }: MentorBookin
               )
             }
           />
-        ) : b.attendance.canCheckIn ? (
+        ) : (
           <BottomBar
+            secondary={
+              b.canCancel ? (
+                <Button label="Huỷ buổi học" variant="ghost" size="md" onPress={() => moHopHuy(true)} testID="nut-huy-buoi" />
+              ) : undefined
+            }
             primary={
-              <Button
-                label="Check-in"
-                size="md"
-                busy={checkIn.isPending}
-                onPress={() => checkIn.mutate({ bookingId: b.bookingId })}
-                testID="nut-check-in"
-              />
+              b.canCompleteByMentor ? (
+                <Button
+                  label="Hoàn tất buổi học"
+                  size="md"
+                  busy={hoanTat.isPending}
+                  onPress={() => {
+                    hoanTat.reset();
+                    setMoHoanTat(true);
+                  }}
+                  testID="nut-hoan-tat"
+                />
+              ) : b.attendance.canCheckIn ? (
+                <Button
+                  label="Check-in"
+                  size="md"
+                  busy={checkIn.isPending}
+                  onPress={() => checkIn.mutate({ bookingId: b.bookingId })}
+                  testID="nut-check-in"
+                />
+              ) : (
+                <View />
+              )
             }
           />
-        ) : null}
+        )}
       </KeyboardAvoidingView>
 
-      <Modal visible={moTuChoi} transparent animationType="slide" onRequestClose={() => setMoTuChoi(false)}>
+      <Modal visible={moTuChoi} transparent animationType="slide" onRequestClose={() => moHopTuChoi(false)}>
         <KeyboardAvoidingView className="flex-1 justify-end bg-black/40" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View testID="hop-thoai-tu-choi" className="gap-3 rounded-t-lg bg-surface p-4">
             <Text className="text-base text-ink" style={{ fontFamily: fonts.bold }}>
@@ -368,6 +487,7 @@ export function MentorBookingDetailScreen({ bookingId, daNoiLich }: MentorBookin
               numberOfLines={3}
               testID="o-ly-do-tu-choi"
             />
+            <LoiHopThoai loi={tuChoi.error} testID="loi-tu-choi" />
             <Button
               label="Từ chối yêu cầu"
               variant="danger"
@@ -376,11 +496,76 @@ export function MentorBookingDetailScreen({ bookingId, daNoiLich }: MentorBookin
               onPress={guiTuChoi}
               testID="nut-gui-tu-choi"
             />
-            <Button label="Quay lại" variant="secondary" onPress={() => setMoTuChoi(false)} />
+            <Button label="Quay lại" variant="secondary" onPress={() => moHopTuChoi(false)} />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={moHoanTat} transparent animationType="slide" onRequestClose={() => setMoHoanTat(false)}>
+        <View className="flex-1 justify-end bg-black/40">
+          <View testID="hop-thoai-hoan-tat" className="gap-3 rounded-t-lg bg-surface p-4">
+            <Text className="text-base text-ink" style={{ fontFamily: fonts.bold }}>
+              Xác nhận buổi học đã diễn ra?
+            </Text>
+            <Text className="text-caption-lg text-ink-body" style={{ fontFamily: fonts.regular }}>
+              Mentee có 24 giờ để xác nhận hoặc báo vấn đề về buổi học. Sau đó thu nhập của buổi được ghi vào ví của bạn.
+            </Text>
+            <Button label="Hoàn tất buổi học" busy={hoanTat.isPending} onPress={guiHoanTat} testID="nut-gui-hoan-tat" />
+            <Button label="Quay lại" variant="secondary" onPress={() => setMoHoanTat(false)} />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={moHuy} transparent animationType="slide" onRequestClose={() => moHopHuy(false)}>
+        <KeyboardAvoidingView className="flex-1 justify-end bg-black/40" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View testID="hop-thoai-huy-buoi" className="gap-3 rounded-t-lg bg-surface p-4">
+            <Text className="text-base text-ink" style={{ fontFamily: fonts.bold }}>
+              Huỷ buổi học đã xác nhận?
+            </Text>
+            <Text className="text-caption-lg text-ink-body" style={{ fontFamily: fonts.regular }}>
+              Mentee sẽ đọc được lý do. Huỷ quá sát giờ bắt đầu có thể bị phạt hoặc tạm khoá nhận lịch.
+            </Text>
+            <TextField
+              label="Lý do huỷ"
+              value={lyDoHuy}
+              onChangeText={setLyDoHuy}
+              placeholder="Ví dụ: Mình có việc đột xuất, xin lỗi bạn."
+              multiline
+              numberOfLines={3}
+              testID="o-ly-do-huy"
+            />
+            <LoiHopThoai loi={huy.error} testID="loi-huy-buoi" />
+            <Button
+              label="Huỷ buổi học"
+              variant="danger"
+              busy={huy.isPending}
+              disabled={lyDoHuy.trim().length === 0 || lyDoHuy.trim().length > LY_DO_HUY_TOI_DA}
+              onPress={guiHuy}
+              testID="nut-gui-huy-buoi"
+            />
+            <Button label="Quay lại" variant="secondary" onPress={() => moHopHuy(false)} />
           </View>
         </KeyboardAvoidingView>
       </Modal>
     </Screen>
+  );
+}
+
+/** Lỗi gửi in ngay trong hộp thoại (hộp thoại phủ lên khối lỗi của màn) */
+function LoiHopThoai({ loi, testID }: { loi: unknown; testID: string }) {
+  if (!loi) {
+    return null;
+  }
+  const thongDiep = toUserMessage(loi);
+  return (
+    <View testID={testID} className="gap-1 rounded-md bg-neutral-soft p-3">
+      <Text className="text-body text-danger" style={{ fontFamily: fonts.semibold }}>
+        {thongDiep.title}
+      </Text>
+      <Text className="text-caption-lg text-danger" style={{ fontFamily: fonts.regular }}>
+        {thongDiep.description}
+      </Text>
+    </View>
   );
 }
 

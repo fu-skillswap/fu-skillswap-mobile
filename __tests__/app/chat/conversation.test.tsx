@@ -1,9 +1,11 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import React from 'react';
+import { StyleSheet } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
@@ -24,6 +26,26 @@ jest.mock('expo-router', () => {
   };
 });
 jest.mock('@/core/net/onlineStatus', () => ({ useIsOffline: () => false }));
+// Barrel `@/features/chat` kéo theo `features/koko` → `AuthProvider` thật →
+// Google Sign-In native (không có trong jest). Mock giữ hình dạng `useAuth()`.
+jest.mock('@/core/auth/AuthProvider', () => ({
+  useAuth: () => ({
+    status: 'authenticated',
+    user: { fullName: 'Nguyễn Thu Hà' },
+    signInWithGoogle: jest.fn(),
+    signOut: jest.fn(),
+    taiLaiNguoiDung: jest.fn(),
+  }),
+}));
+let mockCheDo: 'MENTEE' | 'MENTOR' = 'MENTEE';
+jest.mock('@/core/roleMode/RoleModeProvider', () => ({
+  useRoleMode: () => ({
+    cheDo: mockCheDo,
+    cheDoKhaDung: [mockCheDo],
+    dangTai: false,
+    chuyenCheDo: jest.fn(),
+  }),
+}));
 let demKhoa = 0;
 jest.mock('expo-crypto', () => ({
   randomUUID: () => `cmid-${(demKhoa += 1)}`,
@@ -99,6 +121,10 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => {
   queryClient = createQueryClient();
   mockRouter.push.mockClear();
+  mockRouter.replace.mockClear();
+  mockRouter.back.mockClear();
+  mockRouter.canGoBack.mockReturnValue(true);
+  mockCheDo = 'MENTEE';
 });
 afterEach(() => {
   __resetQueryClientForTests(queryClient);
@@ -157,9 +183,9 @@ describe('MessagesScreen', () => {
     );
 
     await waitFor(() => expect(screen.getByText('Chưa có cuộc trò chuyện nào')).toBeTruthy());
-    // Không có hàng Koko dẫn sang KokoChat: chưa có màn đó và chưa có API trợ lý
-    // AI nào để nối. Minh hoạ Koko trong khối rỗng là chuyện khác — nó không
-    // bấm được và không dẫn đi đâu.
+    // Môi trường test không đặt EXPO_PUBLIC_AI_URL, nên hàng ghim Koko tự ẩn (lối
+    // vào có AI được test ở `__tests__/app/koko`). Minh hoạ Koko trong khối rỗng
+    // là chuyện khác — nó không bấm được và không dẫn đi đâu.
     expect(screen.queryByText(/Koko/)).toBeNull();
     expect(
       screen.getByTestId('minh-hoa-rong-hoi-thoai', { includeHiddenElements: true }).props.source,
@@ -318,5 +344,71 @@ describe('ChatScreen', () => {
 
     await waitFor(() => expect(screen.getByTestId('the-ngu-canh-buoi-hoc')).toBeTruthy());
     expect(screen.getByText(/Review CV 1:1/)).toBeTruthy();
+  });
+  it('mở bằng deep link (stack rỗng) ở chế độ MENTOR thì quay về hộp thư /chat, không về tab bị ẩn', async () => {
+    mockCheDo = 'MENTOR';
+    mockRouter.canGoBack.mockReturnValue(false);
+    server.use(
+      http.get(`${BASE}/api/me/conversations/c1`, () => HttpResponse.json(envelope(hoiThoai('c1', 'Trần Minh Quân')))),
+      http.get(`${BASE}/api/me/conversations/c1/messages`, () => HttpResponse.json(envelope([]))),
+    );
+
+    await moChat();
+    await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-quay-lai'));
+    expect(mockRouter.replace).toHaveBeenCalledWith('/chat');
+  });
+
+  it('mở bằng deep link ở chế độ MENTEE thì quay về tab Tin nhắn', async () => {
+    mockRouter.canGoBack.mockReturnValue(false);
+    server.use(
+      http.get(`${BASE}/api/me/conversations/c1`, () => HttpResponse.json(envelope(hoiThoai('c1', 'Trần Minh Quân')))),
+      http.get(`${BASE}/api/me/conversations/c1/messages`, () => HttpResponse.json(envelope([]))),
+    );
+
+    await moChat();
+    await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-quay-lai'));
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(tabs)/messages');
+  });
+
+  it('MẤT MẠNG lúc mở thì nói mất kết nối, KHÔNG quay spinner mãi', async () => {
+    // Query bị hoãn vì mất mạng vẫn là `isPending` với `fetchStatus: 'paused'`
+    // — nhánh cũ coi đó là "đang tải" và spinner quay vô tận.
+    server.use(
+      http.get(`${BASE}/api/me/conversations/c1`, () => HttpResponse.json(envelope(hoiThoai('c1', 'Trần Minh Quân')))),
+      http.get(`${BASE}/api/me/conversations/c1/messages`, () => HttpResponse.json(envelope([]))),
+    );
+    onlineManager.setOnline(false);
+    try {
+      await moChat();
+
+      await waitFor(() => expect(screen.getByText('Không có kết nối')).toBeTruthy());
+      expect(screen.queryByTestId('dang-tai-hoi-thoai')).toBeNull();
+    } finally {
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
+    await waitFor(() => expect(screen.getByText('Trần Minh Quân')).toBeTruthy());
+  });
+  it('khối "Chưa có tin nhắn" KHÔNG tự lật — để VirtualizedList gắn style đảo đúng nền tảng', async () => {
+    // VirtualizedList tự gắn style đảo lên phần tử rỗng qua `cloneElement`; trên
+    // Android đó là `scale: -1` (cả hai trục). Một `scaleY: -1` tự đặt ĐÈ lên nó
+    // và chữ thành soi gương. Jest chạy nhánh iOS (hai style trùng nhau) nên phải
+    // kiểm chính phần tử màn hình đưa vào, trước khi VirtualizedList chạm tới.
+    server.use(
+      http.get(`${BASE}/api/me/conversations/c1`, () => HttpResponse.json(envelope(hoiThoai('c1', 'Trần Minh Quân')))),
+      http.get(`${BASE}/api/me/conversations/c1/messages`, () => HttpResponse.json(envelope([]))),
+    );
+
+    await moChat();
+    await waitFor(() => expect(screen.getByText('Chưa có tin nhắn')).toBeTruthy());
+
+    const phanTuRong = screen.getByTestId('danh-sach-tin-nhan').props
+      .ListEmptyComponent as React.ReactElement<{ style?: StyleProp<ViewStyle> }>;
+    expect(StyleSheet.flatten(phanTuRong.props.style)?.transform).toBeUndefined();
   });
 });

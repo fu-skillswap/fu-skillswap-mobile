@@ -41,6 +41,16 @@ describe('ListRow', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it('đang chạy (busy) thì hiện vòng quay, bị khoá và bấm không gọi onPress', async () => {
+    const onPress = jest.fn();
+    await render(<ListRow label="Đăng xuất" destructive busy onPress={onPress} testID="hang" />);
+
+    expect(screen.getByTestId('hang-dang-chay')).toBeTruthy();
+    expect(screen.getByTestId('hang')).toBeDisabled();
+    await fireEvent.press(screen.getByTestId('hang'));
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
   it('bật divider thì thêm viền trên, tắt thì không', async () => {
     const { unmount } = await render(<ListRow label="Hồ sơ học thuật" testID="hang" />);
     expect(String(screen.getByTestId('hang').props.className)).not.toContain('border-t');

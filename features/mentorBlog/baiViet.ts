@@ -55,10 +55,16 @@ export interface BanNhapBaiViet {
   noiDung: string;
   phamVi: BlogVisibility;
   dichVu: string[];
+  /**
+   * Id danh mục / thẻ của bài gốc. Mobile không có ô sửa hai thứ này, nhưng
+   * PHẢI gửi lại: `MentorBlogService.apply()` coi thiếu là "xoá hết".
+   */
+  danhMuc: string[];
+  the: string[];
 }
 
 export function banNhapRong(): BanNhapBaiViet {
-  return { tieuDe: '', moTa: '', noiDung: '', phamVi: 'PUBLIC', dichVu: [] };
+  return { tieuDe: '', moTa: '', noiDung: '', phamVi: 'PUBLIC', dichVu: [], danhMuc: [], the: [] };
 }
 
 export function banNhapTuBai(b: MentorBlogPostDetailResponse): BanNhapBaiViet {
@@ -68,7 +74,31 @@ export function banNhapTuBai(b: MentorBlogPostDetailResponse): BanNhapBaiViet {
     noiDung: b.contentMarkdown ?? '',
     phamVi: b.visibility,
     dichVu: b.entitledServiceIds ?? [],
+    danhMuc: (b.categories ?? []).map((c) => c.id),
+    the: (b.tags ?? []).map((t) => t.id),
   };
+}
+
+/**
+ * Lý do bài này KHÔNG được sửa trên mobile, hoặc `null` nếu sửa được.
+ *
+ * - Chỉ bản nháp: bài đã đăng/lưu trữ không có lối sửa trên danh sách, nhưng
+ *   vẫn tới được bằng deep link `/mentor-posts/<id>`, và "Lưu bản nháp" trên
+ *   bài đã đăng sẽ sửa thẳng bài đang hiển thị công khai.
+ * - Bài có ảnh bìa/ảnh OG: `PUT` ghi đè ảnh theo `coverAssetId`/`ogAssetId`,
+ *   mà `MentorBlogPostDetailResponse` chỉ trả URL chứ không trả id tài sản —
+ *   lưu từ mobile sẽ xoá mất ảnh mà không ai biết.
+ */
+export function lyDoKhongSuaDuoc(b: MentorBlogPostDetailResponse): string | null {
+  if (b.status !== 'DRAFT') {
+    return b.status === 'PUBLISHED'
+      ? 'Bài này đã đăng. Ứng dụng chỉ sửa được bản nháp — hãy chỉnh sửa bài đã đăng trên bản web.'
+      : 'Bài này đã được lưu trữ nên không chỉnh sửa được.';
+  }
+  if (b.coverImageUrl || b.ogImageUrl) {
+    return 'Bản nháp này có ảnh bìa. Ứng dụng chưa giữ được ảnh khi lưu, nên hãy chỉnh sửa bài trên bản web để không mất ảnh.';
+  }
+  return null;
 }
 
 /** Bỏ khối code ``` rồi tìm `<`/`>` — đúng cách `BlogContentPolicy` làm */
@@ -112,6 +142,8 @@ export function taoYeuCauBaiViet(b: BanNhapBaiViet): MentorBlogPostCreateRequest
     excerpt: moTa === '' ? null : moTa,
     contentMarkdown: noiDung === '' ? null : noiDung,
     visibility: b.phamVi,
+    categoryIds: b.danhMuc,
+    tagIds: b.the,
     // Đổi khỏi "Mentee đã đặt dịch vụ" thì không gửi dịch vụ đã chọn trước đó.
     entitledServiceIds: b.phamVi === 'BOOKED_MEMBERS' ? b.dichVu : [],
   };

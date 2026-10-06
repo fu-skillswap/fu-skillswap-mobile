@@ -1,6 +1,8 @@
 import {
   bieuTuongThongBao,
+  cheDoChoThongBao,
   dichThongBao,
+  phiaNhanThongBaoBooking,
   nhomThongBao,
   noiDungThongBao,
   tongThongBao,
@@ -43,10 +45,36 @@ describe('dichThongBao — bấm vào đi đâu', () => {
     expect(dichThongBao(tb({ type: 'FORUM_POST_HIDDEN', relatedEntityType: 'FORUM_POST', relatedEntityId: 'p1' }), null)).toBeNull();
   });
 
-  it('booking: chế độ Mentor mở chi tiết, chế độ Mentee về tab Lịch hẹn', () => {
-    expect(dichThongBao(tb(), 'MENTOR')).toBe('/mentor-booking/b1');
-    expect(dichThongBao(tb(), 'MENTEE')).toBe('/(tabs)/bookings');
-    expect(dichThongBao(tb(), null)).toBe('/(tabs)/bookings');
+  it('booking gửi cho CẢ HAI phía: theo chế độ đang xem', () => {
+    const doiLich = tb({ type: 'BOOKING_RESCHEDULE_REQUESTED' });
+    expect(dichThongBao(doiLich, 'MENTOR')).toBe('/mentor-booking/b1');
+    expect(dichThongBao(doiLich, 'MENTEE')).toBe('/(tabs)/bookings');
+    expect(dichThongBao(doiLich, null)).toBe('/(tabs)/bookings');
+  });
+
+  it('booking chỉ gửi cho mentee (BOOKING_ACCEPTED) về tab Lịch hẹn DÙ đang ở chế độ Mentor', () => {
+    expect(dichThongBao(tb(), 'MENTOR')).toBe('/(tabs)/bookings');
+    expect(cheDoChoThongBao(tb(), 'MENTOR')).toBe('MENTEE');
+  });
+
+  it('yêu cầu đặt lịch mới (chỉ gửi mentor) mở màn xử lý DÙ đang ở chế độ Mentee', () => {
+    const yeuCau = tb({ type: 'BOOKING_REQUEST_CREATED' });
+    expect(dichThongBao(yeuCau, 'MENTEE')).toBe('/mentor-booking/b1');
+    expect(cheDoChoThongBao(yeuCau, 'MENTEE')).toBe('MENTOR');
+  });
+
+  it('phía suy từ type mà tài khoản KHÔNG có thì dùng chế độ đang xem', () => {
+    const yeuCau = tb({ type: 'BOOKING_REQUEST_CREATED' });
+    expect(dichThongBao(yeuCau, 'MENTEE', ['MENTEE'])).toBe('/(tabs)/bookings');
+  });
+
+  it('bảng phía nhận khớp nơi backend phát thông báo', () => {
+    expect(phiaNhanThongBaoBooking('BOOKING_PAYMENT_CONFIRMED')).toBe('MENTOR');
+    expect(phiaNhanThongBaoBooking('BOOKING_CANCELLED_BY_MENTEE')).toBe('MENTOR');
+    expect(phiaNhanThongBaoBooking('BOOKING_CANCELLED_BY_MENTOR')).toBe('MENTEE');
+    expect(phiaNhanThongBaoBooking('MEETING_LINK_UPDATED')).toBe('MENTEE');
+    expect(phiaNhanThongBaoBooking('SESSION_COMPLETED')).toBeNull();
+    expect(phiaNhanThongBaoBooking('BOOKING_REMINDER')).toBeNull();
   });
 
   it('loại thực thể app không có màn (blog, xác minh mentor) thì không bấm được', () => {

@@ -60,7 +60,7 @@ export type AppRoleMode = 'MENTEE' | 'MENTOR';
  * Thanh tab của Mentee, đúng thứ tự và đúng icon trong `Main.dc.html`.
  *
  * Koko (trợ lý AI) KHÔNG còn là tab: thiết kế chuyển nó thành một card trên Bảng
- * tin dẫn sang màn `KokoChat` — một màn hình repo chưa có.
+ * tin (và hàng ghim đầu hộp thư) dẫn sang màn `/koko` (`features/koko`).
  */
 const TABS_MENTEE: TabConfig[] = [
   { name: 'index', title: 'Bảng tin', icon: 'home' },

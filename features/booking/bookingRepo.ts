@@ -44,6 +44,7 @@ import type {
   BookingStatus,
   BookingViewRole,
   CancelBookingRequest,
+  ConfirmBookingRequest,
   CreateBookingRequest,
   MentorAvailabilitySlotResponse,
   RejectBookingRequest,
@@ -145,6 +146,31 @@ export const bookingRepo = {
     return apiClient<BookingResponse>(`/api/me/bookings/${bookingId}/check-in`, {
       method: 'POST',
       headers: idempotencyHeaders(idempotencyKey),
+    });
+  },
+
+  // -------------------------------------------------------------------------
+  // Hành động của MENTEE sau buổi học (tách khối riêng để dễ gộp nhánh)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Mentee xác nhận buổi mentoring đã diễn ra
+   * (`MyBookingController.confirmBooking`).
+   *
+   * KHÔNG hoàn tác được: `BookingCompletionService.confirmBookingByParticipant`
+   * chuyển booking sang `COMPLETED` và gọi `requestBookingRelease` — giải ngân
+   * cho mentor. Chỉ hợp lệ khi booking ở `AWAITING_MENTEE_CONFIRMATION` hoặc
+   * `AWAITING_MENTOR_COMPLETION` và còn trong 24 giờ sau giờ kết thúc; giao diện
+   * dựa vào cờ `canConfirmByMentee` của backend, không tự suy.
+   *
+   * `Idempotency-Key` BẮT BUỘC (`@Idempotent`). Đã xác nhận rồi thì backend trả
+   * booking nguyên trạng, nên gửi lại sau lỗi mạng là an toàn.
+   */
+  confirmByMentee(bookingId: string, input: ConfirmBookingRequest, idempotencyKey: string) {
+    return apiClient<BookingResponse>(`/api/me/bookings/${bookingId}/confirm`, {
+      method: 'POST',
+      headers: idempotencyHeaders(idempotencyKey),
+      body: input,
     });
   },
 

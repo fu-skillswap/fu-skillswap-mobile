@@ -51,6 +51,7 @@ function datPhien(value: Partial<ReturnType<typeof useAuth>>) {
     user: null,
     signInWithGoogle: jest.fn(),
     signOut: jest.fn(),
+    taiLaiNguoiDung: jest.fn(),
     ...value,
   });
 }

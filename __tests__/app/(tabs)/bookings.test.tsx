@@ -480,3 +480,132 @@ describe('MyBookingsScreen', () => {
     await donHangDoiDanhSach();
   });
 });
+
+describe('MyBookingsScreen — việc của mentee sau buổi học', () => {
+  /** Thuộc tính điểm danh đầy đủ, chỉ đổi `canCheckIn` */
+  function diemDanhMo(canCheckIn: boolean) {
+    return {
+      mentorCheckedInAt: null,
+      menteeCheckedInAt: null,
+      summary: 'NONE' as const,
+      currentUserCheckedIn: false,
+      canCheckIn,
+      checkInOpensAt: null,
+      checkInClosesAt: null,
+    };
+  }
+
+  it('chip "Chờ bạn xác nhận" có NÚT xác nhận; bấm thì hỏi lại, đồng ý mới gửi kèm Idempotency-Key', async () => {
+    // Trước đây chip này lọc ra đúng nhóm cần xác nhận nhưng thẻ không có nút
+    // nào để xác nhận — người dùng không làm được việc chip mời họ làm.
+    const daGui: { khoa: string | null; than: unknown }[] = [];
+    let daXacNhan = false;
+    const choXacNhan = taoBooking({
+      bookingId: 'b5',
+      status: 'AWAITING_MENTEE_CONFIRMATION',
+      displayState: 'WAITING_CONFIRMATION',
+      canConfirmByMentee: true,
+    });
+    server.use(
+      http.get(`${BASE}/api/me/bookings`, () =>
+        HttpResponse.json(
+          envelope(
+            trang([
+              daXacNhan
+                ? { ...choXacNhan, status: 'COMPLETED', bookingStatus: 'COMPLETED', canConfirmByMentee: false }
+                : choXacNhan,
+            ]),
+          ),
+        ),
+      ),
+      http.post(`${BASE}/api/me/bookings/b5/confirm`, async ({ request }) => {
+        daGui.push({ khoa: request.headers.get('Idempotency-Key'), than: await request.json() });
+        daXacNhan = true;
+        return HttpResponse.json(envelope({ ...choXacNhan, status: 'COMPLETED' }));
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-xac-nhan-da-hoc-b5')).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId('nut-xac-nhan-da-hoc-b5'));
+    // KHÔNG gửi ngay: thao tác không hoàn tác được nên phải hỏi lại.
+    expect(daGui).toHaveLength(0);
+    expect(screen.getByTestId('hop-xac-nhan-da-hoc')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('nut-gui-xac-nhan-da-hoc'));
+
+    await waitFor(() => expect(daGui).toHaveLength(1));
+    expect(daGui[0]?.khoa).toBe('khoa-test-0001');
+    // Danh sách tải lại → booking đã hoàn thành, nút biến mất, hộp đóng.
+    await waitFor(() => expect(screen.queryByTestId('nut-xac-nhan-da-hoc-b5')).toBeNull());
+    expect(screen.queryByTestId('hop-xac-nhan-da-hoc')).toBeNull();
+    await donHangDoiDanhSach();
+  });
+
+  it('xác nhận bị 409 thì hiện câu của backend ngay trong hộp, KHÔNG đóng hộp', async () => {
+    server.use(
+      http.get(`${BASE}/api/me/bookings`, () =>
+        HttpResponse.json(
+          envelope(trang([taoBooking({ bookingId: 'b5', canConfirmByMentee: true })])),
+        ),
+      ),
+      http.post(`${BASE}/api/me/bookings/b5/confirm`, () =>
+        HttpResponse.json(
+          { timestamp: '', status: 409, code: 'BOOKING_4090', message: 'Đã quá hạn xác nhận buổi học', data: null },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-xac-nhan-da-hoc-b5')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('nut-xac-nhan-da-hoc-b5'));
+    await fireEvent.press(screen.getByTestId('nut-gui-xac-nhan-da-hoc'));
+
+    await waitFor(() => expect(screen.getByTestId('loi-xac-nhan-da-hoc')).toBeTruthy());
+    expect(screen.getByText('Đã quá hạn xác nhận buổi học')).toBeTruthy();
+    expect(screen.getByTestId('hop-xac-nhan-da-hoc')).toBeTruthy();
+
+    // "Để sau" đóng hộp; mở lại cho lần sau thì không còn lỗi cũ.
+    await fireEvent.press(screen.getByTestId('nut-huy-xac-nhan-da-hoc'));
+    await fireEvent.press(screen.getByTestId('nut-xac-nhan-da-hoc-b5'));
+    expect(screen.queryByTestId('loi-xac-nhan-da-hoc')).toBeNull();
+    await donHangDoiDanhSach();
+  });
+
+  it('buổi đang mở điểm danh thì có nút "Điểm danh", bấm thì POST check-in kèm key; lỗi thì nói ra', async () => {
+    const khoaDaGui: (string | null)[] = [];
+    server.use(
+      http.get(`${BASE}/api/me/bookings`, () =>
+        HttpResponse.json(
+          envelope(
+            trang([
+              taoBooking({ bookingId: 'b1', attendance: diemDanhMo(true) }),
+              taoBooking({ bookingId: 'b2', attendance: diemDanhMo(false) }),
+            ]),
+          ),
+        ),
+      ),
+      http.post(`${BASE}/api/me/bookings/b1/check-in`, ({ request }) => {
+        khoaDaGui.push(request.headers.get('Idempotency-Key'));
+        return HttpResponse.json(
+          { timestamp: '', status: 409, code: 'SYS_0004', message: 'Đã hết giờ check-in', data: null },
+          { status: 409 },
+        );
+      }),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByTestId('nut-diem-danh-b1')).toBeTruthy());
+    // Cờ của backend tắt thì không có nút — không tự suy theo giờ máy.
+    expect(screen.queryByTestId('nut-diem-danh-b2')).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('nut-diem-danh-b1'));
+
+    await waitFor(() => expect(screen.getByTestId('loi-diem-danh')).toBeTruthy());
+    expect(khoaDaGui).toEqual(['khoa-test-0001']);
+    expect(screen.getByText('Đã hết giờ check-in')).toBeTruthy();
+    await donHangDoiDanhSach();
+  });
+});

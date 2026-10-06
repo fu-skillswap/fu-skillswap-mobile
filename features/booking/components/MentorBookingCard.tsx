@@ -34,6 +34,13 @@
  * Thẻ chỉ có MỘT nút "Xem và phản hồi" dẫn sang màn đó. `MentorBookingCard.test.tsx` có test canh để
  * không ai thêm lại hai nút đó mà quên chỗ nhập dữ liệu.
  *
+ * ## Hàng đầu mở chi tiết cho MỌI booking
+ *
+ * `MentorBookings.dc.html` dòng 33 bọc hàng đầu của MỌI thẻ trong
+ * `<a href="MentorBookingDetail.dc.html">`, không chỉ thẻ đang chờ phản hồi —
+ * màn chi tiết là chỗ duy nhất có "Hoàn tất buổi học", "Huỷ buổi học" và nút
+ * nhắn tin cho mentee. Truyền `onMoChiTiet` thì hàng đầu bấm được.
+ *
  * ## Nút được dựng, và vì sao
  *
  * - **Check-in** khi `attendance.canCheckIn` — cờ của backend là nguồn sự thật,
@@ -48,7 +55,7 @@
  */
 
 import { CalendarDays, Clock, MapPin } from 'lucide-react-native';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { dinhDangKhoangGio, nhanNgayNgan } from '@/core/time/offsetDateTime';
 import { Avatar } from '@/core/ui/Avatar';
@@ -73,6 +80,8 @@ export interface MentorBookingCardProps {
    * kèm lý do). Nút chỉ hiện khi backend cho `canAccept` hoặc `canReject`.
    */
   onXuLy?: (booking: BookingResponse) => void;
+  /** Mở màn chi tiết khi bấm hàng đầu của thẻ — cho MỌI booking */
+  onMoChiTiet?: (booking: BookingResponse) => void;
 }
 
 export function MentorBookingCard({
@@ -81,6 +90,7 @@ export function MentorBookingCard({
   onMoPhongHoc,
   dangCheckIn = null,
   onXuLy,
+  onMoChiTiet,
 }: MentorBookingCardProps) {
   // Nhãn trạng thái dùng CHUNG `bookingStatus.ts` với phía mentee: nó đọc
   // `bookingStatus` + `displayState` + `completionOutcome`, cả ba đều không phụ
@@ -108,7 +118,14 @@ export function MentorBookingCard({
   return (
     <Card elevated testID={`the-booking-mentor-${booking.bookingId}`}>
       <View className="gap-3">
-        <View className="flex-row items-center gap-3">
+        <Pressable
+          accessibilityRole={onMoChiTiet ? 'button' : undefined}
+          accessibilityHint={onMoChiTiet ? 'Mở chi tiết lịch đặt' : undefined}
+          disabled={!onMoChiTiet}
+          onPress={() => onMoChiTiet?.(booking)}
+          className="flex-row items-center gap-3"
+          testID={`mo-chi-tiet-${booking.bookingId}`}
+        >
           <Avatar name={tenMentee} size={44} />
           <View className="min-w-0 flex-1">
             <Text
@@ -131,7 +148,7 @@ export function MentorBookingCard({
             tone={trangThai.tone}
             testID={`trang-thai-mentor-${booking.bookingId}`}
           />
-        </View>
+        </Pressable>
 
         {/*
           Dải ngày / giờ / giá. Mốc nào không đọc được thì BỎ hẳn ô đó chứ không

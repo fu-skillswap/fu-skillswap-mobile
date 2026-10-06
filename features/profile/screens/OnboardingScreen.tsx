@@ -36,12 +36,15 @@ import {
 } from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
+import { trangThaiTai } from '@/core/api/queryState';
 import { useAuth } from '@/core/auth/AuthProvider';
+import { useBuTruBanPhim } from '@/core/ui/banPhim';
 import { BottomBar } from '@/core/ui/BottomBar';
 import { KOKO_READING } from '@/core/ui/brand';
 import { BrandImage } from '@/core/ui/BrandImage';
 import { Button } from '@/core/ui/Button';
 import { Chip } from '@/core/ui/Chip';
+import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
@@ -71,6 +74,8 @@ export function OnboardingScreen({ namHienTai = new Date().getFullYear() }: Onbo
   const coSo = useCampuses();
   const nganh = useAcademicPrograms();
   const luu = useSaveStudentProfile();
+  // Màn nằm trong `Screen` (SafeAreaView), không có thanh tiêu đề native.
+  const buTruBanPhim = useBuTruBanPhim();
 
   const [banNhap, setBanNhap] = useState<BanNhapHoSo | null>(null);
   const chuyenNganh = useSpecializations(banNhap?.programId ?? null);
@@ -116,6 +121,32 @@ export function OnboardingScreen({ namHienTai = new Date().getFullYear() }: Onbo
     );
   }
 
+  // Query bị hoãn vì mất mạng vẫn là `isPending`: không tách nhánh này ra thì
+  // spinner bên dưới quay mãi. Hồ sơ `null` (chưa có) vẫn là ĐÃ có dữ liệu.
+  const matKetNoi = [hoSo, coSo, nganh].some(
+    (q) =>
+      trangThaiTai({
+        isPaused: q.isPaused,
+        isPending: q.isPending,
+        isError: q.isError,
+        coDuLieu: q.data !== undefined,
+      }) === 'mat-ket-noi',
+  );
+  if (matKetNoi) {
+    return (
+      <Screen testID="man-hinh-hoan-thien-ho-so">
+        <OfflineBanner />
+        <View className="px-gutter pt-2">
+          <ScreenHeader title="Hoàn thiện hồ sơ" onBack={roiMan} />
+        </View>
+        <EmptyState
+          title="Không có kết nối"
+          description="Hồ sơ sẽ tải khi có mạng trở lại."
+        />
+      </Screen>
+    );
+  }
+
   if (!banNhap || !kiem || coSo.data === undefined || nganh.data === undefined) {
     return (
       <Screen testID="man-hinh-hoan-thien-ho-so">
@@ -136,7 +167,12 @@ export function OnboardingScreen({ namHienTai = new Date().getFullYear() }: Onbo
   return (
     <Screen testID="man-hinh-hoan-thien-ho-so">
       <OfflineBanner />
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // Khung cha nằm dưới vùng an toàn phía trên — xem `core/ui/banPhim.ts`.
+        keyboardVerticalOffset={buTruBanPhim}
+      >
         <ScrollView
           className="flex-1"
           contentContainerClassName="gap-4 px-gutter pb-6 pt-2"

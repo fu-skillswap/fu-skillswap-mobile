@@ -1,6 +1,6 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import React from 'react';
@@ -25,7 +25,9 @@ jest.mock('expo-router', () => {
 });
 jest.mock('@/core/net/onlineStatus', () => ({ useIsOffline: () => false }));
 jest.mock('@/core/auth/AuthProvider', () => ({
-  useAuth: () => ({ user: { fullName: 'Nguyễn Thu Hà' } }),
+  // `useSaveStudentProfile` gọi `taiLaiNguoiDung()` sau khi lưu — thiếu nó thì
+  // `onSuccess` ném lỗi và màn không bao giờ rời đi.
+  useAuth: () => ({ user: { fullName: 'Nguyễn Thu Hà' }, taiLaiNguoiDung: jest.fn() }),
 }));
 
 const { __mockRouter: mockRouter } = jest.requireMock<{
@@ -243,4 +245,20 @@ describe('OnboardingScreen — người đã có hồ sơ (sửa)', () => {
     expect(screen.queryByTestId('o-mssv')).toBeNull();
     await doiXong();
   }, 15_000);
+  it('MẤT MẠNG lúc mở thì nói mất kết nối, KHÔNG quay spinner mãi', async () => {
+    // Query bị hoãn vì mất mạng vẫn `isPending` — nhánh "đang tải" cũ quay vô tận.
+    onlineManager.setOnline(false);
+    try {
+      await moMan();
+
+      await waitFor(() => expect(screen.getByText('Không có kết nối')).toBeTruthy());
+      expect(screen.queryByTestId('dang-tai-ho-so')).toBeNull();
+    } finally {
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
+    await waitFor(() => expect(screen.getByTestId('o-mssv')).toBeTruthy());
+    await doiXong();
+  });
 });

@@ -26,6 +26,7 @@ import { authMockHandlers } from '@/core/auth/mocks/handlers';
 import { bookingMockHandlers } from '@/features/booking/mocks/handlers';
 import { chatMockHandlers } from '@/features/chat/mocks/handlers';
 import { forumMockHandlers } from '@/features/forum/mocks/handlers';
+import { kokoMockHandlers } from '@/features/koko/mocks/handlers';
 import { mentorMockHandlers } from '@/features/mentor/mocks/handlers';
 import { mentorBlogMockHandlers } from '@/features/mentorBlog/mocks/handlers';
 import { mentorModeMockHandlers } from '@/features/mentorMode/mocks/handlers';
@@ -38,6 +39,7 @@ export const mockHandlers = [
   ...bookingMockHandlers,
   ...chatMockHandlers,
   ...forumMockHandlers,
+  ...kokoMockHandlers,
   ...mentorMockHandlers,
   ...mentorBlogMockHandlers,
   ...mentorModeMockHandlers,

@@ -5,6 +5,9 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { useAuth } from '@/core/auth/AuthProvider';
+import { forumKeys } from '@/features/forum/queryKeys';
+import { mentorKeys } from '@/features/mentor/queryKeys';
 import { profileRepo } from '@/features/profile/profileRepo';
 import { profileKeys } from '@/features/profile/queryKeys';
 import type { StudentProfileRequest } from '@/features/profile/types';
@@ -57,14 +60,25 @@ export function useSpecializations(programId: string | null) {
 /**
  * Lưu hồ sơ. Thành công thì GHI bản backend trả về vào bộ đệm (không chỉ
  * invalidate): tab Hồ sơ thấy ngay hồ sơ mới khi quay lại, kể cả lúc mất mạng.
+ *
+ * Ba thứ khác cũng đổi theo hồ sơ nên phải làm mới cùng lúc:
+ * - `hasStudentProfile` của phiên (`/api/auth/me`) — nếu không, màn đăng nhập lần
+ *   sau vẫn tưởng chưa có hồ sơ và đẩy vào Onboarding;
+ * - mentor gợi ý (xếp theo ngành/mục tiêu, giữ 5 phút) — khối rỗng của nó đang
+ *   mời "hoàn thành hồ sơ" đúng việc người dùng vừa làm;
+ * - bảng tin (backend xếp bài theo ngành học).
  */
 export function useSaveStudentProfile() {
   const queryClient = useQueryClient();
+  const { taiLaiNguoiDung } = useAuth();
   return useMutation({
     networkMode: 'always',
     mutationFn: (input: StudentProfileRequest) => profileRepo.saveStudentProfile(input),
     onSuccess: (hoSo) => {
       queryClient.setQueryData(profileKeys.studentProfile(), hoSo);
+      void queryClient.invalidateQueries({ queryKey: [...mentorKeys.all, 'recommendations'] });
+      void queryClient.invalidateQueries({ queryKey: forumKeys.feed() });
+      void taiLaiNguoiDung();
     },
   });
 }

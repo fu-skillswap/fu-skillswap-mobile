@@ -1,6 +1,6 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import React from 'react';
@@ -133,5 +133,40 @@ describe('MentorServiceEditScreen', () => {
     await fireEvent.press(screen.getByTestId('nut-luu-dich-vu'));
 
     await waitFor(() => expect(ghiNhan.body).toMatchObject({ durationMinutes: 60, priceScoin: 60000, deliveryMode: 'ONE_TO_ONE' }));
+  });
+});
+
+describe('MentorServiceEditScreen — tải thất bại', () => {
+  it('tạo mới: không tải được thời lượng thì nói ra và cho thử lại, không kẹt form', async () => {
+    let lan = 0;
+    server.use(
+      http.get(`${BASE}/api/me/mentor-services/constraints`, () => {
+        lan += 1;
+        return lan === 1
+          ? HttpResponse.json({ timestamp: '', status: 500, code: 'SYS_9999', message: 'Lỗi', data: null }, { status: 500 })
+          : HttpResponse.json(envelope(RANG_BUOC));
+      }),
+    );
+    queryClient.setDefaultOptions({ queries: { retry: false } });
+    await moMan(null);
+
+    await waitFor(() => expect(screen.getByTestId('loi-thoi-luong')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('nut-tai-lai-thoi-luong'));
+
+    await waitFor(() => expect(screen.getByTestId('thoi-luong-30')).toBeTruthy());
+  });
+
+  it('sửa khi mất mạng và chưa có cache: "Không có kết nối", KHÔNG quay mãi', async () => {
+    onlineManager.setOnline(false);
+    try {
+      await moMan('msv1');
+
+      await waitFor(() => expect(screen.getByText('Không có kết nối')).toBeTruthy());
+      expect(screen.queryByTestId('dang-tai-dich-vu')).toBeNull();
+    } finally {
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
   });
 });

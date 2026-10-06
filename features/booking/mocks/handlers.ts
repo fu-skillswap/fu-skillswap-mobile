@@ -65,6 +65,7 @@ import { MOCK_MENTOR_DETAILS } from '@/features/mentor/mocks/handlers';
 import type {
   AcceptBookingRequest,
   BookingResponse,
+  CancelBookingRequest,
   CreateBookingRequest,
   RejectBookingRequest,
 } from '@/features/booking/types';
@@ -134,6 +135,16 @@ let MOCK_BOOKINGS: BookingResponse[] = [
     meetingLink: 'https://meet.google.com/abc-defg-hij',
     canJoin: true,
     canCancel: false,
+    // Đang trong giờ học và mentee chưa điểm danh → nút "Điểm danh" có cái để hiện.
+    attendance: {
+      mentorCheckedInAt: '2026-10-04T20:29:00+07:00',
+      menteeCheckedInAt: null,
+      summary: 'MENTOR_ONLY',
+      currentUserCheckedIn: false,
+      canCheckIn: true,
+      checkInOpensAt: '2026-10-04T20:15:00+07:00',
+      checkInClosesAt: '2026-10-04T21:30:00+07:00',
+    },
   }),
   taoBooking({
     bookingId: 'b2',
@@ -203,6 +214,9 @@ let MOCK_BOOKINGS: BookingResponse[] = [
     selectedStartTime: '2026-10-03T19:00:00+07:00',
     selectedEndTime: '2026-10-03T20:00:00+07:00',
     canCancel: false,
+    // Backend cho mentee xác nhận cả khi mentor CHƯA bấm hoàn tất
+    // (`AWAITING_MENTOR_COMPLETION`) → nút "Xác nhận đã học" có cái để hiện.
+    canConfirmByMentee: true,
   }),
   taoBooking({
     bookingId: 'b6',
@@ -417,8 +431,10 @@ let MOCK_MENTOR_BOOKINGS: BookingResponse[] = [
     meetingPlatform: 'GOOGLE_MEET',
     meetingLink: 'https://meet.google.com/abc-defg-hij',
     canJoin: true,
-    canCancel: true,
-    canCompleteByMentor: true,
+    // Đang trong buổi: `canCancelByMentor` đòi TRƯỚC giờ bắt đầu, còn
+    // `canMentorComplete` đòi `AWAITING_MENTOR_COMPLETION` sau giờ kết thúc.
+    canCancel: false,
+    canCompleteByMentor: false,
     attendance: {
       mentorCheckedInAt: null,
       menteeCheckedInAt: '2026-10-04T20:28:00+07:00',
@@ -766,6 +782,86 @@ export const bookingMockHandlers = [
     return jsonMock(envelope(daHuy));
   }),
 
+  // -------------------------------------------------------------------------
+  // Hành động của MENTEE sau buổi học (tách khối riêng để dễ gộp nhánh)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Check-in của MENTEE. Cùng endpoint với mentor ở handler kế tiếp — backend
+   * tự suy vai trò người gọi. Handler này chỉ nhận booking trong `MOCK_BOOKINGS`
+   * (góc nhìn mentee); id khác thì KHÔNG trả gì để MSW chuyển sang handler sau.
+   * Ba hành vi mô phỏng giống hệt handler của mentor: bắt buộc key, ngoài cửa
+   * sổ thì 409, gửi lại thì trả nguyên trạng.
+   */
+  http.post(`${base}/api/me/bookings/:bookingId/check-in`, ({ params, request }) => {
+    const bookingId = String(params.bookingId);
+    const hienTai = MOCK_BOOKINGS.find((item) => item.bookingId === bookingId);
+    if (!hienTai) {
+      return undefined;
+    }
+    const khoa = request.headers.get('Idempotency-Key');
+    if (khoa === null || !KHUON_KHOA.test(khoa)) {
+      return loi(400, 'SYS_0002', 'IDEMPOTENCY_KEY_REQUIRED');
+    }
+    if (hienTai.attendance.currentUserCheckedIn) {
+      return jsonMock(envelope(hienTai));
+    }
+    if (!hienTai.attendance.canCheckIn) {
+      return loi(409, 'SYS_0004', 'Chưa đến giờ check-in của buổi mentoring này');
+    }
+
+    const daCheckIn: BookingResponse = {
+      ...hienTai,
+      displayState: 'IN_SESSION',
+      actualSessionStatus: 'IN_PROGRESS',
+      attendance: {
+        ...hienTai.attendance,
+        menteeCheckedInAt: '2026-10-04T20:31:00+07:00',
+        summary: hienTai.attendance.mentorCheckedInAt ? 'BOTH' : 'MENTEE_ONLY',
+        currentUserCheckedIn: true,
+        canCheckIn: false,
+      },
+    };
+    MOCK_BOOKINGS = MOCK_BOOKINGS.map((item) => (item.bookingId === bookingId ? daCheckIn : item));
+    return jsonMock(envelope(daCheckIn));
+  }),
+
+  /**
+   * Mentee xác nhận buổi học đã diễn ra
+   * (`BookingCompletionService.confirmBookingByParticipant`): bắt buộc key;
+   * đã `COMPLETED` thì trả nguyên trạng; trạng thái khác hai trạng thái chờ thì
+   * 409 `BOOKING_INVALID_STATUS`. Thành công → `COMPLETED`, tiền giải ngân.
+   */
+  http.post(`${base}/api/me/bookings/:bookingId/confirm`, ({ params, request }) => {
+    const khoa = request.headers.get('Idempotency-Key');
+    if (khoa === null || !KHUON_KHOA.test(khoa)) {
+      return loi(400, 'SYS_0002', 'IDEMPOTENCY_KEY_REQUIRED');
+    }
+    const bookingId = String(params.bookingId);
+    const hienTai = MOCK_BOOKINGS.find((item) => item.bookingId === bookingId);
+    if (!hienTai) {
+      return loi(404, 'SYS_0003', 'Không tìm thấy booking');
+    }
+    if (hienTai.status === 'COMPLETED') {
+      return jsonMock(envelope(hienTai));
+    }
+    if (!hienTai.canConfirmByMentee) {
+      return loi(409, 'BOOKING_4090', 'Booking không ở trạng thái có thể xác nhận');
+    }
+
+    const daXacNhan: BookingResponse = {
+      ...hienTai,
+      status: 'COMPLETED',
+      sessionStatus: 'COMPLETED',
+      bookingStatus: 'COMPLETED',
+      displayState: 'COMPLETED',
+      canConfirmByMentee: false,
+      canReportIssue: false,
+    };
+    MOCK_BOOKINGS = MOCK_BOOKINGS.map((item) => (item.bookingId === bookingId ? daXacNhan : item));
+    return jsonMock(envelope(daXacNhan));
+  }),
+
   /**
    * Check-in một buổi mentoring (dùng ở phía mentor).
    *
@@ -988,5 +1084,70 @@ export const bookingMockHandlers = [
     };
     MOCK_MENTOR_BOOKINGS = MOCK_MENTOR_BOOKINGS.map((b) => (b.bookingId === id ? daTuChoi : b));
     return jsonMock(envelope(daTuChoi));
+  }),
+
+  /**
+   * Mentor xác nhận hoàn tất (`BookingCompletionService.completeBookingByMentor`):
+   * `@Idempotent`, chỉ nhận booking ở `AWAITING_MENTOR_COMPLETION` (sai → 409
+   * `BOOKING_INVALID_STATUS`), rồi chuyển sang chờ mentee xác nhận 24 giờ.
+   */
+  http.post(`${base}/api/mentor/bookings/:bookingId/complete`, ({ params, request }) => {
+    const khoa = request.headers.get('Idempotency-Key');
+    if (khoa === null || !KHUON_KHOA.test(khoa)) {
+      return loi(400, 'SYS_0002', 'IDEMPOTENCY_KEY_REQUIRED');
+    }
+    const id = String(params.bookingId);
+    const hienTai = MOCK_MENTOR_BOOKINGS.find((b) => b.bookingId === id);
+    if (!hienTai) {
+      return loi(404, 'SYS_0003', 'Không tìm thấy booking');
+    }
+    if (hienTai.status === 'AWAITING_MENTEE_CONFIRMATION') {
+      // Gửi lại sau khi đã hoàn tất: backend trả booking nguyên trạng.
+      return jsonMock(envelope(hienTai));
+    }
+    if (!hienTai.canCompleteByMentor) {
+      return loi(409, 'BOOKING_INVALID_STATUS', 'Trạng thái booking không hợp lệ cho thao tác này');
+    }
+    const daHoanTat: BookingResponse = {
+      ...hienTai,
+      status: 'AWAITING_MENTEE_CONFIRMATION',
+      sessionStatus: 'AWAITING_MENTEE_CONFIRMATION',
+      canCompleteByMentor: false,
+      canComplete: false,
+    };
+    MOCK_MENTOR_BOOKINGS = MOCK_MENTOR_BOOKINGS.map((b) => (b.bookingId === id ? daHoanTat : b));
+    return jsonMock(envelope(daHoanTat));
+  }),
+
+  /** Mentor huỷ buổi đã xác nhận: `@Idempotent`, `cancelReason` bắt buộc, cờ `canCancel` */
+  http.post(`${base}/api/mentor/bookings/:bookingId/cancel`, async ({ params, request }) => {
+    const khoa = request.headers.get('Idempotency-Key');
+    if (khoa === null || !KHUON_KHOA.test(khoa)) {
+      return loi(400, 'SYS_0002', 'IDEMPOTENCY_KEY_REQUIRED');
+    }
+    const id = String(params.bookingId);
+    const hienTai = MOCK_MENTOR_BOOKINGS.find((b) => b.bookingId === id);
+    if (!hienTai) {
+      return loi(404, 'SYS_0003', 'Không tìm thấy booking');
+    }
+    const body = (await request.json()) as Partial<CancelBookingRequest>;
+    if (!body.cancelReason || body.cancelReason.trim() === '') {
+      return loi(400, 'SYS_0001', 'cancelReason không được để trống');
+    }
+    if (!hienTai.canCancel) {
+      return loi(409, 'BOOKING_INVALID_STATUS', 'Trạng thái booking không hợp lệ cho thao tác này');
+    }
+    const daHuy: BookingResponse = {
+      ...hienTai,
+      bookingStatus: 'CANCELED_BY_MENTOR',
+      status: 'CANCELLED_BY_MENTOR',
+      displayState: 'CANCELED_OR_EXPIRED',
+      cancelReason: body.cancelReason.trim(),
+      canCancel: false,
+      canJoin: false,
+      canCompleteByMentor: false,
+    };
+    MOCK_MENTOR_BOOKINGS = MOCK_MENTOR_BOOKINGS.map((b) => (b.bookingId === id ? daHuy : b));
+    return jsonMock(envelope(daHuy));
   }),
 ];

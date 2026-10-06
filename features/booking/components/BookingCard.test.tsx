@@ -224,3 +224,68 @@ describe('BookingCard', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 });
+
+describe('BookingCard — việc của mentee sau buổi học', () => {
+  const diemDanh = jest.fn();
+  const xacNhan = jest.fn();
+  const DIEM_DANH_MO = {
+    mentorCheckedInAt: null,
+    menteeCheckedInAt: null,
+    summary: 'NONE' as const,
+    currentUserCheckedIn: false,
+    canCheckIn: true,
+    checkInOpensAt: null,
+    checkInClosesAt: null,
+  };
+
+  beforeEach(() => {
+    diemDanh.mockClear();
+    xacNhan.mockClear();
+  });
+
+  async function renderVoiHanhDong(ghiDe: Partial<BookingResponse>, coHandler = true) {
+    return render(
+      <BookingCard
+        booking={taoBooking(ghiDe)}
+        onVaoPhongHoc={vaoPhongHoc}
+        onHuyLich={huyLich}
+        onXemMentor={xemMentor}
+        onDiemDanh={coHandler ? diemDanh : undefined}
+        onXacNhanDaHoc={coHandler ? xacNhan : undefined}
+      />,
+    );
+  }
+
+  it('canConfirmByMentee bật thì có nút "Xác nhận đã học" và gọi đúng booking', async () => {
+    await renderVoiHanhDong({ bookingId: 'b5', canConfirmByMentee: true });
+
+    await fireEvent.press(screen.getByTestId('nut-xac-nhan-da-hoc-b5'));
+
+    expect(xacNhan).toHaveBeenCalledWith(expect.objectContaining({ bookingId: 'b5' }));
+  });
+
+  it('attendance.canCheckIn bật thì có nút "Điểm danh"', async () => {
+    await renderVoiHanhDong({ bookingId: 'b1', attendance: DIEM_DANH_MO });
+
+    await fireEvent.press(screen.getByTestId('nut-diem-danh-b1'));
+
+    expect(diemDanh).toHaveBeenCalledWith(expect.objectContaining({ bookingId: 'b1' }));
+  });
+
+  it('cờ của backend tắt thì KHÔNG có hai nút đó', async () => {
+    await renderVoiHanhDong({ bookingId: 'b2', canConfirmByMentee: false });
+
+    expect(screen.queryByTestId('nut-xac-nhan-da-hoc-b2')).toBeNull();
+    expect(screen.queryByTestId('nut-diem-danh-b2')).toBeNull();
+  });
+
+  it('cờ bật nhưng người gọi không nối handler thì KHÔNG dựng nút chết', async () => {
+    await renderVoiHanhDong(
+      { bookingId: 'b5', canConfirmByMentee: true, attendance: DIEM_DANH_MO },
+      false,
+    );
+
+    expect(screen.queryByTestId('nut-xac-nhan-da-hoc-b5')).toBeNull();
+    expect(screen.queryByTestId('nut-diem-danh-b5')).toBeNull();
+  });
+});

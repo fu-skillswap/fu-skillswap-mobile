@@ -18,6 +18,8 @@ import { mentorModeKeys } from '@/features/mentorMode/queryKeys';
 import type {
   CreateMentorServiceRequest,
   CreateSlotRequest,
+  MentorServiceActiveRequest,
+  MentorServiceManagementResponse,
   UpdateMentorServiceRequest,
 } from '@/features/mentorMode/types';
 
@@ -53,7 +55,7 @@ export function useDeactivateSlot() {
       ),
     onSuccess: (_d, { slotId }) => {
       khoKhoa.release(slotId);
-      void queryClient.invalidateQueries({ queryKey: [...mentorModeKeys.all, 'slots'] });
+      void queryClient.invalidateQueries({ queryKey: mentorModeKeys.slotsAll() });
     },
   });
 }
@@ -118,12 +120,32 @@ export function useUpdateService(serviceId: string) {
   });
 }
 
+/**
+ * Bật/tắt nhận đặt một dịch vụ.
+ *
+ * - Ghi NGAY bản ghi mới (version mới) vào cache danh sách và chi tiết: công tắc
+ *   bấm lần hai trước khi tải lại xong phải gửi `expectedVersion` mới, không
+ *   phải bản cũ đang hiện (→ 409).
+ * - Tắt dịch vụ gỡ nó khỏi mọi slot tương lai và TĂNG version các slot đó
+ *   (`MentorServiceRetirementPortImpl`), nên cache slot cũng phải làm mới — nếu
+ *   không, lần "Ngừng nhận lịch" kế tiếp gửi version cũ và nhận 409.
+ * - Tắt dịch vụ còn yêu cầu đang chờ → 409 `SERVICE_HAS_PENDING_BOOKINGS`; màn
+ *   hình hỏi lại rồi gửi kèm `rejectPendingBookings: true`.
+ */
 export function useSetServiceActive() {
+  const queryClient = useQueryClient();
   const lamMoi = useLamMoiDichVu();
   return useMutation({
     networkMode: 'always',
-    mutationFn: ({ serviceId, isActive, expectedVersion }: { serviceId: string; isActive: boolean; expectedVersion: number }) =>
-      mentorModeRepo.setServiceActive(serviceId, { isActive, expectedVersion }),
-    onSuccess: (_d, { serviceId }) => lamMoi(serviceId),
+    mutationFn: ({ serviceId, ...input }: MentorServiceActiveRequest & { serviceId: string }) =>
+      mentorModeRepo.setServiceActive(serviceId, input),
+    onSuccess: (dv, { serviceId }) => {
+      queryClient.setQueryData<MentorServiceManagementResponse[]>(mentorModeKeys.services(), (cu) =>
+        cu?.map((d) => (d.serviceId === serviceId ? dv : d)),
+      );
+      queryClient.setQueryData(mentorModeKeys.service(serviceId), dv);
+      lamMoi(serviceId);
+      void queryClient.invalidateQueries({ queryKey: mentorModeKeys.slotsAll() });
+    },
   });
 }

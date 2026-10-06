@@ -26,8 +26,10 @@ jest.mock('expo-router', () => {
 jest.mock('@/core/net/onlineStatus', () => ({ useIsOffline: () => false }));
 
 let mockCheDo: 'MENTEE' | 'MENTOR' = 'MENTEE';
+let mockKhaDung: ('MENTEE' | 'MENTOR')[] | null = null;
+const mockChuyenCheDo = jest.fn();
 jest.mock('@/core/roleMode/RoleModeProvider', () => ({
-  useRoleMode: () => ({ cheDo: mockCheDo, cheDoKhaDung: [mockCheDo], chuyenCheDo: jest.fn() }),
+  useRoleMode: () => ({ cheDo: mockCheDo, cheDoKhaDung: mockKhaDung ?? [mockCheDo], chuyenCheDo: mockChuyenCheDo }),
 }));
 
 const { __mockRouter: mockRouter } = jest.requireMock<{
@@ -173,6 +175,25 @@ describe('NotificationsScreen', () => {
 
     expect(mockRouter.push).toHaveBeenCalledWith('/mentor-booking/b-n1');
     await donHangDoiDanhSach();
+  });
+
+  it('tài khoản hai vai đang ở chế độ Mentee bấm "yêu cầu đặt lịch mới": chuyển sang Mentor rồi mở màn xử lý', async () => {
+    mockCheDo = 'MENTEE';
+    mockKhaDung = ['MENTEE', 'MENTOR'];
+    mockChuyenCheDo.mockClear();
+    try {
+      server.use(danhSach([tb('n1', { read: true, type: 'BOOKING_REQUEST_CREATED' })]));
+
+      await moMan();
+      await waitFor(() => expect(screen.getByTestId('thong-bao-n1')).toBeTruthy());
+      await fireEvent.press(screen.getByTestId('thong-bao-n1'));
+
+      expect(mockChuyenCheDo).toHaveBeenCalledWith('MENTOR');
+      expect(mockRouter.push).toHaveBeenCalledWith('/mentor-booking/b-n1');
+      await donHangDoiDanhSach();
+    } finally {
+      mockKhaDung = null;
+    }
   });
 
   it('"Đọc tất cả" gọi read-all, xoá mọi chấm rồi tự ẩn', async () => {

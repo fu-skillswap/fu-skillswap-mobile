@@ -1,13 +1,18 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { createQueryClient } from '@/core/api/queryClient';
-import { useForumComments, useForumList, useForumTopics } from '@/features/forum/hooks/useForumQueries';
+import {
+  useCommentReplies,
+  useForumComments,
+  useForumList,
+  useForumTopics,
+} from '@/features/forum/hooks/useForumQueries';
 
 const BASE = 'https://api.skillswap.asia';
 
@@ -148,14 +153,14 @@ describe('useForumTopics', () => {
 });
 
 describe('useForumComments', () => {
-  it('trả về cây bình luận 1 cấp đã dựng sẵn', async () => {
+  it('trả về danh sách bình luận GỐC phẳng, giữ replyCount của backend', async () => {
     server.use(
       http.get(`${BASE}/api/forum/posts/p1/comments`, () =>
         HttpResponse.json(
           envelope(
             cursorPage([
-              { commentId: 'c1', replyToCommentId: null, authorUserId: 'u1' },
-              { commentId: 'r1', replyToCommentId: 'c1', authorUserId: 'u2' },
+              { commentId: 'c1', replyToCommentId: null, authorUserId: 'u1', replyCount: 2 },
+              { commentId: 'c2', replyToCommentId: null, authorUserId: 'u2', replyCount: 0 },
             ]),
           ),
         ),
@@ -164,7 +169,40 @@ describe('useForumComments', () => {
 
     const { result } = await renderHook(() => useForumComments('p1'), { wrapper });
 
-    await waitFor(() => expect(result.current.comments).toHaveLength(1));
-    expect(result.current.comments[0]?.replies).toHaveLength(1);
+    await waitFor(() => expect(result.current.comments).toHaveLength(2));
+    expect(result.current.comments[0]?.replyCount).toBe(2);
+  });
+});
+
+describe('useCommentReplies', () => {
+  it('gọi đúng endpoint reply của bình luận gốc và nối trang theo cursor', async () => {
+    const cursors: (string | null)[] = [];
+    server.use(
+      http.get(`${BASE}/api/forum/comments/c1/replies`, ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor');
+        cursors.push(cursor);
+        return HttpResponse.json(
+          envelope(
+            cursor === null
+              ? cursorPage([{ commentId: 'r1', replyToCommentId: 'c1' }], 'trang-2')
+              : cursorPage([{ commentId: 'r2', replyToCommentId: 'c1' }]),
+          ),
+        );
+      }),
+    );
+
+    const { result } = await renderHook(() => useCommentReplies('p1', 'c1'), { wrapper });
+    await waitFor(() => expect(result.current.replies).toHaveLength(1));
+
+    // Hai lần gọi cùng một tick: chốt chặn trong hook chỉ để MỘT request đi.
+    await act(async () => {
+      result.current.taiTrangKe();
+      result.current.taiTrangKe();
+    });
+
+    await waitFor(() =>
+      expect(result.current.replies.map((r) => r.commentId)).toEqual(['r1', 'r2']),
+    );
+    expect(cursors).toEqual([null, 'trang-2']);
   });
 });

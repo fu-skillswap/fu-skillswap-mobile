@@ -188,6 +188,7 @@ export function MentorBookingsScreen() {
               onMoPhongHoc={moPhongHoc}
               dangCheckIn={checkIn.isPending ? checkIn.variables?.bookingId ?? null : null}
               onXuLy={(booking) => router.push(`/mentor-booking/${booking.bookingId}`)}
+              onMoChiTiet={(booking) => router.push(`/mentor-booking/${booking.bookingId}`)}
             />
           )}
           // `grow` để EmptyState (flex-1) căn giữa được theo chiều dọc; lề và gap

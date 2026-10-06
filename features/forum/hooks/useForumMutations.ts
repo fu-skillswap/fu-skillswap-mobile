@@ -106,14 +106,20 @@ function patchPostInCache(
   );
 }
 
-/** Áp một phép biến đổi lên một bình luận trong cache bình luận của bài */
+/**
+ * Áp một phép biến đổi lên một bình luận trong cache bình luận của bài.
+ *
+ * Khớp theo TIỀN TỐ `comments(postId)`: bình luận gốc nằm ở danh sách của bài,
+ * còn reply nằm ở từng luồng `replies(postId, gốc)` ngay dưới tiền tố đó. Ghi
+ * vào đúng một khoá thì thả tim cho một reply không đổi gì trên màn hình.
+ */
 function patchCommentInCache(
   queryClient: QueryClient,
   postId: string,
   commentId: string,
   patch: (comment: ForumCommentResponse) => ForumCommentResponse,
 ) {
-  queryClient.setQueryData<CommentPages>(forumKeys.comments(postId), (data) => {
+  queryClient.setQueriesData<CommentPages>({ queryKey: forumKeys.comments(postId) }, (data) => {
     if (!data?.pages) {
       return data;
     }
@@ -216,7 +222,13 @@ export function useToggleCommentLike(postId: string) {
       return { truoc: comment };
     },
     onSuccess: (binhLuanMoi) => {
-      patchCommentInCache(queryClient, postId, binhLuanMoi.commentId, () => binhLuanMoi);
+      // Phản hồi của API thích bình luận KHÔNG tính `replyCount` (luôn 0, xem
+      // `ForumReactionService.toCommentResponse`). Đắp nguyên nó vào cache là
+      // nút "Xem N phản hồi" biến mất ngay sau một cú thả tim — giữ số đang có.
+      patchCommentInCache(queryClient, postId, binhLuanMoi.commentId, (current) => ({
+        ...binhLuanMoi,
+        replyCount: current.replyCount,
+      }));
     },
     onError: (_loi, _bien, context) => {
       if (context) {
@@ -342,7 +354,28 @@ export function useCreateComment(postId: string) {
     // Xem luật 4 ở đầu file: mặc định 'online' hoãn request, nút Gửi quay mãi.
     networkMode: 'always',
     mutationFn: (input: ForumCommentUpsertRequest) => forumRepo.createComment(postId, input),
-    onSuccess: () => {
+    onSuccess: (_binhLuanMoi, input) => {
+      const gocId = input.replyToCommentId;
+      if (gocId) {
+        // Reply KHÔNG nằm trong danh sách bình luận của bài (backend chỉ trả
+        // gốc), nên phải tăng `replyCount` của gốc ngay để nút "Xem N phản hồi"
+        // hiện ra/đúng số trước khi lần tải lại bên dưới kịp về.
+        queryClient.setQueryData<CommentPages>(forumKeys.comments(postId), (data) => {
+          if (!data?.pages) {
+            return data;
+          }
+          return {
+            ...data,
+            pages: data.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) =>
+                item.commentId === gocId ? { ...item, replyCount: item.replyCount + 1 } : item,
+              ),
+            })),
+          };
+        });
+        void queryClient.invalidateQueries({ queryKey: forumKeys.replies(postId, gocId) });
+      }
       lamMoiBinhLuanCuaBai(queryClient, postId);
     },
   });

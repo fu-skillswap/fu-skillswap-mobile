@@ -70,10 +70,29 @@ export const forumRepo = {
     return apiClient<ForumPostResponse>(`/api/forum/posts/${postId}`);
   },
 
-  /** Bình luận của một bài, backend trả từ cũ nhất đến mới nhất */
+  /**
+   * Bình luận GỐC của một bài, backend trả từ cũ nhất đến mới nhất.
+   *
+   * KHÔNG gồm reply — backend lọc `replyToCommentId is null`. Mỗi bình luận
+   * mang `replyCount`; muốn xem reply thì gọi `getCommentReplies`.
+   */
   getComments(postId: string, params: CursorParams) {
     return apiClient<CursorPageResponse<ForumCommentResponse>>(
       `/api/forum/posts/${postId}/comments`,
+      { params: cleanParams({ ...params }) },
+    );
+  },
+
+  /**
+   * Reply của MỘT bình luận gốc, phân trang cursor như `getComments`, từ cũ đến
+   * mới (`ForumPostController.getCommentReplies`).
+   *
+   * `commentId` phải là bình luận GỐC — đưa id của một reply thì backend trả
+   * `400`. Nơi gọi chỉ có id gốc vì nút "Xem N phản hồi" chỉ nằm trên gốc.
+   */
+  getCommentReplies(commentId: string, params: CursorParams) {
+    return apiClient<CursorPageResponse<ForumCommentResponse>>(
+      `/api/forum/comments/${commentId}/replies`,
       { params: cleanParams({ ...params }) },
     );
   },

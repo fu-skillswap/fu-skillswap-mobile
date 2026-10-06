@@ -12,6 +12,7 @@ import { getEnv } from '@/core/config/env';
 import { jsonMock } from '@/core/dev/jsonMock';
 import type {
   BlogExpectedVersionRequest,
+  BlogLabelResponse,
   MentorBlogPostCreateRequest,
   MentorBlogPostDetailResponse,
   MentorBlogPostUpdateRequest,
@@ -54,6 +55,19 @@ function bai(ghiDe: Partial<MentorBlogPostDetailResponse> & Pick<MentorBlogPostD
   };
 }
 
+/**
+ * Danh mục và thẻ đang hoạt động — `loadCategories`/`loadTags` của backend chỉ
+ * nhận id có trong bảng và `active = true`, id lạ bị bỏ qua.
+ */
+const DANH_MUC: BlogLabelResponse[] = [
+  { id: 'cat1', name: 'Sự nghiệp' },
+  { id: 'cat2', name: 'Kỹ năng' },
+];
+const THE: BlogLabelResponse[] = [
+  { id: 'tag1', name: 'PRD' },
+  { id: 'tag2', name: 'CV' },
+];
+
 function taoKho(): MentorBlogPostDetailResponse[] {
   return [
     bai({
@@ -75,7 +89,18 @@ function taoKho(): MentorBlogPostDetailResponse[] {
       contentMarkdown: 'Nội dung đang viết dở…',
       visibility: 'BOOKED_MEMBERS',
       entitledServiceIds: ['msv1'],
+      categories: [DANH_MUC[0]],
+      tags: [THE[0]],
       updatedAt: ldt(60 * 24 * 3),
+      version: 1,
+    }),
+    // Bản nháp có ảnh bìa (tải lên trên web) — mobile không được sửa vì sẽ xoá ảnh.
+    bai({
+      id: 'bp4',
+      title: 'Lộ trình học SQL trong 30 ngày',
+      contentMarkdown: 'Tuần 1: SELECT và WHERE.',
+      coverImageUrl: 'https://cdn.skillswap.asia/blog/bp4-cover.png',
+      updatedAt: ldt(60 * 24 * 5),
       version: 1,
     }),
     bai({ id: 'bp3', title: 'Bài cũ đã lưu trữ', status: 'ARCHIVED', version: 3 }),
@@ -100,9 +125,20 @@ function ghi(moi: MentorBlogPostDetailResponse): MentorBlogPostDetailResponse {
   return moi;
 }
 
+/**
+ * Đúng `MentorBlogService.apply()`: MỌI trường bị ghi đè không điều kiện. Thiếu
+ * `categoryIds`/`tagIds` là xoá hết; ảnh bìa/OG lấy từ `coverAssetId`/`ogAssetId`,
+ * nên request không mang id ảnh là xoá ảnh (mock không giả kho tài sản: có id thì
+ * giữ URL cũ).
+ */
 function apDung(b: MentorBlogPostDetailResponse, yc: MentorBlogPostCreateRequest): MentorBlogPostDetailResponse {
+  const yeuCau = yc as MentorBlogPostCreateRequest & { coverAssetId?: string | null; ogAssetId?: string | null };
   return {
     ...b,
+    coverImageUrl: yeuCau.coverAssetId ? b.coverImageUrl : null,
+    ogImageUrl: yeuCau.ogAssetId ? b.ogImageUrl : null,
+    categories: DANH_MUC.filter((c) => (yc.categoryIds ?? []).includes(c.id)),
+    tags: THE.filter((t) => (yc.tagIds ?? []).includes(t.id)),
     title: yc.title.trim(),
     excerpt: yc.excerpt,
     contentMarkdown: yc.contentMarkdown,

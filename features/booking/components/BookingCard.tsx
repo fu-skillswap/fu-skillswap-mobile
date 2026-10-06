@@ -17,6 +17,11 @@
  * `canCancelByMentee()` đồng ý. Tự suy ra từ trạng thái sẽ hiện một nút mà
  * backend chắc chắn trả 409.
  *
+ * Hai việc của mentee sau giờ học cũng theo cờ của backend: "Điểm danh" theo
+ * `attendance.canCheckIn`, "Xác nhận đã học" theo `canConfirmByMentee`. "Báo vấn
+ * đề" (`canReportIssue`) KHÔNG dựng: `SubmitBookingIssueRequest` bắt buộc 1–5
+ * `evidenceIds` đã tải lên, mà mobile chưa có luồng tải minh chứng.
+ *
  * `canJoin` có thể đúng mà `meetingLink` vẫn trống — mentor chọn
  * `meetingPlatform = OFFLINE` và chỉ ghi `location`. Khi đó KHÔNG dựng nút "Vào
  * phòng học" (không có gì để mở), mà in địa điểm ra thành chữ.
@@ -63,6 +68,18 @@ export interface BookingCardProps {
    * backend chỉ tạo phòng chat khi mentor đã chấp nhận.
    */
   onNhanTin?: (conversationId: string) => void;
+  /**
+   * Điểm danh (check-in). Nút chỉ hiện khi `attendance.canCheckIn` của backend
+   * bật — cờ đó tính bằng giờ SERVER và tự tắt ngay sau khi đã điểm danh.
+   */
+  onDiemDanh?: (booking: BookingResponse) => void;
+  /**
+   * Xác nhận buổi học đã diễn ra. Nút chỉ hiện khi `canConfirmByMentee` bật;
+   * người gọi PHẢI hỏi lại trước khi gửi vì thao tác không hoàn tác được.
+   */
+  onXacNhanDaHoc?: (booking: BookingResponse) => void;
+  /** Đang điểm danh cho chính thẻ này — nút quay và khoá */
+  dangDiemDanh?: boolean;
 }
 
 export function BookingCard({
@@ -71,6 +88,9 @@ export function BookingCard({
   onHuyLich,
   onXemMentor,
   onNhanTin,
+  onDiemDanh,
+  onXacNhanDaHoc,
+  dangDiemDanh = false,
 }: BookingCardProps) {
   const trangThai = nhanTrangThaiBooking(booking);
   const coChat = !!booking.conversationId && !!onNhanTin;
@@ -91,6 +111,10 @@ export function BookingCard({
   // offline). Không phải một nút: không có gì để bấm, chỉ có thông tin để đọc.
   const hienDiaDiem = booking.canJoin && !coLinkHop && diaDiem.length > 0;
   const hienXemMentor = booking.bookingStatus === 'COMPLETED';
+  // Cờ của backend là nguồn sự thật (xem JSDoc đầu file); thiếu handler thì
+  // không dựng nút — không có nút chết.
+  const hienDiemDanh = booking.attendance.canCheckIn && !!onDiemDanh;
+  const hienXacNhan = booking.canConfirmByMentee && !!onXacNhanDaHoc;
 
   return (
     <Card elevated testID={`the-lich-hen-${booking.bookingId}`}>
@@ -168,6 +192,35 @@ export function BookingCard({
             >
               {diaDiem}
             </Text>
+          </View>
+        ) : null}
+
+        {hienDiemDanh || hienXacNhan ? (
+          // Việc CẦN LÀM của mentee với buổi này — tách hàng riêng, đứng trước
+          // các nút phụ, để không bị lẫn với "Hủy lịch".
+          <View className="flex-row gap-2">
+            {hienDiemDanh ? (
+              <View className="flex-1">
+                <Button
+                  label="Điểm danh"
+                  onPress={() => onDiemDanh?.(booking)}
+                  busy={dangDiemDanh}
+                  variant="secondary"
+                  size="sm"
+                  testID={`nut-diem-danh-${booking.bookingId}`}
+                />
+              </View>
+            ) : null}
+            {hienXacNhan ? (
+              <View className="flex-1">
+                <Button
+                  label="Xác nhận đã học"
+                  onPress={() => onXacNhanDaHoc?.(booking)}
+                  size="sm"
+                  testID={`nut-xac-nhan-da-hoc-${booking.bookingId}`}
+                />
+              </View>
+            ) : null}
           </View>
         ) : null}
 

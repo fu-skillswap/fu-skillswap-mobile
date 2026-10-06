@@ -7,11 +7,10 @@
  * sách), và rỗng (EmptyState — gọi API thành công nhưng không có bài nào).
  *
  * `Main.dc.html` vẽ màn này thành một dashboard: logo + lời chào + ô tìm mentor
- * + card Koko + carousel "Mentor nổi bật" + danh sách bài. Lần này CHỈ dựng
- * phần có dữ liệu thật — logo, lời chào (tên từ `useAuth()`) và danh sách bài
- * theo đúng kiểu thẻ của thiết kế. Các khối còn lại bị bỏ qua có chủ ý, lý do
- * ghi ngay tại chỗ; card Koko dẫn sang màn `KokoChat` chưa tồn tại nên không
- * dựng (luật "đừng dựng nút chết").
+ * + card Koko + carousel "Mentor nổi bật" + danh sách bài. Màn dựng logo, lời
+ * chào (tên từ `useAuth()`), card Koko (`TheKoko`, dẫn sang `/koko`, tự ẩn khi
+ * bản build không có AI) và danh sách bài theo đúng kiểu thẻ của thiết kế. Các
+ * khối còn lại bị bỏ qua có chủ ý, lý do ghi ngay tại chỗ.
  */
 
 import { useRouter } from 'expo-router';
@@ -22,7 +21,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'r
 import { trangThaiTai } from '@/core/api/queryState';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { useDebouncedValue } from '@/core/hooks/useDebouncedValue';
-import { KOKO_READING, LOGO_MARK } from '@/core/ui/brand';
+import { KOKO_404, KOKO_READING, LOGO_MARK } from '@/core/ui/brand';
 import { BrandImage } from '@/core/ui/BrandImage';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
@@ -34,6 +33,7 @@ import { PostCard } from '@/features/forum/components/PostCard';
 import { TopicChips } from '@/features/forum/components/TopicChips';
 import { useTogglePostLike } from '@/features/forum/hooks/useForumMutations';
 import { useForumList, useForumTopics } from '@/features/forum/hooks/useForumQueries';
+import { TheKoko } from '@/features/koko';
 import { ChuongThongBao } from '@/features/notification';
 
 /**
@@ -76,6 +76,13 @@ export function ForumFeedScreen() {
     keyword: timKiem || undefined,
     forumTopicId: topicId ?? undefined,
   });
+
+  /**
+   * Danh sách đang hiện là kết quả LỌC (từ khoá đã lắng hoặc chủ đề). Đọc giá
+   * trị đã lắng chứ không đọc ô nhập: khối rỗng phải khớp với query đang có kết
+   * quả, không phải với chữ đang gõ dở.
+   */
+  const dangLoc = Boolean(timKiem) || topicId !== null;
 
   const openPost = (postId: string) => router.push(`/forum/${postId}`);
 
@@ -227,6 +234,9 @@ export function ForumFeedScreen() {
                 </Pressable>
               ) : null}
 
+              {/* Card Koko cuộn theo bảng tin, đúng vị trí trong `Main.dc.html`. */}
+              <TheKoko />
+
               {/* Tiêu đề section 18/700, đúng `<h2>` của thiết kế. */}
               {list.posts.length > 0 ? (
                 <Text className="text-section-title text-ink" style={{ fontFamily: fonts.bold }}>
@@ -247,6 +257,17 @@ export function ForumFeedScreen() {
             ) : null
           }
           ListEmptyComponent={
+            dangLoc ? (
+              // Lọc mà không ra bài nào KHÔNG có nghĩa là diễn đàn trống — mời "là
+              // người đầu tiên" ở đây là nói sai. Tư thế "404" như hộp thư.
+              <EmptyState
+                title="Không tìm thấy bài viết"
+                description="Thử từ khoá khác hoặc bỏ lọc chủ đề."
+                illustration={
+                  <BrandImage source={KOKO_404} size={140} testID="minh-hoa-khong-thay-bai-viet" />
+                }
+              />
+            ) : (
             <EmptyState
               title="Chưa có bài viết nào"
               description="Hãy là người đầu tiên bắt đầu một cuộc thảo luận."
@@ -257,6 +278,7 @@ export function ForumFeedScreen() {
                 <BrandImage source={KOKO_READING} size={140} testID="minh-hoa-rong-dien-dan" />
               }
             />
+            )
           }
         />
       )}

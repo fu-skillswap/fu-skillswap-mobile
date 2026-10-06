@@ -202,24 +202,28 @@ function binhLuan(overrides: Partial<ForumCommentResponse>): ForumCommentRespons
     createdAt: '2026-09-28T03:00:00Z',
     updatedAt: '2026-09-28T03:00:00Z',
     imageUrls: [],
+    // Bản gốc trong `MOCK_COMMENTS` để 0; handler tính lại khi trả về — xem
+    // `voiSoPhanHoi`.
+    replyCount: 0,
     ...overrides,
   };
 }
 
 /**
- * Bình luận theo từng bài.
+ * Bình luận theo từng bài, gốc lẫn reply chung một mảng phẳng — đây là KHO dữ
+ * liệu, KHÔNG phải hình dạng trả về: handler tách gốc và reply đúng như backend.
  *
- * Số lượng ở đây phải khớp `commentCount` của bài tương ứng: thẻ bài hiện con số,
- * màn chi tiết hiện danh sách, hai bên lệch nhau trông y như lỗi của backend.
+ * Số lượng ở đây phải khớp `commentCount` của bài tương ứng (backend đếm cả gốc
+ * lẫn reply): thẻ bài hiện con số, màn chi tiết hiện bình luận, hai bên lệch
+ * nhau trông y như lỗi của backend.
  */
 const MOCK_COMMENTS: Record<string, ForumCommentResponse[]> = {
   mp1: [
     binhLuan({}),
     binhLuan({
       commentId: 'mc2',
-      // Reply trỏ vào `mc1` — một bình luận GỐC có thật trong cùng trang. Trỏ vào
-      // một id không có thì `buildCommentTree` nâng nó lên thành bình luận gốc và
-      // nhánh thụt lề không bao giờ xem được.
+      // Reply trỏ vào `mc1` — một bình luận GỐC có thật. Nó chỉ hiện ra qua
+      // `GET /api/forum/comments/mc1/replies`, đúng như backend.
       replyToCommentId: 'mc1',
       replyToUserId: 'u-khac-02',
       replyToUserName: 'Đỗ Quang Dũng',
@@ -309,6 +313,20 @@ function timBinhLuan(commentId: string): ForumCommentResponse | undefined {
     .find((c) => c.commentId === commentId);
 }
 
+/**
+ * Gắn `replyCount` như backend: gốc mang số reply hiển thị của nó, reply luôn 0
+ * (`ForumPostService.toCommentResponse`).
+ */
+function voiSoPhanHoi(comment: ForumCommentResponse): ForumCommentResponse {
+  if (comment.replyToCommentId) {
+    return { ...comment, replyCount: 0 };
+  }
+  const soPhanHoi = Object.values(MOCK_COMMENTS)
+    .flat()
+    .filter((c) => c.replyToCommentId === comment.commentId).length;
+  return { ...comment, replyCount: soPhanHoi };
+}
+
 const base = getEnv().apiUrl;
 
 export const forumMockHandlers = [
@@ -373,9 +391,33 @@ export const forumMockHandlers = [
     return jsonMock(envelope(post));
   }),
 
-  http.get(`${base}/api/forum/posts/:postId/comments`, ({ params }) =>
-    jsonMock(envelope(motTrang(MOCK_COMMENTS[String(params.postId)] ?? []))),
-  ),
+  /**
+   * CHỈ bình luận gốc, kèm `replyCount` — backend lọc `replyToCommentId is null`
+   * (`ForumCommentRepositoryImpl.findVisibleRootCommentsWindow`). Trả cả reply
+   * ở đây là dựng một backend khác và che mất việc app phải tải reply riêng.
+   */
+  http.get(`${base}/api/forum/posts/:postId/comments`, ({ params }) => {
+    const goc = (MOCK_COMMENTS[String(params.postId)] ?? []).filter((c) => !c.replyToCommentId);
+    return jsonMock(envelope(motTrang(goc.map(voiSoPhanHoi))));
+  }),
+
+  /**
+   * Reply của một bình luận gốc (`ForumPostService.getCommentReplies`): 404 khi
+   * không có bình luận, 400 khi id là của một reply.
+   */
+  http.get(`${base}/api/forum/comments/:commentId/replies`, ({ params }) => {
+    const goc = timBinhLuan(String(params.commentId));
+    if (!goc) {
+      return loi(404, 'SYS_0003', 'Không tìm thấy bình luận forum');
+    }
+    if (goc.replyToCommentId) {
+      return loi(400, 'SYS_0002', 'Bình luận này là phản hồi, không có danh sách phản hồi con');
+    }
+    const phanHoi = Object.values(MOCK_COMMENTS)
+      .flat()
+      .filter((c) => c.replyToCommentId === goc.commentId);
+    return jsonMock(envelope(motTrang(phanHoi.map(voiSoPhanHoi))));
+  }),
 
   http.post(`${base}/api/forum/posts/:postId/comments`, async ({ params, request }) => {
     const body = (await request.json()) as {
@@ -440,9 +482,12 @@ export const forumMockHandlers = [
     if (!comment) {
       return loi(404, 'SYS_0003', 'Không tìm thấy bình luận');
     }
+    // `replyCount: 0` như backend thật: phản hồi của API thích bình luận không
+    // tính trường này (`ForumReactionService.toCommentResponse`).
     return jsonMock(
       envelope({
         ...comment,
+        replyCount: 0,
         reactedByCurrentUser: true,
         reactionCount: comment.reactedByCurrentUser
           ? comment.reactionCount
@@ -459,6 +504,7 @@ export const forumMockHandlers = [
     return jsonMock(
       envelope({
         ...comment,
+        replyCount: 0,
         reactedByCurrentUser: false,
         reactionCount: comment.reactedByCurrentUser
           ? comment.reactionCount - 1

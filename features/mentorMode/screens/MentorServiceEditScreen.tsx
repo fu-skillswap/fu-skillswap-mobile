@@ -20,10 +20,12 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
+import { trangThaiTai } from '@/core/api/queryState';
 import { phanCachNghin } from '@/core/format/soLuong';
 import { BottomBar } from '@/core/ui/BottomBar';
 import { Button } from '@/core/ui/Button';
 import { Chip } from '@/core/ui/Chip';
+import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
@@ -125,12 +127,42 @@ export function MentorServiceEditScreen({ serviceId }: { serviceId: string | nul
     router.replace('/(tabs)/mentor-schedule');
   };
 
-  if (!laTaoMoi && dichVu.isPending && dichVu.fetchStatus !== 'idle') {
+  const trangThaiDichVu = trangThaiTai({
+    isPaused: dichVu.isPaused,
+    isPending: dichVu.isPending,
+    isError: dichVu.isError,
+    coDuLieu: dichVu.data !== undefined,
+  });
+  const trangThaiRangBuoc = trangThaiTai({
+    isPaused: rangBuoc.isPaused,
+    isPending: rangBuoc.isPending,
+    isError: rangBuoc.isError,
+    coDuLieu: rangBuoc.data !== undefined,
+  });
+
+  if (!laTaoMoi && trangThaiDichVu === 'dang-tai') {
     return (
       <Screen testID="man-hinh-sua-dich-vu">
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator testID="dang-tai-dich-vu" color={colors.accent} />
         </View>
+      </Screen>
+    );
+  }
+  if (!laTaoMoi && trangThaiDichVu === 'mat-ket-noi') {
+    // Truy vấn bị HOÃN khi mất mạng: `isPending` bật mãi, vòng quay không dừng.
+    return (
+      <Screen testID="man-hinh-sua-dich-vu">
+        <OfflineBanner />
+        <View className="px-gutter pt-2">
+          <ScreenHeader title="Chỉnh sửa dịch vụ" onBack={roiDi} />
+        </View>
+        <EmptyState
+          title="Không có kết nối"
+          description="Dịch vụ sẽ tải khi có mạng trở lại."
+          actionLabel="Thử lại"
+          onAction={() => void dichVu.refetch()}
+        />
       </Screen>
     );
   }
@@ -191,11 +223,26 @@ export function MentorServiceEditScreen({ serviceId }: { serviceId: string | nul
                 <Text className="text-caption-lg text-ink" style={{ fontFamily: fonts.semibold }}>
                   Thời lượng
                 </Text>
-                <View className="flex-row flex-wrap gap-2">
-                  {(rangBuoc.data?.allowedDurationMinutes ?? []).slice().sort((a, b) => a - b).map((p) => (
-                    <Chip key={p} label={`${p} phút`} selected={thoiLuong === p} onPress={() => setThoiLuong(p)} testID={`thoi-luong-${p}`} />
-                  ))}
-                </View>
+                {trangThaiRangBuoc === 'dang-tai' ? (
+                  <ActivityIndicator testID="dang-tai-thoi-luong" color={colors.accent} />
+                ) : trangThaiRangBuoc === 'co-noi-dung' ? (
+                  <View className="flex-row flex-wrap gap-2">
+                    {(rangBuoc.data?.allowedDurationMinutes ?? []).slice().sort((a, b) => a - b).map((p) => (
+                      <Chip key={p} label={`${p} phút`} selected={thoiLuong === p} onPress={() => setThoiLuong(p)} testID={`thoi-luong-${p}`} />
+                    ))}
+                  </View>
+                ) : (
+                  // Không tải được danh sách thời lượng thì form không bao giờ
+                  // gửi được (chưa chọn thời lượng) — phải nói ra và cho thử lại.
+                  <View testID="loi-thoi-luong" className="gap-2">
+                    <Text className="text-caption text-danger" style={{ fontFamily: fonts.medium }}>
+                      {trangThaiRangBuoc === 'mat-ket-noi'
+                        ? 'Không có kết nối nên chưa tải được các thời lượng cho phép.'
+                        : 'Chưa tải được các thời lượng cho phép.'}
+                    </Text>
+                    <Button label="Thử lại" variant="secondary" size="sm" onPress={() => void rangBuoc.refetch()} testID="nut-tai-lai-thoi-luong" />
+                  </View>
+                )}
               </View>
             ) : (
               <View className="flex-row items-center gap-2.5 rounded-md bg-surface-page p-3">

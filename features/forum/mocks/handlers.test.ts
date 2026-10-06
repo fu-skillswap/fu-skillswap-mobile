@@ -5,8 +5,8 @@
  * Không có một assertion nào nhìn trực tiếp vào fixture rồi so với chính nó:
  * fixture bịa sai hình dạng DTO là lớp lỗi repo này đã dính nhiều lần, và chỉ
  * đường đi `forumRepo → apiClient → envelope` mới bắt được. Các helper thật của
- * feature (`buildCommentTree`, `isBotComment`) cũng được gọi vào, vì chúng chính
- * là thứ quyết định giao diện có hiện reply và badge "AI" hay không.
+ * feature (`isBotComment`) cũng được gọi vào, vì nó chính là thứ quyết định
+ * giao diện có hiện badge "AI" hay không.
  */
 
 import { setupServer } from 'msw/node';
@@ -14,7 +14,7 @@ import { setupServer } from 'msw/node';
 import { __resetApiClientForTests } from '@/core/api/client';
 import { ApiClientError } from '@/core/api/errors';
 import { MOCK_USER } from '@/core/auth/mocks/handlers';
-import { buildCommentTree, isBotComment } from '@/features/forum/commentTree';
+import { isBotComment } from '@/features/forum/commentTree';
 import { forumRepo } from '@/features/forum/forumRepo';
 import { forumMockHandlers, MOCK_POSTS, MOCK_TOPICS } from '@/features/forum/mocks/handlers';
 
@@ -78,18 +78,39 @@ describe('handler mock của diễn đàn', () => {
     expect((loi as ApiClientError).code).toBe('SYS_0003');
   });
 
-  it('bình luận của một bài có cả bình luận gốc và reply, dựng được thành cây 1 cấp', async () => {
+  it('danh sách bình luận CHỈ có gốc kèm replyCount, đúng như backend', async () => {
+    // Backend lọc `replyToCommentId is null` ở endpoint này. Mock từng trả reply
+    // lẫn vào đây và che mất việc app không bao giờ gọi endpoint reply.
     const page = await forumRepo.getComments(MOCK_POSTS[0].postId, {});
 
-    expect(page.items.some((c) => c.replyToCommentId === null)).toBe(true);
-    expect(page.items.some((c) => c.replyToCommentId !== null)).toBe(true);
+    expect(page.items.length).toBeGreaterThan(0);
+    expect(page.items.every((c) => !c.replyToCommentId)).toBe(true);
+    expect(page.items.some((c) => c.replyCount > 0)).toBe(true);
+  });
 
-    // Reply phải trỏ vào một bình luận gốc CÓ THẬT trong cùng trang: trỏ sai thì
-    // `buildCommentTree` nâng nó lên thành bình luận gốc và giao diện mất hẳn
-    // phần thụt lề — nhánh reply không bao giờ xem được.
-    const cay = buildCommentTree(page.items);
-    expect(cay.some((goc) => goc.replies.length > 0)).toBe(true);
-    expect(cay.every((goc) => goc.replyToCommentId === null)).toBe(true);
+  it('reply của một gốc lấy qua endpoint riêng, số lượng khớp replyCount', async () => {
+    const page = await forumRepo.getComments(MOCK_POSTS[0].postId, {});
+    const goc = page.items.find((c) => c.replyCount > 0)!;
+
+    const phanHoi = await forumRepo.getCommentReplies(goc.commentId, {});
+
+    expect(phanHoi.items).toHaveLength(goc.replyCount);
+    expect(phanHoi.items.every((c) => c.replyToCommentId === goc.commentId)).toBe(true);
+    expect(phanHoi.items.every((c) => c.replyCount === 0)).toBe(true);
+  });
+
+  it('hỏi reply của một REPLY thì 400, của bình luận không tồn tại thì 404', async () => {
+    const goc = (await forumRepo.getComments(MOCK_POSTS[0].postId, {})).items.find(
+      (c) => c.replyCount > 0,
+    )!;
+    const motReply = (await forumRepo.getCommentReplies(goc.commentId, {})).items[0]!;
+
+    await expect(forumRepo.getCommentReplies(motReply.commentId, {})).rejects.toMatchObject({
+      status: 400,
+    });
+    await expect(forumRepo.getCommentReplies('khong-co', {})).rejects.toMatchObject({
+      status: 404,
+    });
   });
 
   it('có ít nhất một bình luận của bot để thấy badge AI', async () => {
@@ -101,14 +122,15 @@ describe('handler mock của diễn đàn', () => {
     expect(page.items.some((c) => !isBotComment(c))).toBe(true);
   });
 
-  it('commentCount của mỗi bài khớp số bình luận handler trả về', async () => {
-    // Thẻ bài hiện `commentCount`, màn chi tiết hiện danh sách. Hai số lệch nhau
-    // trông y như một lỗi đồng bộ của backend.
+  it('commentCount của mỗi bài khớp số gốc cộng số reply handler trả về', async () => {
+    // Thẻ bài hiện `commentCount` (backend đếm cả gốc lẫn reply), màn chi tiết
+    // hiện bình luận. Hai số lệch nhau trông y như một lỗi đồng bộ của backend.
     const feed = await forumRepo.getFeed({});
 
     for (const bai of feed.items) {
       const page = await forumRepo.getComments(bai.postId, {});
-      expect(page.items).toHaveLength(bai.commentCount);
+      const soPhanHoi = page.items.reduce((tong, c) => tong + c.replyCount, 0);
+      expect(page.items.length + soPhanHoi).toBe(bai.commentCount);
     }
   });
 
@@ -216,6 +238,8 @@ describe('handler mock của diễn đàn', () => {
 
     expect(daThich.commentId).toBe('mc1');
     expect(daThich.reactedByCurrentUser).toBe(true);
+    // Như backend: phản hồi thích bình luận không tính replyCount.
+    expect(daThich.replyCount).toBe(0);
 
     const boThich = await forumRepo.unlikeComment('mc1');
     expect(boThich.reactedByCurrentUser).toBe(false);

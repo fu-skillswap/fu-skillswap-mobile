@@ -39,12 +39,18 @@ import { useMemo } from 'react';
 
 import { createIdempotencyStore } from '@/core/api/idempotency';
 import { bookingRepo } from '@/features/booking/bookingRepo';
+import { mentorBookingRepo } from '@/features/booking/mentorBookingRepo';
 import { bookingKeys } from '@/features/booking/queryKeys';
 import type {
   AcceptBookingRequest,
   CancelBookingRequest,
+  ConfirmBookingRequest,
+  CompleteBookingRequest,
   RejectBookingRequest,
 } from '@/features/booking/types';
+// Import thẳng file khoá (không qua barrel `@/features/mentorMode`): barrel đó
+// kéo màn Tổng quan, mà màn đó lại import barrel booking — thành vòng import.
+import { mentorModeKeys } from '@/features/mentorMode/queryKeys';
 
 /** Tham số của một lần hủy: booking nào, vì lý do gì */
 export interface HuyLichInput extends CancelBookingRequest {
@@ -123,8 +129,26 @@ export function useCheckInBooking() {
       void queryClient.invalidateQueries({ queryKey: bookingKeys.listsAll() });
       void queryClient.invalidateQueries({ queryKey: bookingKeys.countsAll() });
       void queryClient.invalidateQueries({ queryKey: bookingKeys.detail(bookingId) });
+      // Lịch dạy của mentor hiện trạng thái buổi trong từng slot.
+      void queryClient.invalidateQueries({ queryKey: mentorModeKeys.slotsAll() });
     },
   });
+}
+
+/**
+ * Làm mới sau khi MENTOR quyết định một booking (chấp nhận, từ chối, hoàn tất, huỷ).
+ *
+ * - Chi tiết: invalidate theo TIỀN TỐ `detail`, không chỉ booking vừa xử lý —
+ *   chấp nhận một yêu cầu làm backend tự từ chối mọi yêu cầu PENDING khác của
+ *   cùng slot (`MentorBookingController.acceptBooking`), nên chi tiết đã cache
+ *   của chúng đang nói sai.
+ * - Slot của mentor (`mentorModeKeys.slotsAll()`): slot được chốt/giải phóng.
+ */
+function lamMoiSauQuyetDinhMentor(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: bookingKeys.listsAll() });
+  void queryClient.invalidateQueries({ queryKey: bookingKeys.countsAll() });
+  void queryClient.invalidateQueries({ queryKey: [...bookingKeys.all, 'detail'] });
+  void queryClient.invalidateQueries({ queryKey: mentorModeKeys.slotsAll() });
 }
 
 /** Mentor chấp nhận một yêu cầu đặt lịch */
@@ -139,8 +163,7 @@ export function useAcceptBooking() {
     onSuccess: (data, { bookingId }) => {
       khoKhoa.release(`accept-${bookingId}`);
       queryClient.setQueryData(bookingKeys.detail(bookingId), data);
-      void queryClient.invalidateQueries({ queryKey: bookingKeys.listsAll() });
-      void queryClient.invalidateQueries({ queryKey: bookingKeys.countsAll() });
+      lamMoiSauQuyetDinhMentor(queryClient);
     },
   });
 }
@@ -156,6 +179,87 @@ export function useRejectBooking() {
       bookingRepo.rejectBooking(bookingId, input, khoKhoa.keyFor(`reject-${bookingId}`, input)),
     onSuccess: (data, { bookingId }) => {
       khoKhoa.release(`reject-${bookingId}`);
+      queryClient.setQueryData(bookingKeys.detail(bookingId), data);
+      lamMoiSauQuyetDinhMentor(queryClient);
+    },
+  });
+}
+
+// ===========================================================================
+// PHÍA MENTOR — hoàn tất và huỷ buổi đã xác nhận (`mentorBookingRepo.ts`).
+// Giữ tách khỏi phần của mentee ở trên.
+// ===========================================================================
+
+/**
+ * Mentor xác nhận buổi học đã diễn ra. Hiện nút theo cờ `canCompleteByMentor`
+ * của backend, không tự suy từ giờ máy. Sau khi gửi, booking sang
+ * `AWAITING_MENTEE_CONFIRMATION` — thẻ rời chip "Chờ bạn xác nhận".
+ */
+export function useCompleteBookingByMentor() {
+  const queryClient = useQueryClient();
+  const khoKhoa = useMemo(() => createIdempotencyStore(), []);
+
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: ({ bookingId, ...input }: CompleteBookingRequest & { bookingId: string }) =>
+      mentorBookingRepo.completeBooking(bookingId, input, khoKhoa.keyFor(`complete-${bookingId}`, input)),
+    onSuccess: (data, { bookingId }) => {
+      khoKhoa.release(`complete-${bookingId}`);
+      queryClient.setQueryData(bookingKeys.detail(bookingId), data);
+      lamMoiSauQuyetDinhMentor(queryClient);
+    },
+  });
+}
+
+/**
+ * Mentor huỷ buổi đã xác nhận. Hiện nút theo cờ `canCancel` (backend tính theo
+ * vai trò người xem). Không nút thử lại khi lỗi — backend chặn 3 lần huỷ/giờ.
+ */
+export function useCancelBookingByMentor() {
+  const queryClient = useQueryClient();
+  const khoKhoa = useMemo(() => createIdempotencyStore(), []);
+
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: ({ bookingId, cancelReason }: CancelBookingRequest & { bookingId: string }) => {
+      const payload: CancelBookingRequest = { cancelReason };
+      return mentorBookingRepo.cancelBooking(bookingId, payload, khoKhoa.keyFor(`mentor-cancel-${bookingId}`, payload));
+    },
+    onSuccess: (data, { bookingId }) => {
+      khoKhoa.release(`mentor-cancel-${bookingId}`);
+      queryClient.setQueryData(bookingKeys.detail(bookingId), data);
+      lamMoiSauQuyetDinhMentor(queryClient);
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Hành động của MENTEE sau buổi học (tách khối riêng để dễ gộp nhánh).
+// Check-in của mentee dùng lại `useCheckInBooking` ở trên: cùng một endpoint
+// phục vụ hai phía (`SessionAttendanceService` tự suy vai trò người gọi).
+// ---------------------------------------------------------------------------
+
+/**
+ * Mentee xác nhận buổi học đã diễn ra ("Xác nhận đã học").
+ *
+ * Bốn luật ở đầu file vẫn áp dụng. Riêng thao tác này KHÔNG hoàn tác được —
+ * booking thành `COMPLETED` và tiền được giải ngân cho mentor — nên màn hình
+ * phải hỏi lại trước khi gọi. Key ổn định theo `bookingId` + ghi chú: bấm lại
+ * sau lỗi mạng thì backend replay chứ không xác nhận hai lần.
+ *
+ * Invalidate cả `listsAll()` lẫn `countsAll()`: booking rời chip "Chờ bạn xác
+ * nhận" sang "Đã hoàn thành".
+ */
+export function useConfirmBookingByMentee() {
+  const queryClient = useQueryClient();
+  const khoKhoa = useMemo(() => createIdempotencyStore(), []);
+
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: ({ bookingId, ...input }: ConfirmBookingRequest & { bookingId: string }) =>
+      bookingRepo.confirmByMentee(bookingId, input, khoKhoa.keyFor(`confirm-${bookingId}`, input)),
+    onSuccess: (data, { bookingId }) => {
+      khoKhoa.release(`confirm-${bookingId}`);
       queryClient.setQueryData(bookingKeys.detail(bookingId), data);
       void queryClient.invalidateQueries({ queryKey: bookingKeys.listsAll() });
       void queryClient.invalidateQueries({ queryKey: bookingKeys.countsAll() });

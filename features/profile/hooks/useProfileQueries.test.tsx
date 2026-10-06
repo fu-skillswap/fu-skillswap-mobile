@@ -10,6 +10,12 @@ import { createQueryClient } from '@/core/api/queryClient';
 import { useStudentProfile } from '@/features/profile/hooks/useProfileQueries';
 import { profileKeys } from '@/features/profile/queryKeys';
 
+// `useProfileQueries` đọc `useAuth()` (cho `useSaveStudentProfile`); AuthProvider
+// thật kéo theo Google Sign-In native, không có trong jest.
+jest.mock('@/core/auth/AuthProvider', () => ({
+  useAuth: () => ({ taiLaiNguoiDung: jest.fn() }),
+}));
+
 const BASE = 'https://api.skillswap.asia';
 
 function envelope(data: unknown) {

@@ -63,7 +63,13 @@ export interface ForumPostResponse {
   imageUrls: string[];
 }
 
-/** Một bình luận; cấu trúc thảo luận chỉ có 1 cấp */
+/**
+ * Một bình luận; cấu trúc thảo luận chỉ có 1 cấp.
+ *
+ * `GET /api/forum/posts/{id}/comments` chỉ trả bình luận GỐC (lọc
+ * `replyToCommentId is null` ở `ForumCommentRepositoryImpl`); reply phải lấy
+ * riêng qua `GET /api/forum/comments/{commentId}/replies`.
+ */
 export interface ForumCommentResponse {
   commentId: string;
   postId: string;
@@ -84,6 +90,15 @@ export interface ForumCommentResponse {
   updatedAt: string;
   /** Tối đa 1 URL */
   imageUrls: string[];
+  /**
+   * Số reply đang hiển thị của bình luận GỐC; reply luôn là 0.
+   *
+   * Java là `Integer` nhưng constructor của record tự đổi `null` thành 0, nên
+   * trên dây luôn có số. Cẩn thận: phản hồi của API thích/bỏ thích bình luận
+   * (`ForumReactionService.toCommentResponse`) KHÔNG tính trường này và luôn trả
+   * 0 — đắp thẳng nó vào cache là xoá mất nút "Xem N phản hồi".
+   */
+  replyCount: number;
 }
 
 /**

@@ -4,13 +4,36 @@
  */
 
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 import { flattenPages, getNextCursor } from '@/core/api/pagination';
-import { buildCommentTree } from '@/features/forum/commentTree';
 import { forumRepo } from '@/features/forum/forumRepo';
 import { forumKeys } from '@/features/forum/queryKeys';
 import type { ForumListFilters } from '@/features/forum/types';
+
+/**
+ * Chốt chặn ĐỒNG BỘ cho việc tải trang kế — cùng lý do và cùng cách làm như
+ * `useChotChanTrangKe` của `features/mentor/hooks/useMentorQueries.ts` (bản
+ * riêng vì hai feature không import chéo nhau): FlatList bắn `onEndReached`
+ * nhiều lần trong cùng một frame, cả hai lần cùng đọc `isFetchingNextPage ===
+ * false` của lần render cũ nên cùng một cursor bị gửi hai lượt. Ref đổi ngay
+ * lập tức nên lần gọi thứ hai bị chặn.
+ */
+function useChotChanTrangKe(query: {
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => Promise<unknown>;
+}) {
+  const dangTaiTrangKe = useRef(false);
+
+  return () => {
+    if (dangTaiTrangKe.current || !query.hasNextPage || query.isFetchingNextPage) return;
+    dangTaiTrangKe.current = true;
+    void query.fetchNextPage().finally(() => {
+      dangTaiTrangKe.current = false;
+    });
+  };
+}
 
 /** Có bộ lọc nào đang bật không */
 function hasFilters(filters: ForumListFilters): boolean {
@@ -68,7 +91,15 @@ export function useForumPost(postId: string) {
   });
 }
 
-/** Bình luận của một bài, đã dựng thành cây 1 cấp */
+/**
+ * Bình luận GỐC của một bài.
+ *
+ * Backend KHÔNG trả reply ở đây (chỉ `replyCount`), nên danh sách này là phẳng
+ * và mọi phần tử đều là gốc; reply của từng gốc tải bằng `useCommentReplies`.
+ *
+ * Trả thêm `taiTrangKe()` đã bọc chốt chặn — màn hình nối thẳng vào
+ * `onEndReached`, KHÔNG tự dựng `useRef` lần nữa.
+ */
 export function useForumComments(postId: string) {
   const query = useInfiniteQuery({
     queryKey: forumKeys.comments(postId),
@@ -77,10 +108,29 @@ export function useForumComments(postId: string) {
     getNextPageParam: getNextCursor,
   });
 
-  const comments = useMemo(
-    () => buildCommentTree(flattenPages(query.data?.pages)),
-    [query.data],
-  );
+  const comments = useMemo(() => flattenPages(query.data?.pages), [query.data]);
+  const taiTrangKe = useChotChanTrangKe(query);
 
-  return { ...query, comments };
+  return { ...query, comments, taiTrangKe };
+}
+
+/**
+ * Reply của một bình luận gốc (`GET /api/forum/comments/{id}/replies`).
+ *
+ * Chỉ được gọi khi người dùng MỞ luồng reply — màn hình dựng component chứa
+ * hook này chỉ lúc đã mở, nên mỗi bình luận gốc không tự bắn một request.
+ * Khoá nằm dưới `forumKeys.comments(postId)` (xem `queryKeys.ts`).
+ */
+export function useCommentReplies(postId: string, commentId: string) {
+  const query = useInfiniteQuery({
+    queryKey: forumKeys.replies(postId, commentId),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => forumRepo.getCommentReplies(commentId, { cursor: pageParam }),
+    getNextPageParam: getNextCursor,
+  });
+
+  const replies = useMemo(() => flattenPages(query.data?.pages), [query.data]);
+  const taiTrangKe = useChotChanTrangKe(query);
+
+  return { ...query, replies, taiTrangKe };
 }

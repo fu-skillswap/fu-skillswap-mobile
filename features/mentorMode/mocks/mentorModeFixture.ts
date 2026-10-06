@@ -151,14 +151,18 @@ export function taoViMentor(ghiDe: Partial<MentorWalletResponse> = {}): MentorWa
     availableScoin: 1215000,
     recentTransactions: [
       taoGiaoDichVi(),
+      // `finalizePayout()`: PAID_OUT mang số tiền ở `amountScoin`, ảnh hưởng số dư
+      // 0 (đã trừ ở bước HOLD). COMMISSION không bao giờ nằm ở ví mentor — nó ghi
+      // vào tài khoản nền tảng.
       taoGiaoDichVi({
         id: 'tx-2',
-        entryType: 'COMMISSION',
-        sourceId: 'b6',
-        amountScoin: 10,
-        balanceEffectScoin: -10,
-        memo: 'Phí nền tảng',
-        createdAt: '2026-10-01T19:00:01+07:00',
+        entryType: 'PAID_OUT',
+        sourceType: 'PAYOUT_REQUEST',
+        sourceId: 'po-1',
+        amountScoin: 200000,
+        balanceEffectScoin: 0,
+        memo: 'Đã chuyển khoản yêu cầu rút',
+        createdAt: '2026-09-29T10:00:00+07:00',
       }),
       taoGiaoDichVi({
         id: 'tx-3',

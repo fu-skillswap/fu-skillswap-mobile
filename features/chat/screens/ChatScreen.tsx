@@ -17,8 +17,7 @@
  */
 
 import { useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, FileText, Send } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { CalendarDays, ChevronLeft, FileText } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -26,22 +25,25 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
+import { trangThaiTai } from '@/core/api/queryState';
+import { useRoleMode } from '@/core/roleMode/RoleModeProvider';
 import { dinhDangGio, nhanNgayNgan } from '@/core/time/offsetDateTime';
 import { Avatar } from '@/core/ui/Avatar';
+import { useBuTruBanPhim } from '@/core/ui/banPhim';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { IconButton } from '@/core/ui/IconButton';
+import { NutGui } from '@/core/ui/NutGui';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
 import { StatusBadge } from '@/core/ui/StatusBadge';
-import { colors, fonts, gradientButton, shadows, spacing } from '@/core/ui/theme';
+import { colors, fonts, spacing } from '@/core/ui/theme';
 import { nhanTrangThaiBooking, useBookingDetail } from '@/features/booking';
 import {
   THAM_DO_KHUNG_CHAT_MS,
@@ -75,6 +77,9 @@ export interface ChatScreenProps {
 
 export function ChatScreen({ conversationId, thamDoMs = THAM_DO_KHUNG_CHAT_MS }: ChatScreenProps) {
   const router = useRouter();
+  const { cheDo } = useRoleMode();
+  // Màn nằm trong `Screen` (SafeAreaView), không có thanh tiêu đề native.
+  const buTruBanPhim = useBuTruBanPhim();
   const hoiThoai = useConversation(conversationId);
   const tin = useMessages(conversationId, thamDoMs);
   const guiTin = useSendMessage(conversationId);
@@ -103,7 +108,9 @@ export function ChatScreen({ conversationId, thamDoMs = THAM_DO_KHUNG_CHAT_MS }:
       router.back();
       return;
     }
-    router.replace('/(tabs)/messages');
+    // Chế độ Mentor không có tab Tin nhắn — `/(tabs)/messages` là một tab bị ẩn,
+    // không mục nào sáng. Hộp thư của mentor là route `/chat` (`app/chat/index.tsx`).
+    router.replace(cheDo === 'MENTOR' ? '/chat' : '/(tabs)/messages');
   };
 
   const gui = () => {
@@ -117,6 +124,21 @@ export function ChatScreen({ conversationId, thamDoMs = THAM_DO_KHUNG_CHAT_MS }:
   const h = hoiThoai.data;
   const ten = h ? tenHoiThoai(h) : '';
   const quaDai = noiDung.trim().length > NOI_DUNG_TIN_TOI_DA;
+
+  // `isPending` một mình quay mãi khi mất mạng (query bị hoãn vẫn là pending) —
+  // quy về một trạng thái bằng `trangThaiTai`, xem `core/api/queryState.ts`.
+  const trangThaiHoiThoai = trangThaiTai({
+    isPaused: hoiThoai.isPaused,
+    isPending: hoiThoai.isPending,
+    isError: hoiThoai.isError,
+    coDuLieu: h !== undefined,
+  });
+  const trangThaiTin = trangThaiTai({
+    isPaused: tin.isPaused,
+    isPending: tin.isPending,
+    isError: tin.isError,
+    coDuLieu: tin.tinNhan.length > 0,
+  });
 
   return (
     <Screen testID="man-hinh-chat">
@@ -150,16 +172,23 @@ export function ChatScreen({ conversationId, thamDoMs = THAM_DO_KHUNG_CHAT_MS }:
         )}
       </View>
 
-      {hoiThoai.isPending && hoiThoai.fetchStatus !== 'idle' ? (
+      {trangThaiHoiThoai === 'dang-tai' ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator testID="dang-tai-hoi-thoai" color={colors.accent} />
         </View>
-      ) : hoiThoai.isError || !h ? (
+      ) : trangThaiHoiThoai === 'mat-ket-noi' ? (
+        <EmptyState
+          title="Không có kết nối"
+          description="Cuộc trò chuyện sẽ tải khi có mạng trở lại."
+        />
+      ) : trangThaiHoiThoai === 'loi' || !h ? (
         <ErrorView error={hoiThoai.error} onAction={() => void hoiThoai.refetch()} />
       ) : (
         <KeyboardAvoidingView
           className="flex-1"
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // Khung cha nằm dưới vùng an toàn phía trên — xem `core/ui/banPhim.ts`.
+          keyboardVerticalOffset={buTruBanPhim}
         >
           {booking.data ? (
             <Pressable
@@ -182,11 +211,16 @@ export function ChatScreen({ conversationId, thamDoMs = THAM_DO_KHUNG_CHAT_MS }:
             </Pressable>
           ) : null}
 
-          {tin.isPending && tin.fetchStatus !== 'idle' ? (
+          {trangThaiTin === 'dang-tai' ? (
             <View className="flex-1 items-center justify-center">
               <ActivityIndicator testID="dang-tai-tin-nhan" color={colors.accent} />
             </View>
-          ) : tin.isError && tin.tinNhan.length === 0 ? (
+          ) : trangThaiTin === 'mat-ket-noi' ? (
+            <EmptyState
+              title="Không có kết nối"
+              description="Tin nhắn sẽ tải khi có mạng trở lại."
+            />
+          ) : trangThaiTin === 'loi' ? (
             <ErrorView error={tin.error} onAction={() => void tin.refetch()} />
           ) : (
             <FlatList
@@ -209,16 +243,18 @@ export function ChatScreen({ conversationId, thamDoMs = THAM_DO_KHUNG_CHAT_MS }:
               contentContainerStyle={{ paddingHorizontal: spacing.card, paddingVertical: 14, gap: 10 }}
               // Danh sách đảo: "cuối" là phía TRÊN — tải thêm tin cũ.
               onEndReachedThreshold={0.3}
-              onEndReached={() => {
-                if (tin.hasNextPage && !tin.isFetchingNextPage) {
-                  void tin.fetchNextPage();
-                }
-              }}
+              // Chốt chặn bấm trùng nằm trong `useMessages` (mục 6 của quy ước).
+              onEndReached={tin.taiTrangKe}
               ListFooterComponent={
                 tin.isFetchingNextPage ? <ActivityIndicator color={colors.accent} /> : null
               }
               ListEmptyComponent={
-                <View style={{ transform: [{ scaleY: -1 }] }}>
+                // KHÔNG tự lật: VirtualizedList đã gắn style đảo (`inversionStyle`) lên
+                // phần tử rỗng qua `cloneElement`. Tự đặt `scaleY: -1` ở đây ĐÈ lên
+                // style đó — trên Android style đảo là `scale: -1` (cả hai trục), nên
+                // chữ bị lật gương. Bọc một `View` trần vì `EmptyState` không nhận
+                // prop `style` mà VirtualizedList gắn vào.
+                <View testID="chat-rong" className="flex-1">
                   <EmptyState
                     title="Chưa có tin nhắn"
                     description={`Gửi lời chào tới ${ten} để bắt đầu trao đổi.`}
@@ -335,31 +371,5 @@ function BongTin({ tin, hienGio, daXem }: { tin: MessageResponse; hienGio: boole
         </Text>
       ) : null}
     </View>
-  );
-}
-
-function NutGui({ disabled, busy, onPress }: { disabled: boolean; busy: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Gửi"
-      accessibilityState={{ disabled: disabled || busy, busy }}
-      disabled={disabled || busy}
-      onPress={onPress}
-      testID="nut-gui-tin"
-      className="items-center justify-center overflow-hidden rounded-full"
-      style={[{ width: 48, height: 48, opacity: disabled ? 0.5 : 1 }, disabled ? null : shadows.button]}
-    >
-      <LinearGradient
-        colors={[gradientButton[0], gradientButton[1]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      {/* Bọc trong View: trên web, phần tử có `position` mới nổi lên trên lớp gradient tuyệt đối. */}
-      <View>
-        {busy ? <ActivityIndicator color={colors.onAccent} /> : <Send size={20} color={colors.onAccent} strokeWidth={2} />}
-      </View>
-    </Pressable>
   );
 }

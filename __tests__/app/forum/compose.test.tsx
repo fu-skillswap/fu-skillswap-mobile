@@ -54,6 +54,7 @@ jest.mock('@/core/auth/AuthProvider', () => ({
     user: null,
     signInWithGoogle: jest.fn(),
     signOut: jest.fn(),
+    taiLaiNguoiDung: jest.fn(),
   }),
 }));
 
@@ -153,6 +154,20 @@ async function dienForm({ chonChuDe = true }: { chonChuDe?: boolean } = {}) {
 }
 
 describe('ComposeScreen — đăng bài mới', () => {
+  it('form nằm trong lớp tránh bàn phím, và chạm khi bàn phím đang mở vẫn ăn ngay', async () => {
+    // Chốt cấu trúc: jest không có layout engine nên không đo được bàn phím có
+    // che ô nhập hay không. Nó giữ cho lớp tránh bàn phím và
+    // `keyboardShouldPersistTaps` không bị gỡ đi lặng lẽ.
+    server.use(topicsOk());
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Hỏi đáp')).toBeTruthy());
+
+    expect(screen.getByTestId('vung-tranh-ban-phim-soan-bai')).toBeTruthy();
+    expect(screen.getByTestId('cuon-soan-bai').props.keyboardShouldPersistTaps).toBe('handled');
+    await donHangDoiDanhSach();
+  });
+
   it('chưa chọn chủ đề thì nút bị khoá và KHÔNG gửi bài nào đi', async () => {
     let soPost = 0;
     server.use(

@@ -5,7 +5,7 @@
  * token nào) thì ra màn hình đăng nhập.
  */
 
-import { useQueryClient } from '@tanstack/react-query';
+import { onlineManager, useQueryClient } from '@tanstack/react-query';
 import React, {
   createContext,
   useCallback,
@@ -17,6 +17,7 @@ import React, {
 } from 'react';
 
 import { refreshSession, setAccessToken, setUnauthenticatedHandler } from '@/core/api/client';
+import { ApiClientError } from '@/core/api/errors';
 import { authRepo } from '@/core/auth/authRepo';
 import { getGoogleIdToken, signOutGoogle } from '@/core/auth/googleSignIn';
 import { decodeIdTokenClaims, describeIdTokenForSpike } from '@/core/auth/idTokenClaims';
@@ -34,6 +35,20 @@ export interface AuthContextValue {
   signInWithGoogle: () => Promise<void>;
   /** Thu hồi phiên ở backend và xoá refresh token đã lưu trên máy */
   signOut: () => Promise<void>;
+  /**
+   * Nạp lại `/api/auth/me` khi một thao tác vừa làm đổi thông tin phiên — ví dụ
+   * lưu hồ sơ học thuật (`hasStudentProfile`) hay vừa được duyệt làm mentor
+   * (`roles`). Lỗi bị nuốt: thông tin cũ vẫn dùng được, lần mở app sau sẽ đúng.
+   */
+  taiLaiNguoiDung: () => Promise<void>;
+}
+
+/**
+ * Lỗi khởi động có nghĩa là refresh token đã chết thật (backend từ chối nó), hay
+ * chỉ là lúc này không gọi được backend (mất mạng, timeout, 5xx).
+ */
+function phienDaChet(error: unknown): boolean {
+  return error instanceof ApiClientError && (error.status === 401 || error.status === 403);
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -81,7 +96,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       void xoaRefreshToken();
     });
 
-    void (async () => {
+    let huyChoMang: (() => void) | undefined;
+    const khoiPhucPhien = async () => {
       try {
         await refreshSession();
         const me = await authRepo.getMe();
@@ -89,17 +105,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(me);
           setStatus('authenticated');
         }
-      } catch {
+      } catch (error) {
         setAccessToken(null);
         if (mounted.current) {
           setUser(null);
           setStatus('unauthenticated');
         }
+        // Mở app lúc mất mạng: refresh token trong keystore vẫn còn tốt (client
+        // chỉ xoá nó khi backend trả 401), nhưng không ai thử lại — người dùng kẹt
+        // ở màn đăng nhập, nơi nút Google cũng cần mạng. Chờ có mạng rồi thử lại
+        // ĐÚNG MỘT lần; nếu trong lúc chờ họ đã tự đăng nhập thì lần thử này chỉ
+        // nạp lại đúng phiên vừa có, vô hại.
+        if (!phienDaChet(error) && mounted.current && !huyChoMang) {
+          huyChoMang = onlineManager.subscribe((online) => {
+            if (online && huyChoMang) {
+              huyChoMang();
+              void khoiPhucPhien();
+            }
+          });
+        }
       }
-    })();
+    };
+    void khoiPhucPhien();
 
     return () => {
       mounted.current = false;
+      huyChoMang?.();
       setUnauthenticatedHandler(undefined);
     };
   }, [queryClient]);
@@ -159,9 +190,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [queryClient]);
 
+  const taiLaiNguoiDung = useCallback(async () => {
+    try {
+      const me = await authRepo.getMe();
+      if (mounted.current) {
+        setUser(me);
+      }
+    } catch {
+      // Giữ thông tin cũ — xem JSDoc của `taiLaiNguoiDung`.
+    }
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, signInWithGoogle, signOut }),
-    [status, user, signInWithGoogle, signOut],
+    () => ({ status, user, signInWithGoogle, signOut, taiLaiNguoiDung }),
+    [status, user, signInWithGoogle, signOut, taiLaiNguoiDung],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

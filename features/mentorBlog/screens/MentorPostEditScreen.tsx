@@ -12,6 +12,13 @@
  * - **Kiểm trước khi gửi** đúng các luật của backend: tiêu đề bắt buộc ≤ 220 ký
  *   tự, không có `<`/`>` ngoài khối code, cần nội dung mới đăng được.
  *
+ * ## Bài KHÔNG sửa trên mobile
+ *
+ * Bài đã đăng/lưu trữ (tới được bằng deep link) và bản nháp có ảnh bìa/ảnh OG
+ * chỉ hiện lời giải thích, không hiện form — xem `lyDoKhongSuaDuoc()`. Lưu bản
+ * nháp có ảnh từ đây sẽ âm thầm xoá ảnh, vì backend ghi đè ảnh theo id tài sản
+ * mà response không trả.
+ *
  * Đăng = lưu rồi mới đăng (hai lời gọi). Bài vừa lưu được GIỮ trong state trước
  * khi đăng: bước đăng hỏng thì lần bấm lại sửa đúng bài đó chứ không tạo bài mới.
  */
@@ -25,6 +32,7 @@ import { toUserMessage } from '@/core/api/errors';
 import { BottomBar } from '@/core/ui/BottomBar';
 import { Button } from '@/core/ui/Button';
 import { Chip } from '@/core/ui/Chip';
+import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
@@ -32,7 +40,14 @@ import { ScreenHeader } from '@/core/ui/ScreenHeader';
 import { TextField } from '@/core/ui/TextField';
 import { colors, fonts, spacing } from '@/core/ui/theme';
 import type { BanNhapBaiViet } from '@/features/mentorBlog/baiViet';
-import { banNhapRong, banNhapTuBai, kiemBaiViet, PHAM_VI, taoYeuCauBaiViet } from '@/features/mentorBlog/baiViet';
+import {
+  banNhapRong,
+  banNhapTuBai,
+  kiemBaiViet,
+  lyDoKhongSuaDuoc,
+  PHAM_VI,
+  taoYeuCauBaiViet,
+} from '@/features/mentorBlog/baiViet';
 import { useMyBlogPost, usePublishBlogPost, useSaveBlogPost } from '@/features/mentorBlog/hooks/useMentorBlog';
 import type { MentorBlogPostDetailResponse } from '@/features/mentorBlog/types';
 import { useMyServices } from '@/features/mentorMode/hooks/useMentorStudio';
@@ -52,13 +67,24 @@ export function MentorPostEditScreen({ postId }: MentorPostEditScreenProps) {
   const [banNhap, setBanNhap] = useState<BanNhapBaiViet | null>(postId === null ? banNhapRong() : null);
   /** Bài đã có trên server (bản gốc, hoặc bản vừa lưu ở lần bấm trước) */
   const [baiHienTai, setBaiHienTai] = useState<MentorBlogPostDetailResponse | null>(null);
+  /**
+   * Lý do không cho sửa, chốt MỘT lần lúc nạp bài gốc. Không tính lại theo
+   * `baiGoc.data` mỗi lần render: sau khi "Đăng bài" thành công, query bài được
+   * làm mới thành PUBLISHED và màn sẽ nháy sang lời giải thích trước khi rời đi.
+   */
+  const [lyDoKhoa, setLyDoKhoa] = useState<string | null>(null);
 
   useEffect(() => {
-    if (banNhap === null && baiGoc.data) {
+    if (banNhap === null && lyDoKhoa === null && baiGoc.data) {
+      const lyDo = lyDoKhongSuaDuoc(baiGoc.data);
+      if (lyDo) {
+        setLyDoKhoa(lyDo);
+        return;
+      }
       setBanNhap(banNhapTuBai(baiGoc.data));
       setBaiHienTai(baiGoc.data);
     }
-  }, [banNhap, baiGoc.data]);
+  }, [banNhap, lyDoKhoa, baiGoc.data]);
 
   const kiem = useMemo(() => (banNhap ? kiemBaiViet(banNhap) : null), [banNhap]);
   const dangGui = luu.isPending || dang.isPending;
@@ -73,6 +99,21 @@ export function MentorPostEditScreen({ postId }: MentorPostEditScreenProps) {
           <ScreenHeader title="Chỉnh sửa bản nháp" onBack={roiMan} />
         </View>
         <ErrorView error={baiGoc.error} onAction={() => void baiGoc.refetch()} />
+      </Screen>
+    );
+  }
+  if (lyDoKhoa) {
+    return (
+      <Screen testID="man-hinh-soan-bai">
+        <View className="px-gutter pt-2">
+          <ScreenHeader title="Chỉnh sửa bài viết" onBack={roiMan} />
+        </View>
+        <EmptyState
+          title="Không chỉnh sửa được trên ứng dụng"
+          description={lyDoKhoa}
+          actionLabel="Quay lại"
+          onAction={roiMan}
+        />
       </Screen>
     );
   }

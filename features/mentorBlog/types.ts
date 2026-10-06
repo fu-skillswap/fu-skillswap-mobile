@@ -45,14 +45,23 @@ export interface MentorBlogPostDetailResponse {
 }
 
 /**
- * `MentorBlogPostCreateRequest.java`. App không gửi ảnh bìa, danh mục hay thẻ —
- * bản web cũng không; backend nhận `null` cho các trường đó.
+ * `MentorBlogPostCreateRequest.java`.
+ *
+ * `MentorBlogService.apply()` ghi đè MỌI trường không điều kiện: thiếu
+ * `categoryIds`/`tagIds` là XOÁ hết danh mục/thẻ, thiếu `coverAssetId`/`ogAssetId`
+ * là xoá ảnh bìa/ảnh OG. Vì vậy danh mục và thẻ là trường BẮT BUỘC ở đây (gửi lại
+ * đúng id đang có), còn hai id ảnh app không có cách nào biết — response không
+ * trả chúng — nên bài có ảnh không được sửa trên mobile (xem `lyDoKhongSuaDuoc`).
  */
 export interface MentorBlogPostCreateRequest {
   title: string;
   excerpt: string | null;
   contentMarkdown: string | null;
   visibility: BlogVisibility;
+  /** Gửi lại id danh mục đang có; mảng rỗng = bài không có danh mục */
+  categoryIds: string[];
+  /** Gửi lại id thẻ đang có; mảng rỗng = bài không có thẻ */
+  tagIds: string[];
   /** BẮT BUỘC có ít nhất một khi `visibility = BOOKED_MEMBERS` (luật lúc đăng) */
   entitledServiceIds: string[];
 }

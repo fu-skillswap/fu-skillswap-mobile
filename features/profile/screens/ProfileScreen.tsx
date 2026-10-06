@@ -31,7 +31,8 @@
 
 import { useRouter } from 'expo-router';
 import { ArrowLeftRight, ChevronRight, LogOut } from 'lucide-react-native';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { trangThaiTai } from '@/core/api/queryState';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -101,13 +102,29 @@ export function ProfileScreen() {
     router.replace('/(tabs)/mentor-dashboard');
   };
 
+  /**
+   * Chốt chặn đăng xuất. `useRef` chứ không chỉ state: hai cú chạm trong cùng
+   * một frame cùng đọc state cũ, và mỗi cú là một `POST /api/auth/logout` nữa.
+   * State chỉ để vẽ vòng quay và khoá hàng.
+   */
+  const dangGuiDangXuat = useRef(false);
+  const [dangDangXuat, setDangDangXuat] = useState(false);
+
   const dangXuat = async () => {
+    if (dangGuiDangXuat.current) {
+      return;
+    }
+    dangGuiDangXuat.current = true;
+    setDangDangXuat(true);
     try {
       await signOut();
     } catch {
       // Phiên cục bộ (cookie, access token, trạng thái) đã được dọn ở nhánh
       // finally của AuthProvider TRƯỚC khi lỗi được ném ra — nuốt lỗi ở đây là
       // đúng, không phải che giấu sự cố.
+    } finally {
+      dangGuiDangXuat.current = false;
+      setDangDangXuat(false);
     }
   };
 
@@ -164,7 +181,13 @@ export function ProfileScreen() {
             ) : null}
           </View>
 
-          {trangThaiHoSo === 'mat-ket-noi' ? (
+          {trangThaiHoSo === 'dang-tai' ? (
+            // Thiếu nhánh này thì lúc đang tải rơi xuống danh sách bên dưới và vẽ
+            // sáu hàng trống trơn như thể hồ sơ không có gì.
+            <View className="items-center py-6">
+              <ActivityIndicator testID="dang-tai-ho-so" color={colors.accent} />
+            </View>
+          ) : trangThaiHoSo === 'mat-ket-noi' ? (
             <EmptyState title="Không có kết nối" description="Hồ sơ sẽ tải khi có mạng trở lại." />
           ) : trangThaiHoSo === 'loi' ? (
             <ErrorView error={hoSo.error} onAction={() => void hoSo.refetch()} />
@@ -260,6 +283,7 @@ export function ProfileScreen() {
             destructive
             icon={<LogOut size={20} color={colors.danger} strokeWidth={2} />}
             onPress={() => void dangXuat()}
+            busy={dangDangXuat}
             testID="nut-dang-xuat"
           />
         </Card>

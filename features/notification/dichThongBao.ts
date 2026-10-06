@@ -119,14 +119,78 @@ export function bieuTuongThongBao(type: string): BieuTuongThongBao {
 }
 
 /**
+ * Loại thông báo booking mà backend CHỈ gửi cho MENTOR của booking (đã đọc từng
+ * chỗ phát trong `modules/booking`): yêu cầu mới (`BookingCreationService`),
+ * mentee đã thanh toán (`BookingPaymentSettlementAdapter`), mentee huỷ
+ * (`BookingCancellationService`).
+ */
+const BOOKING_GUI_MENTOR = new Set(['BOOKING_REQUEST_CREATED', 'BOOKING_PAYMENT_CONFIRMED', 'BOOKING_CANCELLED_BY_MENTEE']);
+
+/**
+ * Loại CHỈ gửi cho MENTEE: chấp nhận / từ chối / tự từ chối (`BookingDecisionService`,
+ * `BookingLifecycleMaintenanceService`), mentor huỷ, cập nhật link phòng học
+ * (`BookingMeetingService`), mời đánh giá (`BookingEngagementService`).
+ *
+ * Mọi loại khác (`BOOKING_RESCHEDULE_*`, `BOOKING_REQUEST_EXPIRED`,
+ * `BOOKING_PAYMENT_EXPIRED`, `SESSION_COMPLETED`, `BOOKING_REMINDER`,
+ * `BOOKING_ISSUE_*`, `GOOGLE_CALENDAR_SYNC_NOTICE`, `FEEDBACK_RECEIVED`) được gửi
+ * cho CẢ HAI phía — `type` không nói được người nhận là ai, nên dùng chế độ đang xem.
+ */
+const BOOKING_GUI_MENTEE = new Set([
+  'BOOKING_ACCEPTED',
+  'BOOKING_REJECTED',
+  'BOOKING_AUTO_REJECTED',
+  'BOOKING_CANCELLED_BY_MENTOR',
+  'MEETING_LINK_UPDATED',
+  'FEEDBACK_PROMPT',
+]);
+
+/** Phía nhận một loại thông báo booking; `null` khi loại đó gửi cho cả hai phía */
+export function phiaNhanThongBaoBooking(type: string): AppRoleMode | null {
+  if (BOOKING_GUI_MENTOR.has(type)) {
+    return 'MENTOR';
+  }
+  if (BOOKING_GUI_MENTEE.has(type)) {
+    return 'MENTEE';
+  }
+  return null;
+}
+
+/**
+ * Chế độ cần đứng để mở một thông báo booking, hoặc `null` nếu thông báo không
+ * phải booking.
+ *
+ * Ưu tiên phía nhận suy từ `type` — mentor đang ở chế độ Mentee bấm "Bạn có yêu
+ * cầu đặt lịch mới" phải tới màn xử lý yêu cầu, không phải tab Lịch hẹn của
+ * mentee (nơi booking đó không hề có). Phía đó phải là chế độ tài khoản CÓ; nếu
+ * không (ví dụ đã bị gỡ quyền mentor), hoặc loại gửi cho cả hai phía, thì dùng
+ * chế độ đang xem.
+ */
+export function cheDoChoThongBao(
+  n: NotificationResponse,
+  cheDo: AppRoleMode | null,
+  cheDoKhaDung: readonly AppRoleMode[] = ['MENTEE', 'MENTOR'],
+): AppRoleMode | null {
+  if ((n.relatedEntityType ?? '').toUpperCase() !== 'BOOKING' || !n.relatedEntityId) {
+    return null;
+  }
+  const phia = phiaNhanThongBaoBooking(n.type);
+  return phia && cheDoKhaDung.includes(phia) ? phia : cheDo;
+}
+
+/**
  * Đường dẫn trong app mà thông báo dẫn tới; `null` = không bấm được.
  *
- * Booking có HAI đích tuỳ chế độ đang xem: chế độ Mentor có màn chi tiết booking
- * (`/mentor-booking/<id>`), còn bên Mentee chưa có màn chi tiết nên dẫn về tab
- * Lịch hẹn. Không đoán phía nào từ `type`: cùng một `BOOKING_RESCHEDULE_*` có thể
- * gửi cho cả hai phía.
+ * Booking có HAI đích: phía Mentor có màn chi tiết booking
+ * (`/mentor-booking/<id>`), phía Mentee chưa có màn chi tiết nên dẫn về tab
+ * Lịch hẹn. Phía nào do `cheDoChoThongBao()` quyết; màn hình tự chuyển chế độ
+ * khi phía đó khác chế độ đang xem (tab Lịch hẹn bị ẩn ở chế độ Mentor).
  */
-export function dichThongBao(n: NotificationResponse, cheDo: AppRoleMode | null): Href | null {
+export function dichThongBao(
+  n: NotificationResponse,
+  cheDo: AppRoleMode | null,
+  cheDoKhaDung?: readonly AppRoleMode[],
+): Href | null {
   const id = n.relatedEntityId;
   if (!id) {
     return null;
@@ -137,7 +201,7 @@ export function dichThongBao(n: NotificationResponse, cheDo: AppRoleMode | null)
     case 'FORUM_POST':
       return n.type === 'FORUM_POST_HIDDEN' || n.type === 'FORUM_COMMENT_HIDDEN' ? null : `/forum/${id}`;
     case 'BOOKING':
-      return cheDo === 'MENTOR' ? `/mentor-booking/${id}` : '/(tabs)/bookings';
+      return cheDoChoThongBao(n, cheDo, cheDoKhaDung) === 'MENTOR' ? `/mentor-booking/${id}` : '/(tabs)/bookings';
     default:
       return null;
   }

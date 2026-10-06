@@ -80,7 +80,7 @@ describe('MentorPostsScreen', () => {
   it('đếm "đã đăng · bản nháp", ẩn bài lưu trữ, chỉ bản nháp mới sửa được', async () => {
     await boc(<MentorPostsScreen />);
 
-    await waitFor(() => expect(screen.getByText('1 đã đăng · 1 bản nháp')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('1 đã đăng · 2 bản nháp')).toBeTruthy());
     expect(screen.queryByText('Bài cũ đã lưu trữ')).toBeNull();
     expect(screen.queryByTestId('sua-bai-bp1')).toBeNull();
     expect(screen.getByTestId('sua-bai-bp2')).toBeTruthy();
@@ -99,7 +99,7 @@ describe('MentorPostsScreen', () => {
     await fireEvent.press(screen.getByTestId('nut-xac-nhan-xoa-bai'));
 
     await waitFor(() => expect(screen.queryByTestId('bai-viet-bp1')).toBeNull());
-    expect(screen.getByText('0 đã đăng · 1 bản nháp')).toBeTruthy();
+    expect(screen.getByText('0 đã đăng · 2 bản nháp')).toBeTruthy();
     await donHangDoiDanhSach();
   });
 
@@ -210,6 +210,46 @@ describe('MentorPostEditScreen', () => {
 
     await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
     expect(body).toMatchObject({ expectedVersion: 1, visibility: 'BOOKED_MEMBERS', entitledServiceIds: ['msv1'] });
+    await doiXong();
+  });
+
+  it('lưu bản nháp GIỮ danh mục và thẻ: gửi lại đúng id đang có', async () => {
+    // `MentorBlogService.apply()` coi thiếu `categoryIds`/`tagIds` là xoá hết.
+    let body: Record<string, unknown> | null = null;
+    server.events.on('request:start', async ({ request }) => {
+      if (request.method === 'PUT') {
+        body = (await request.clone().json()) as Record<string, unknown>;
+      }
+    });
+    await boc(<MentorPostEditScreen postId="bp2" />);
+    await waitFor(() => expect(screen.getByTestId('o-tieu-de').props.value).toBe('Template PRD mình dùng khi làm ở Google'));
+
+    await fireEvent.press(screen.getByTestId('nut-luu-nhap'));
+
+    await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
+    expect(body).toMatchObject({ categoryIds: ['cat1'], tagIds: ['tag1'] });
+    await doiXong();
+  });
+
+  it('bản nháp có ảnh bìa: không hiện form, giải thích phải sửa trên web', async () => {
+    await boc(<MentorPostEditScreen postId="bp4" />);
+
+    await waitFor(() => expect(screen.getByText('Không chỉnh sửa được trên ứng dụng')).toBeTruthy());
+    expect(screen.getByText(/có ảnh bìa/)).toBeTruthy();
+    expect(screen.queryByTestId('o-tieu-de')).toBeNull();
+    expect(screen.queryByTestId('nut-luu-nhap')).toBeNull();
+
+    await fireEvent.press(screen.getByText('Quay lại'));
+    expect(mockRouter.back).toHaveBeenCalled();
+    await doiXong();
+  });
+
+  it('bài ĐÃ ĐĂNG mở qua deep link: không hiện form sửa', async () => {
+    await boc(<MentorPostEditScreen postId="bp1" />);
+
+    await waitFor(() => expect(screen.getByText(/Bài này đã đăng/)).toBeTruthy());
+    expect(screen.queryByTestId('o-tieu-de')).toBeNull();
+    expect(screen.queryByTestId('nut-dang-bai')).toBeNull();
     await doiXong();
   });
 });

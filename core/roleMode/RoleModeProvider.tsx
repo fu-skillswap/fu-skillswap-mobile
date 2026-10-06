@@ -92,6 +92,29 @@ export function RoleModeProvider({ children }: { children: ReactNode }) {
     [khoaKhaDung],
   );
 
+  /*
+    Đăng xuất (hoặc đổi sang một tài khoản khác) thì QUÊN lựa chọn của người
+    trước. Lựa chọn lưu theo MÁY chứ không theo tài khoản, nên không dọn ở đây
+    thì tài khoản hai vai đăng nhập kế tiếp trên cùng máy sẽ mở thẳng vào thanh
+    Mentor mà chính họ chưa từng chọn.
+
+    Chỉ phản ứng với lần CHUYỂN từ một người dùng đã biết sang người khác/không
+    ai: lần khởi động nguội đi từ `null` lên người dùng thật, và lúc đó lựa chọn
+    đã lưu chính là của người này (đăng xuất trước đó đã dọn của người cũ).
+    Đặt ở đây chứ không ở `AuthProvider` để vòng đời của lựa chọn vai trò nằm
+    trọn trong `core/roleMode/`.
+  */
+  const maNguoiDung = user?.publicId ?? null;
+  const maNguoiDungTruoc = useRef<string | null>(maNguoiDung);
+  useEffect(() => {
+    const truoc = maNguoiDungTruoc.current;
+    maNguoiDungTruoc.current = maNguoiDung;
+    if (truoc !== null && truoc !== maNguoiDung) {
+      setDaLuu(null);
+      void xoaCheDoVaiTro();
+    }
+  }, [maNguoiDung]);
+
   useEffect(() => {
     if (ketQua.daLuuKhongHopLe) {
       // Dọn giá trị chết. KHÔNG gọi kèm `setDaLuu(null)`: `ketQua.cheDo` đã là

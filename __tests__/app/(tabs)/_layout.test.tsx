@@ -70,6 +70,7 @@ function authValue(overrides: Partial<AuthContextValue>): AuthContextValue {
     user: null,
     signInWithGoogle: jest.fn(),
     signOut: jest.fn(),
+    taiLaiNguoiDung: jest.fn(),
     ...overrides,
   };
 }

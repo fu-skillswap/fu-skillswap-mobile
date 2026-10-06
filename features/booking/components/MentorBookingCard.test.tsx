@@ -251,6 +251,24 @@ describe('MentorBookingCard', () => {
     expect(xuLy).toHaveBeenCalledWith(expect.objectContaining({ bookingId: 'b7' }));
   });
 
+  it('booking ĐÃ XỬ LÝ (không còn canAccept/canReject) vẫn mở được chi tiết từ hàng đầu', async () => {
+    // `MentorBookings.dc.html` dòng 33: mọi thẻ dẫn sang MentorBookingDetail —
+    // nơi duy nhất có "Hoàn tất buổi học" cho chip "Chờ bạn xác nhận".
+    const moChiTiet = jest.fn();
+    await render(
+      <MentorBookingCard
+        booking={taoBooking({ bookingId: 'b8', bookingStatus: 'CONFIRMED', canCompleteByMentor: true })}
+        onCheckIn={jest.fn()}
+        onMoPhongHoc={jest.fn()}
+        onMoChiTiet={moChiTiet}
+      />,
+    );
+
+    await fireEvent.press(screen.getByTestId('mo-chi-tiet-b8'));
+
+    expect(moChiTiet).toHaveBeenCalledWith(expect.objectContaining({ bookingId: 'b8' }));
+  });
+
   it('KHÔNG dựng lối thanh toán nào, kể cả khi canPay đúng', async () => {
     // Mục 4.1 của quy ước: bản mobile chỉ xem và tiêu.
     await renderCard({

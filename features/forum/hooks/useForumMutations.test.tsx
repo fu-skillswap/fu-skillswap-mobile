@@ -17,6 +17,7 @@ import {
   useUpdatePost,
 } from '@/features/forum/hooks/useForumMutations';
 import {
+  useCommentReplies,
   useForumComments,
   useForumList,
   useForumPost,
@@ -74,6 +75,7 @@ function comment(commentId: string, overrides: Record<string, unknown> = {}) {
     createdAt: '2026-09-22T00:00:00Z',
     updatedAt: '2026-09-22T00:00:00Z',
     imageUrls: [],
+    replyCount: 0,
     ...overrides,
   };
 }
@@ -1138,6 +1140,129 @@ describe('useReport', () => {
     } finally {
       await act(async () => {
         onlineManager.setOnline(true);
+      });
+    }
+    await nhuongMotNhip();
+  });
+});
+
+describe('luồng reply (backend trả reply ở endpoint riêng)', () => {
+  function renderHookLuongPhanHoi() {
+    return renderHook(
+      () => ({
+        binhLuan: useForumComments('p1'),
+        phanHoi: useCommentReplies('p1', 'c1'),
+        likeBinhLuan: useToggleCommentLike('p1'),
+        taoBinhLuan: useCreateComment('p1'),
+      }),
+      { wrapper },
+    );
+  }
+
+  it('thả tim bình luận gốc GIỮ replyCount — phản hồi like của backend luôn trả 0', async () => {
+    server.use(
+      feedOk([]),
+      baiVietOk(),
+      binhLuanOk([comment('c1', { replyCount: 2 })]),
+      http.get(`${BASE}/api/forum/comments/c1/replies`, () =>
+        HttpResponse.json(envelope(cursorPage([]))),
+      ),
+      http.put(`${BASE}/api/forum/comments/c1/reaction`, () =>
+        HttpResponse.json(
+          envelope(comment('c1', { reactedByCurrentUser: true, reactionCount: 9, replyCount: 0 })),
+        ),
+      ),
+    );
+
+    const { result } = await renderHookLuongPhanHoi();
+    await waitFor(() => expect(result.current.binhLuan.comments).toHaveLength(1));
+
+    await act(async () => {
+      result.current.likeBinhLuan.toggle(result.current.binhLuan.comments[0]!);
+    });
+
+    await waitFor(() => expect(result.current.binhLuan.comments[0]?.reactionCount).toBe(9));
+    expect(result.current.binhLuan.comments[0]?.replyCount).toBe(2);
+    await nhuongMotNhip();
+  });
+
+  it('thả tim một REPLY đổi ngay trong luồng reply, không chỉ danh sách gốc', async () => {
+    const chot = taoChot();
+    server.use(
+      feedOk([]),
+      baiVietOk(),
+      binhLuanOk([comment('c1', { replyCount: 1 })]),
+      http.get(`${BASE}/api/forum/comments/c1/replies`, () =>
+        HttpResponse.json(envelope(cursorPage([comment('r1', { replyToCommentId: 'c1' })]))),
+      ),
+      http.put(`${BASE}/api/forum/comments/r1/reaction`, async () => {
+        await chot.cho;
+        return HttpResponse.json(
+          envelope(comment('r1', { replyToCommentId: 'c1', reactedByCurrentUser: true, reactionCount: 4 })),
+        );
+      }),
+    );
+
+    const { result } = await renderHookLuongPhanHoi();
+    await waitFor(() => expect(result.current.phanHoi.replies).toHaveLength(1));
+
+    await act(async () => {
+      result.current.likeBinhLuan.toggle(result.current.phanHoi.replies[0]!);
+    });
+
+    expect(result.current.phanHoi.replies[0]?.reactedByCurrentUser).toBe(true);
+    expect(result.current.phanHoi.replies[0]?.reactionCount).toBe(4);
+
+    await act(async () => {
+      chot.mo();
+      await chot.cho;
+    });
+    await nhuongMotNhip();
+  });
+
+  it('gửi reply thì tăng ngay replyCount của gốc và tải lại luồng reply của nó', async () => {
+    const chotTaiLaiGoc = taoChot();
+    let lanLayGoc = 0;
+    let lanLayPhanHoi = 0;
+    server.use(
+      feedOk([]),
+      baiVietOk(),
+      http.get(`${BASE}/api/forum/posts/p1/comments`, async () => {
+        lanLayGoc += 1;
+        // Giữ lần tải lại sau khi gửi đứng yên: số trên màn hình lúc này chỉ có
+        // thể đến từ cú tăng tại chỗ, không phải từ backend.
+        if (lanLayGoc > 1) await chotTaiLaiGoc.cho;
+        return HttpResponse.json(envelope(cursorPage([comment('c1', { replyCount: lanLayGoc > 1 ? 1 : 0 })])));
+      }),
+      http.get(`${BASE}/api/forum/comments/c1/replies`, () => {
+        lanLayPhanHoi += 1;
+        return HttpResponse.json(
+          envelope(
+            cursorPage(lanLayPhanHoi === 1 ? [] : [comment('r1', { replyToCommentId: 'c1' })]),
+          ),
+        );
+      }),
+      http.post(`${BASE}/api/forum/posts/p1/comments`, () =>
+        HttpResponse.json(envelope(comment('r1', { replyToCommentId: 'c1' }))),
+      ),
+    );
+
+    const { result } = await renderHookLuongPhanHoi();
+    await waitFor(() => expect(result.current.phanHoi.isSuccess).toBe(true));
+    expect(result.current.binhLuan.comments[0]?.replyCount).toBe(0);
+
+    try {
+      await act(async () => {
+        await result.current.taoBinhLuan.mutateAsync({ content: 'Dong y', replyToCommentId: 'c1' });
+      });
+
+      expect(result.current.binhLuan.comments[0]?.replyCount).toBe(1);
+      await waitFor(() => expect(result.current.phanHoi.replies).toHaveLength(1));
+    } finally {
+      // Mở chốt cả khi assertion hỏng — để nguyên thì request treo và Jest không thoát.
+      await act(async () => {
+        chotTaiLaiGoc.mo();
+        await chotTaiLaiGoc.cho;
       });
     }
     await nhuongMotNhip();

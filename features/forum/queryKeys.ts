@@ -21,4 +21,11 @@ export const forumKeys = {
   posts: (filters: ForumListFilters) => [...forumKeys.postsAll(), filters] as const,
   post: (postId: string) => [...forumKeys.all, 'post', postId] as const,
   comments: (postId: string) => [...forumKeys.all, 'comments', postId] as const,
+  /**
+   * Reply của một bình luận gốc — đặt DƯỚI `comments(postId)` có chủ ý: tải lại
+   * hay huỷ theo tiền tố `comments(postId)` chạm luôn mọi luồng reply của bài,
+   * và cập nhật lạc quan nút thích tìm thấy reply ở cùng nhánh với bình luận gốc.
+   */
+  replies: (postId: string, commentId: string) =>
+    [...forumKeys.comments(postId), 'replies', commentId] as const,
 };

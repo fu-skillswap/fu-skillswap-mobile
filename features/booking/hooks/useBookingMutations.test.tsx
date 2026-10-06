@@ -11,6 +11,7 @@ import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryC
 import {
   useCancelBooking,
   useCheckInBooking,
+  useConfirmBookingByMentee,
 } from '@/features/booking/hooks/useBookingMutations';
 import { bookingKeys } from '@/features/booking/queryKeys';
 
@@ -422,5 +423,93 @@ describe('useCheckInBooking', () => {
 
     expect(invalidate).not.toHaveBeenCalled();
     invalidate.mockRestore();
+  });
+});
+
+describe('useConfirmBookingByMentee', () => {
+  function xacNhanTraVe(ghiNhan: { khoa: (string | null)[]; than: unknown[] }, status = 200) {
+    return http.post(`${BASE}/api/me/bookings/:bookingId/confirm`, async ({ request }) => {
+      ghiNhan.khoa.push(request.headers.get('Idempotency-Key'));
+      ghiNhan.than.push(await request.json());
+      return status === 200
+        ? HttpResponse.json(envelope({ bookingId: 'b5', bookingStatus: 'COMPLETED' }))
+        : HttpResponse.json(
+            { timestamp: 'x', status, code: 'SYS', message: 'Lỗi', data: null },
+            { status },
+          );
+    });
+  }
+
+  it('gửi Idempotency-Key lên đúng endpoint confirm', async () => {
+    // Endpoint mang `@Idempotent`: thiếu header thì MỌI lần xác nhận nhận 400.
+    const ghiNhan = { khoa: [] as (string | null)[], than: [] as unknown[] };
+    server.use(xacNhanTraVe(ghiNhan));
+
+    const { result } = await renderHook(() => useConfirmBookingByMentee(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ bookingId: 'b5' });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(ghiNhan.khoa[0]).toMatch(/^[A-Za-z0-9._~-]{1,100}$/);
+    expect(ghiNhan.than[0]).toEqual({});
+  });
+
+  it('lỗi rồi bấm lại thì dùng lại ĐÚNG key cũ — backend replay, không xác nhận hai lần', async () => {
+    const ghiNhan = { khoa: [] as (string | null)[], than: [] as unknown[] };
+    server.use(xacNhanTraVe(ghiNhan, 500));
+
+    const { result } = await renderHook(() => useConfirmBookingByMentee(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ bookingId: 'b5' });
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    await act(async () => {
+      result.current.mutate({ bookingId: 'b5' });
+    });
+    await waitFor(() => expect(ghiNhan.khoa).toHaveLength(2));
+
+    expect(ghiNhan.khoa[1]).toBe(ghiNhan.khoa[0]);
+  });
+
+  it('thành công thì invalidate CẢ danh sách lẫn phép đếm, và ghi chi tiết mới vào cache', async () => {
+    const ghiNhan = { khoa: [] as (string | null)[], than: [] as unknown[] };
+    server.use(xacNhanTraVe(ghiNhan));
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = await renderHook(() => useConfirmBookingByMentee(), { wrapper });
+    await act(async () => {
+      result.current.mutate({ bookingId: 'b5' });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const khoaDaGoi = invalidate.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+    expect(khoaDaGoi).toContain(JSON.stringify(bookingKeys.listsAll()));
+    expect(khoaDaGoi).toContain(JSON.stringify(bookingKeys.countsAll()));
+    expect(queryClient.getQueryData(bookingKeys.detail('b5'))).toMatchObject({
+      bookingStatus: 'COMPLETED',
+    });
+    invalidate.mockRestore();
+  });
+
+  it('`networkMode: always` — mất mạng thì THẤT BẠI NGAY, không treo', async () => {
+    const ghiNhan = { khoa: [] as (string | null)[], than: [] as unknown[] };
+    server.use(xacNhanTraVe(ghiNhan));
+
+    const { result } = await renderHook(() => useConfirmBookingByMentee(), { wrapper });
+    await act(async () => {
+      onlineManager.setOnline(false);
+    });
+    try {
+      await act(async () => {
+        result.current.mutate({ bookingId: 'b5' });
+      });
+      await waitFor(() => expect(result.current.isPaused).toBe(false));
+      await waitFor(() => expect(result.current.isSuccess || result.current.isError).toBe(true));
+    } finally {
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
   });
 });

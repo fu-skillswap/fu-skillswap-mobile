@@ -28,29 +28,83 @@ import { colors, fonts, radius } from '@/core/ui/theme';
 import { useMyMentorWallet } from '@/features/mentorMode/hooks/useMentorModeQueries';
 import type { LedgerEntryType, WalletTransactionResponse } from '@/features/mentorMode/types';
 
-/** Nhãn giao dịch — đúng chữ bản web (`MentorWalletView.tsx`) dùng */
+/**
+ * Nhãn giao dịch của ví SETTLEMENT mentor, theo nghĩa thật của từng loại trong
+ * `SettlementService.java` (ví mentor chỉ nhận `SettlementEntryType`: RELEASE,
+ * HOLD, PAID_OUT, COMMISSION, ADJUSTMENT, VOID — mapper đổi tên sang
+ * `LedgerEntryType` cùng tên):
+ *
+ * - `RELEASE` là TIỀN VÀO: giải ngân buổi học đã hoàn thành (nguồn `BOOKING`),
+ *   khoá học (`COURSE_ENROLLMENT`) hay phần chia sau xử lý khiếu nại. Bản web gọi
+ *   nó "Hoàn giữ" — sai nghĩa với mentor. Nhãn chi tiết theo nguồn ở `nhanGiaoDich`.
+ * - `HOLD`: giữ tiền cho một yêu cầu rút (số dư đã trừ).
+ * - `VOID`: yêu cầu rút bị huỷ, tiền giữ trả lại số dư.
+ * - `PAID_OUT`: tiền đã chuyển về ngân hàng. `balanceEffectScoin = 0` (số dư đã
+ *   trừ ở bước HOLD), nên số tiền phải lấy từ `amountScoin`.
+ * - `COMMISSION` chỉ ghi vào tài khoản NỀN TẢNG, không xuất hiện ở ví mentor.
+ * - `ISSUE`/`RESERVE`/`CONSUME`/`REFUND` là loại của ví credit mentee — giữ nhãn
+ *   để kiểu đủ, không bao giờ tới đây.
+ */
 export const NHAN_GIAO_DICH: Record<LedgerEntryType, string> = {
-  ISSUE: 'Ghi nhận thu nhập',
+  ISSUE: 'Cộng S-coins',
   RESERVE: 'Tạm giữ',
   CONSUME: 'Đã sử dụng',
-  RELEASE: 'Hoàn giữ',
+  RELEASE: 'Thu nhập',
   REFUND: 'Hoàn tiền',
   ADJUSTMENT: 'Điều chỉnh',
-  HOLD: 'Đang giữ',
-  PAID_OUT: 'Đã rút',
+  HOLD: 'Tạm giữ để rút tiền',
+  PAID_OUT: 'Đã rút về ngân hàng',
   COMMISSION: 'Phí nền tảng',
-  VOID: 'Đã huỷ',
+  VOID: 'Huỷ yêu cầu rút, hoàn số dư',
 };
+
+/** Nhãn một dòng: `RELEASE` nói rõ thu nhập từ đâu */
+export function nhanGiaoDich(gd: WalletTransactionResponse): string {
+  if (!gd.entryType) {
+    return 'Giao dịch';
+  }
+  if (gd.entryType === 'RELEASE') {
+    if (gd.sourceType === 'BOOKING') return 'Thu nhập buổi học';
+    if (gd.sourceType === 'COURSE_ENROLLMENT') return 'Thu nhập khoá học';
+    if (gd.sourceType === 'BOOKING_ISSUE_RESOLUTION') return 'Thu nhập sau xử lý khiếu nại';
+  }
+  return NHAN_GIAO_DICH[gd.entryType];
+}
 
 /** Tông của ô biểu tượng theo chiều tiền */
 type Tong = 'vao' | 'ra' | 'giu';
 
+/**
+ * Chiều tiền, quyết định theo LOẠI trước rồi mới tới dấu của `balanceEffectScoin`:
+ * `PAID_OUT` có ảnh hưởng 0 nhưng là tiền RA, đọc theo dấu sẽ thành "+ 0".
+ */
 export function tongGiaoDich(gd: WalletTransactionResponse): Tong {
-  if (gd.entryType === 'HOLD' || gd.entryType === 'RESERVE') {
-    return 'giu';
+  switch (gd.entryType) {
+    case 'HOLD':
+    case 'RESERVE':
+      return 'giu';
+    case 'PAID_OUT':
+    case 'CONSUME':
+      return 'ra';
+    case 'RELEASE':
+    case 'VOID':
+    case 'ISSUE':
+    case 'REFUND':
+      return 'vao';
+    default: {
+      const anhHuong = gd.balanceEffectScoin ?? gd.amountScoin ?? 0;
+      return anhHuong >= 0 ? 'vao' : 'ra';
+    }
   }
-  const anhHuong = gd.balanceEffectScoin ?? gd.amountScoin ?? 0;
-  return anhHuong >= 0 ? 'vao' : 'ra';
+}
+
+/**
+ * Độ lớn số tiền hiển thị. `PAID_OUT` (và mọi loại có ảnh hưởng 0) lấy
+ * `amountScoin` — số tiền thật của giao dịch.
+ */
+export function soTienGiaoDich(gd: WalletTransactionResponse): number {
+  const anhHuong = gd.balanceEffectScoin ?? 0;
+  return Math.abs(gd.entryType === 'PAID_OUT' || anhHuong === 0 ? (gd.amountScoin ?? 0) : anhHuong);
 }
 
 const MAU_TONG: Record<Tong, { nen: string; chu: string; dau: string }> = {
@@ -132,7 +186,7 @@ export function MentorWalletScreen() {
 function DongGiaoDich({ gd, dau, cuoi }: { gd: WalletTransactionResponse; dau: boolean; cuoi: boolean }) {
   const tong = tongGiaoDich(gd);
   const mau = MAU_TONG[tong];
-  const soTien = Math.abs(gd.balanceEffectScoin ?? gd.amountScoin ?? 0);
+  const soTien = soTienGiaoDich(gd);
   const ngay = nhanNgayNgan(gd.createdAt) ?? dinhDangNgayCoOffset(gd.createdAt);
 
   return (
@@ -150,7 +204,7 @@ function DongGiaoDich({ gd, dau, cuoi }: { gd: WalletTransactionResponse; dau: b
       </View>
       <View className="min-w-0 flex-1 gap-0.5">
         <Text className="text-body text-ink" style={{ fontFamily: fonts.bold }}>
-          {gd.entryType ? NHAN_GIAO_DICH[gd.entryType] : 'Giao dịch'}
+          {nhanGiaoDich(gd)}
         </Text>
         {gd.memo ? (
           <Text numberOfLines={1} className="text-caption text-ink-muted" style={{ fontFamily: fonts.regular }}>

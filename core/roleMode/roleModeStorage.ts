@@ -7,10 +7,11 @@
  *
  * File đó chỉ lo MỘT thứ: refresh token của phiên đăng nhập, và nó là nơi duy
  * nhất trong app chạm vào bộ nhớ bền của phiên. Chế độ vai trò là một lựa chọn
- * GIAO DIỆN, không phải phần của phiên: đăng xuất thì token phải chết, còn lựa
- * chọn "tôi đang làm việc ở chế độ Mentor" thì không có lý do gì phải chết theo
- * (cùng một người đăng nhập lại sẽ muốn về đúng chỗ họ đang làm). Trộn hai thứ
- * vào một file làm cả hai vòng đời dính nhau.
+ * GIAO DIỆN, không phải phần của phiên, và trộn hai thứ vào một file làm cả hai
+ * vòng đời dính nhau. Lựa chọn vẫn bị xoá khi đăng xuất — nhưng việc đó do
+ * `RoleModeProvider` lo (nó theo dõi người dùng đổi), vì lựa chọn lưu theo MÁY:
+ * không xoá thì tài khoản hai vai đăng nhập kế tiếp trên cùng máy sẽ mở thẳng
+ * vào thanh Mentor.
  *
  * ## Vì sao vẫn là `expo-secure-store` chứ không phải AsyncStorage
  *

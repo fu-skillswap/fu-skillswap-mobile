@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { Redirect } from 'expo-router';
 import React from 'react';
 
@@ -63,6 +63,7 @@ function authValue(overrides: Partial<AuthContextValue>): AuthContextValue {
     user: null,
     signInWithGoogle: jest.fn(),
     signOut: jest.fn(),
+    taiLaiNguoiDung: jest.fn(),
     ...overrides,
   };
 }
@@ -113,6 +114,18 @@ describe('LoginScreen', () => {
 
     expect(mockedRedirect).not.toHaveBeenCalled();
     expect(screen.getByText('Đăng nhập với Google')).toBeTruthy();
+  });
+
+  it('nội dung cuộn được và nút Google nằm TRONG vùng cuộn — máy màn ngắn không bị cắt mất nút', async () => {
+    // Logo + hero 330 + chữ + nút cao ~730pt, hơn ~647pt dùng được của iPhone SE.
+    // `flexGrow: 1` giữ `mt-auto` đẩy nút xuống đáy trên máy cao như thiết kế.
+    mockedUseAuth.mockReturnValue(authValue({ status: 'unauthenticated' }));
+
+    await render(<LoginScreen />);
+
+    const cuon = screen.getByTestId('cuon-dang-nhap');
+    expect(cuon.props.contentContainerStyle).toEqual(expect.objectContaining({ flexGrow: 1 }));
+    expect(within(cuon).getByText('Đăng nhập với Google')).toBeTruthy();
   });
 
   it('khối hero có mascot Koko và logo có chữ, cả hai lấy từ ảnh nhận diện', async () => {

@@ -19,4 +19,5 @@ export {
   useMyMentorProfile,
   useMyMentorWallet,
 } from '@/features/mentorMode/hooks/useMentorModeQueries';
+export { useGoogleCalendarStatus } from '@/features/mentorMode/hooks/useMentorStudio';
 export type { MentorProfileResponse, MentorStatus, MentorWalletResponse } from '@/features/mentorMode/types';

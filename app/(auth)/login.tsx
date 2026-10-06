@@ -1,6 +1,6 @@
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { toUserMessage } from '@/core/api/errors';
@@ -74,6 +74,17 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface-page">
+      {/*
+        Logo + hero 330 + ba dòng chữ + nút cao ~730pt, hơn phần dùng được của
+        máy màn ngắn (iPhone SE ~647pt): không cuộn được thì nút Google — lối vào
+        DUY NHẤT của app — bị cắt mất. `flexGrow: 1` giữ khung cao ít nhất bằng
+        màn hình, nên trên máy cao `mt-auto` vẫn đẩy nhóm nút xuống đáy như cũ.
+      */}
+      <ScrollView
+        testID="cuon-dang-nhap"
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+      >
       {/* `Welcome.dc.html`: padding 56/24/40 — phần trên đã do safe area lo. */}
       <View className="flex-1 px-6 pb-10 pt-6">
         {/*
@@ -190,6 +201,7 @@ export default function LoginScreen() {
           */}
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

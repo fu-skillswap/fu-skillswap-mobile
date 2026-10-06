@@ -17,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createQueryClient } from '@/core/api/queryClient';
 import { AuthProvider } from '@/core/auth/AuthProvider';
 import { startMockServerIfEnabled } from '@/core/dev/mockServer';
+import { setupFocusManager } from '@/core/net/appFocus';
 import { setupOnlineManager } from '@/core/net/onlineStatus';
 import { RoleModeProvider } from '@/core/roleMode/RoleModeProvider';
 import { colors } from '@/core/ui/theme';
@@ -47,6 +48,8 @@ export default function RootLayout() {
   });
 
   useEffect(() => setupOnlineManager(), []);
+  // Xuống nền thì dừng polling, quay lại thì tải lại dữ liệu cũ — xem `core/net/appFocus.ts`.
+  useEffect(() => setupFocusManager(), []);
 
   // Chưa nạp xong thì giữ một nền trống đúng màu `surface-page` thay vì render
   // cây với font hệ thống rồi nhảy sang Montserrat — người dùng sẽ thấy chữ

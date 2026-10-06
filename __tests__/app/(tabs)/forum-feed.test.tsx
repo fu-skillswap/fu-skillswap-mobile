@@ -7,7 +7,7 @@ import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
-import { KOKO_READING, LOGO_MARK, LOGO_MARK_NEGATIVE } from '@/core/ui/brand';
+import { KOKO_404, KOKO_READING, LOGO_MARK, LOGO_MARK_NEGATIVE } from '@/core/ui/brand';
 import { ForumFeedScreen } from '@/features/forum';
 import { DO_TRE_TIM_KIEM_MS, loiChao } from '@/features/forum/screens/ForumFeedScreen';
 import { donHangDoiDanhSach, nhuongChoDebounce } from '@/test-utils/nhuongNhip';
@@ -43,6 +43,7 @@ jest.mock('@/core/auth/AuthProvider', () => ({
     user: null,
     signInWithGoogle: jest.fn(),
     signOut: jest.fn(),
+    taiLaiNguoiDung: jest.fn(),
   }),
 }));
 
@@ -321,6 +322,28 @@ describe('ForumFeedScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Bài theo chủ đề')).toBeTruthy());
     expect(topicIdDaGui).toBe('t1');
+    await donHangDoiDanhSach();
+  });
+
+  it('lọc chủ đề mà không ra bài nào thì nói "Không tìm thấy", KHÔNG mời là người đầu tiên', async () => {
+    // Diễn đàn không trống — chỉ là bộ lọc không khớp. "Chưa có bài viết nào /
+    // Hãy là người đầu tiên…" ở đây là nói sai với người dùng.
+    server.use(
+      topicsOk([TOPIC]),
+      http.get(`${BASE}/api/forum/feed`, () => HttpResponse.json(envelope(cursorPage([POST])))),
+      http.get(`${BASE}/api/forum/posts`, () => HttpResponse.json(envelope(cursorPage([])))),
+    );
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy());
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Hỏi đáp', selected: false }));
+
+    await waitFor(() => expect(screen.getByText('Không tìm thấy bài viết')).toBeTruthy());
+    expect(screen.queryByText('Chưa có bài viết nào')).toBeNull();
+    expect(
+      screen.getByTestId('minh-hoa-khong-thay-bai-viet', { includeHiddenElements: true }).props.source,
+    ).toBe(KOKO_404);
     await donHangDoiDanhSach();
   });
 

@@ -6,12 +6,13 @@
  *
  * ## Những gì thiết kế có mà màn này CỐ Ý KHÔNG dựng
  *
- * - **Hàng ghim "Koko · Trợ lý AI"**: backend chưa có API trợ lý AI nào và AI
- *   service chưa triển khai (`EXPO_PUBLIC_AI_URL` trống). Một hàng mở ra khung
- *   chat không trả lời được là nút chết.
  * - **Nút "Tin nhắn mới"**: không có endpoint mở hội thoại tự do. Phòng chat chỉ
  *   được backend tạo khi mentor chấp nhận một booking.
  * - **Chấm xanh "đang hoạt động"**: backend không có API trạng thái trực tuyến.
+ *
+ * Hàng ghim "Koko · TRỢ LÝ AI" (`HangKoko`) nằm ở phần đầu cố định, không trong
+ * danh sách: hộp thư rỗng, đang tải hay mất mạng thì Koko vẫn hỏi được. Nó tự ẩn
+ * khi bản build không có AI.
  *
  * Ô tìm kiếm lọc TẠI CHỖ trên các hội thoại đã tải (backend không có tham số tìm
  * cho hộp thư) — đủ cho hộp thư của một sinh viên, vốn chỉ vài chục hội thoại.
@@ -35,6 +36,7 @@ import { colors, fonts, radius, shadows } from '@/core/ui/theme';
 import { THAM_DO_HOP_THU_MS, useConversations } from '@/features/chat/hooks/useChat';
 import { nhanThoiGianHoiThoai } from '@/features/chat/thoiGian';
 import type { ConversationResponse } from '@/features/chat/types';
+import { HangKoko } from '@/features/koko';
 
 export interface MessagesScreenProps {
   /** Chu kỳ tải lại hộp thư; test truyền `false` */
@@ -93,6 +95,7 @@ export function MessagesScreen({ thamDoMs = THAM_DO_HOP_THU_MS, onBack }: Messag
             style={{ fontFamily: fonts.medium, paddingVertical: 0 }}
           />
         </View>
+        <HangKoko />
       </View>
 
       {trangThai === 'dang-tai' ? (
@@ -128,11 +131,8 @@ export function MessagesScreen({ thamDoMs = THAM_DO_HOP_THU_MS, onBack }: Messag
             />
           )}
           onEndReachedThreshold={0.5}
-          onEndReached={() => {
-            if (query.hasNextPage && !query.isFetchingNextPage) {
-              void query.fetchNextPage();
-            }
-          }}
+          // Chốt chặn bấm trùng nằm trong hook (mục 6 của quy ước).
+          onEndReached={query.taiTrangKe}
           refreshing={query.isRefetching && !query.isFetchingNextPage}
           onRefresh={() => void query.refetch()}
           ListFooterComponent={

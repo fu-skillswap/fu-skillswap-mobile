@@ -1,13 +1,14 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { setupServer } from 'msw/node';
 import React from 'react';
 
 import { __resetApiClientForTests } from '@/core/api/client';
 import { __resetQueryClientForTests, createQueryClient } from '@/core/api/queryClient';
-import { dauTuan, homNayVN, isoNgay } from '@/core/time/lichTuan';
-import { studioMockHandlers } from '@/features/mentorMode/mocks/studioMock';
+import { congNgay, dauTuan, homNayVN, isoNgay } from '@/core/time/lichTuan';
+import { mentorModeKeys } from '@/features/mentorMode/queryKeys';
+import { __resetStudioMockForTests, studioMockHandlers } from '@/features/mentorMode/mocks/studioMock';
 import { MentorScheduleScreen, loiTaoSlot, trangThaiSlot } from '@/features/mentorMode/screens/MentorScheduleScreen';
 import type { MentorManagedSlotResponse } from '@/features/mentorMode/types';
 
@@ -33,6 +34,7 @@ beforeEach(() => {
 afterEach(() => {
   __resetQueryClientForTests(queryClient);
   __resetApiClientForTests();
+  __resetStudioMockForTests();
 });
 afterAll(() => server.close());
 
@@ -118,5 +120,99 @@ describe('MentorScheduleScreen', () => {
     );
 
     await waitFor(() => expect(screen.getByTestId('the-lich-google')).toBeTruthy());
+  });
+});
+
+describe('MentorScheduleScreen — lỗi và trạng thái', () => {
+  it('tắt dịch vụ còn yêu cầu chờ: hỏi lại, rồi gửi kèm rejectPendingBookings', async () => {
+    const bodies: unknown[] = [];
+    server.events.on('request:start', async ({ request }) => {
+      if (request.method === 'PATCH') {
+        bodies.push(await request.clone().json());
+      }
+    });
+    try {
+      await render(
+        <QueryClientProvider client={queryClient}>
+          <MentorScheduleScreen phanYeuCau="dich-vu" />
+        </QueryClientProvider>,
+      );
+      await waitFor(() => expect(screen.getByTestId('cong-tac-msv2')).toBeTruthy());
+
+      await fireEvent(screen.getByTestId('cong-tac-msv2'), 'valueChange', false);
+
+      await waitFor(() => expect(screen.getByTestId('hop-thoai-tat-dich-vu')).toBeTruthy());
+      // KHÔNG còn câu chung "Trạng thái vừa thay đổi" ở đầu danh sách.
+      expect(screen.queryByTestId('loi-doi-trang-thai')).toBeNull();
+
+      await fireEvent.press(screen.getByTestId('nut-tat-va-tu-choi'));
+
+      await waitFor(() => expect(screen.queryByTestId('hop-thoai-tat-dich-vu')).toBeNull());
+      expect(bodies).toEqual([
+        { isActive: false, expectedVersion: 1 },
+        { isActive: false, expectedVersion: 1, rejectPendingBookings: true },
+      ]);
+      await waitFor(() => expect(screen.getAllByText('Đã đóng')).toHaveLength(2));
+    } finally {
+      server.events.removeAllListeners();
+    }
+  });
+
+  it('tắt dịch vụ thành công thì làm mới cache slot (version slot đã tăng)', async () => {
+    queryClient.setQueryData(mentorModeKeys.slots('2000-01-01', '2000-01-07'), []);
+    await render(
+      <QueryClientProvider client={queryClient}>
+        <MentorScheduleScreen phanYeuCau="dich-vu" />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('cong-tac-msv1')).toBeTruthy());
+
+    await fireEvent(screen.getByTestId('cong-tac-msv1'), 'valueChange', false);
+
+    await waitFor(() =>
+      expect(queryClient.getQueryState(mentorModeKeys.slots('2000-01-01', '2000-01-07'))?.isInvalidated).toBe(true),
+    );
+  });
+
+  it('ngừng slot sinh từ lịch lặp: câu lỗi riêng; đóng rồi mở slot khác thì lỗi cũ đã xoá', async () => {
+    await moMan();
+    await waitFor(() => expect(screen.getByTestId('the-lich-google')).toBeTruthy());
+    await fireEvent.press(screen.getByLabelText('Tuần sau'));
+    const thuBa = isoNgay(congNgay(dauTuan(homNayVN()), 8));
+    await fireEvent.press(screen.getByTestId(`ngay-day-${thuBa}`));
+    await waitFor(() => expect(screen.getByTestId(`slot-ms-${thuBa}-sang`)).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId(`slot-ms-${thuBa}-sang`));
+    await fireEvent.press(screen.getByTestId('nut-ngung-slot'));
+    await waitFor(() => expect(screen.getByTestId('loi-ngung-slot')).toHaveTextContent(/lịch lặp hàng tuần/));
+
+    await fireEvent.press(within(screen.getByTestId('hop-thoai-slot')).getByText('Đóng'));
+    const thuHai = isoNgay(congNgay(dauTuan(homNayVN()), 7));
+    await fireEvent.press(screen.getByTestId(`ngay-day-${thuHai}`));
+    await waitFor(() => expect(screen.getByTestId(`slot-ms-${thuHai}-sang`)).toBeTruthy());
+    await fireEvent.press(screen.getByTestId(`slot-ms-${thuHai}-sang`));
+
+    expect(screen.queryByTestId('loi-ngung-slot')).toBeNull();
+  });
+
+  it('mất mạng, chưa có cache: phần Dịch vụ nói "Không có kết nối", lịch không quay mãi', async () => {
+    onlineManager.setOnline(false);
+    try {
+      await render(
+        <QueryClientProvider client={queryClient}>
+          <MentorScheduleScreen phanYeuCau="dich-vu" />
+        </QueryClientProvider>,
+      );
+      await waitFor(() => expect(screen.getByText('Không có kết nối')).toBeTruthy());
+      expect(screen.queryByTestId('dang-tai-dich-vu')).toBeNull();
+
+      await fireEvent.press(screen.getByText('Lịch dạy'));
+      await waitFor(() => expect(screen.getByTestId('slot-mat-ket-noi')).toBeTruthy());
+      expect(screen.queryByTestId('dang-tai-slot')).toBeNull();
+    } finally {
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+    }
   });
 });

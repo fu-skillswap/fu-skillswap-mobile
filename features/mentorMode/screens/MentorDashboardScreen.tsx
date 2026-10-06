@@ -115,6 +115,45 @@ const SO_DONG_SAP_TOI = 3;
  */
 const SO_DONG_XIN_VE = 12;
 
+/**
+ * Trạng thái legacy (`BookingResponse.status`) đã KẾT THÚC — không bao giờ là
+ * "sắp tới" dù giờ bắt đầu còn ở tương lai. Chế độ dashboard của backend trả cả
+ * chúng (xếp nhóm cuối, `BookingRepository.findMyMentorBookingsOrderedByDashboardPriority`).
+ */
+const TRANG_THAI_KET_THUC: ReadonlySet<string> = new Set([
+  'REJECTED',
+  'EXPIRED',
+  'CANCELLED_BY_MENTEE',
+  'CANCELLED_BY_MENTOR',
+  'COMPLETED',
+]);
+
+/**
+ * Buổi "sắp tới": chưa bắt đầu, chưa kết thúc/huỷ, sắp theo GIỜ BẮT ĐẦU tăng
+ * dần. Backend xếp theo nhóm việc-cần-làm trước rồi mới tới giờ, nên giữ thứ tự
+ * đó sẽ đặt một yêu cầu tuần sau lên trên buổi học tối nay.
+ *
+ * So bằng `mocMs` của `docOffsetDateTime()` chứ không `new Date(chuỗi)`.
+ * Booking thiếu `selectedStartTime` bị loại — buổi không có giờ thì không thể
+ * là "sắp tới".
+ */
+export function locBuoiSapToi(
+  bookings: readonly BookingResponse[],
+  bayGioMs: number,
+  soDong: number,
+): BookingResponse[] {
+  return bookings
+    .flatMap((booking) => {
+      const moc = docOffsetDateTime(booking.selectedStartTime);
+      return moc != null && moc.mocMs >= bayGioMs && !TRANG_THAI_KET_THUC.has(booking.status)
+        ? [{ booking, ms: moc.mocMs }]
+        : [];
+    })
+    .sort((a, b) => a.ms - b.ms)
+    .slice(0, soDong)
+    .map((x) => x.booking);
+}
+
 /** Một dòng booking gọn, theo khối "Đặt chỗ sắp tới" của thiết kế */
 function DongBookingGon({ booking, onPress }: { booking: BookingResponse; onPress: () => void }) {
   const ngay = nhanNgayNgan(booking.selectedStartTime);
@@ -186,25 +225,12 @@ export function MentorDashboardScreen() {
   const sapToi = useMentorBookings({ size: SO_DONG_XIN_VE });
 
   /**
-   * Chỉ giữ buổi CHƯA diễn ra.
-   *
-   * Khối này tên là "Đặt chỗ sắp tới", nhưng backend trả cả buổi trong 7 ngày
-   * trước (xem `SO_DONG_XIN_VE`), nên không lọc thì mentor thấy buổi **hôm qua**
-   * nằm dưới tiêu đề "sắp tới" — gặp thật trên máy ảo 05/10/2026.
-   *
-   * So bằng `mocMs` của `docOffsetDateTime()` chứ không `new Date(chuỗi)`: với
-   * chuỗi CÓ offset thì cả hai cho cùng thời điểm, nhưng đi qua một đường đã có
-   * test thì không ai phải nhớ lại là chuỗi nào có offset chuỗi nào không.
-   * Booking thiếu `selectedStartTime` bị loại — một buổi không có giờ thì không
-   * thể là "sắp tới".
+   * Chỉ giữ buổi CHƯA diễn ra và chưa kết thúc — xem `locBuoiSapToi`. Backend
+   * trả cả buổi trong 7 ngày trước (xem `SO_DONG_XIN_VE`), nên không lọc thì
+   * mentor thấy buổi **hôm qua** dưới tiêu đề "sắp tới" (gặp trên máy ảo
+   * 05/10/2026), và cả yêu cầu đã huỷ/bị từ chối.
    */
-  const bayGio = Date.now();
-  const danhSachSapToi = sapToi.bookings
-    .filter((booking) => {
-      const moc = docOffsetDateTime(booking.selectedStartTime);
-      return moc != null && moc.mocMs >= bayGio;
-    })
-    .slice(0, SO_DONG_SAP_TOI);
+  const danhSachSapToi = locBuoiSapToi(sapToi.bookings, Date.now(), SO_DONG_SAP_TOI);
 
   const trangThaiHoSo = trangThaiTai({
     isPaused: hoSo.isPaused,
@@ -396,7 +422,11 @@ export function MentorDashboardScreen() {
           ) : danhSachSapToi.length === 0 ? (
             <Card>
               <Text className="text-caption-lg text-ink-muted" style={{ fontFamily: fonts.medium }}>
-                Chưa có mentee nào đặt lịch với bạn.
+                {/* Có booking mà không buổi nào sắp tới (đều đã qua hoặc đã huỷ):
+                    nói "chưa ai đặt lịch" là sai. */}
+                {sapToi.bookings.length > 0
+                  ? 'Không có buổi nào sắp tới.'
+                  : 'Chưa có mentee nào đặt lịch với bạn.'}
               </Text>
             </Card>
           ) : (

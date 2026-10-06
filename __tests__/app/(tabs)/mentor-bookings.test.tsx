@@ -460,9 +460,10 @@ describe('MentorBookingsScreen', () => {
     await donHangDoiDanhSach();
   });
 
-  it('thẻ booking KHÔNG dẫn đi đâu — MentorBookingDetail chưa tồn tại', async () => {
-    // TEST CANH. Thiết kế cho mỗi thẻ dẫn sang `MentorBookingDetail.dc.html`;
-    // màn đó chưa thuộc đợt này, nên thẻ chỉ là thông tin chứ không phải lối đi.
+  it('bấm hàng đầu của MỌI thẻ (kể cả buổi đã xác nhận) thì mở MentorBookingDetail', async () => {
+    // Thiết kế (`MentorBookings.dc.html` dòng 33) cho mỗi thẻ dẫn sang chi tiết;
+    // trước đây chỉ thẻ đang chờ phản hồi mới đi được, nên buổi "Chờ bạn xác
+    // nhận" không có lối nào tới nút "Hoàn tất buổi học".
     server.use(
       http.get(`${BASE}/api/me/bookings`, () =>
         HttpResponse.json(envelope(trang([dangDenGio()]))),
@@ -472,9 +473,9 @@ describe('MentorBookingsScreen', () => {
     await renderScreen();
     await waitFor(() => expect(screen.getByText('Nguyễn Thu Hà')).toBeTruthy());
 
-    await fireEvent.press(screen.getByTestId('the-booking-mentor-mb1'));
+    await fireEvent.press(screen.getByTestId('mo-chi-tiet-mb1'));
 
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/mentor-booking/mb1');
     await donHangDoiDanhSach();
   });
 });

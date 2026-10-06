@@ -18,7 +18,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -28,6 +30,7 @@ import {
 
 import { toUserMessage } from '@/core/api/errors';
 import { trangThaiTai } from '@/core/api/queryState';
+import { useBuTruBanPhim } from '@/core/ui/banPhim';
 import { Button } from '@/core/ui/Button';
 import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
@@ -44,6 +47,7 @@ const CONTENT_MAX = 5000;
 
 export function ComposeScreen({ postId }: { postId?: string }) {
   const router = useRouter();
+  const buTruBanPhim = useBuTruBanPhim();
   const dangSua = postId !== undefined && postId.length > 0;
 
   const topics = useForumTopics();
@@ -240,7 +244,24 @@ export function ComposeScreen({ postId }: { postId?: string }) {
         </Text>
       </View>
 
-      <ScrollView contentContainerClassName="gap-3 p-4">
+      {/*
+        Ô nội dung nhiều dòng nằm giữa màn, nút "Đăng bài" ở cuối: không có lớp này
+        thì trên iOS bàn phím che mất cả hai. Màn tắt header của Stack nên chỉ cần
+        bù vùng an toàn phía trên — xem `core/ui/banPhim.ts`.
+      */}
+      <KeyboardAvoidingView
+        testID="vung-tranh-ban-phim-soan-bai"
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={buTruBanPhim}
+      >
+      <ScrollView
+        testID="cuon-soan-bai"
+        contentContainerClassName="gap-3 p-4"
+        // Bàn phím đang mở thì cú chạm đầu tiên vào "Đăng bài" hay chip chủ đề
+        // phải ĂN luôn, không chỉ để đóng bàn phím.
+        keyboardShouldPersistTaps="handled"
+      >
         <TextInput
           accessibilityLabel="Tiêu đề bài viết"
           placeholder="Tiêu đề"
@@ -297,6 +318,7 @@ export function ComposeScreen({ postId }: { postId?: string }) {
           testID="nut-dang-bai"
         />
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <Modal
         visible={dangHoiRoiDi}

@@ -43,6 +43,7 @@ import { colors, fonts, radius, spacing } from '@/core/ui/theme';
 import type { BieuTuongThongBao, TongThongBao } from '@/features/notification/dichThongBao';
 import {
   bieuTuongThongBao,
+  cheDoChoThongBao,
   dichThongBao,
   nhanThoiGianThongBao,
   nhomThongBao,
@@ -83,7 +84,7 @@ const TONG: Record<TongThongBao, { nen: string; chu: string }> = {
 
 export function NotificationsScreen({ thamDoMs = THAM_DO_THONG_BAO_MS }: NotificationsScreenProps) {
   const router = useRouter();
-  const { cheDo } = useRoleMode();
+  const { cheDo, cheDoKhaDung, chuyenCheDo } = useRoleMode();
   const query = useNotifications(thamDoMs);
   const danhDau = useMarkNotificationRead();
   const danhDauHet = useMarkAllNotificationsRead();
@@ -101,10 +102,17 @@ export function NotificationsScreen({ thamDoMs = THAM_DO_THONG_BAO_MS }: Notific
     if (!n.read) {
       danhDau.mutate(n.notificationId);
     }
-    const dich = dichThongBao(n, cheDo);
-    if (dich) {
-      router.push(dich);
+    const dich = dichThongBao(n, cheDo, cheDoKhaDung);
+    if (!dich) {
+      return;
     }
+    // Thông báo của phía kia (ví dụ yêu cầu đặt lịch mới khi đang xem chế độ
+    // Mentee): đổi chế độ trước, để quay lại từ đích là về đúng thanh tab.
+    const canCheDo = cheDoChoThongBao(n, cheDo, cheDoKhaDung);
+    if (canCheDo && canCheDo !== cheDo) {
+      chuyenCheDo(canCheDo);
+    }
+    router.push(dich);
   };
 
   return (
@@ -162,16 +170,13 @@ export function NotificationsScreen({ thamDoMs = THAM_DO_THONG_BAO_MS }: Notific
               thongBao={item}
               dau={index === 0}
               cuoi={index === section.data.length - 1}
-              coDich={dichThongBao(item, cheDo) !== null}
+              coDich={dichThongBao(item, cheDo, cheDoKhaDung) !== null}
               onPress={() => moThongBao(item)}
             />
           )}
           onEndReachedThreshold={0.5}
-          onEndReached={() => {
-            if (query.hasNextPage && !query.isFetchingNextPage) {
-              void query.fetchNextPage();
-            }
-          }}
+          // Chốt chặn bấm trùng nằm trong hook (mục 6 của quy ước).
+          onEndReached={query.taiTrangKe}
           refreshing={query.isRefetching && !query.isFetchingNextPage}
           onRefresh={() => void query.refetch()}
           ListFooterComponent={

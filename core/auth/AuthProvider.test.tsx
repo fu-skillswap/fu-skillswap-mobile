@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -92,6 +92,52 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(result.current.status).toBe('authenticated'));
     expect(result.current.user?.publicId).toBe('u-1');
     expect(headerThayDuoc).toBe('rt-con-tot');
+  });
+
+  it('khởi động lúc mất mạng: ra màn đăng nhập, có mạng lại thì tự vào lại bằng token đã lưu', async () => {
+    await luuRefreshToken('rt-con-tot');
+    let matMang = true;
+    server.use(
+      http.post(`${BASE}/api/auth/refresh`, () =>
+        matMang ? HttpResponse.error() : HttpResponse.json(envelope({ accessToken: 'at-1', tokenType: 'Bearer' })),
+      ),
+      http.get(`${BASE}/api/auth/me`, () => HttpResponse.json(envelope(ME))),
+    );
+
+    try {
+      onlineManager.setOnline(false);
+      const { result } = await renderHook(() => useAuth(), { wrapper: createWrapper() });
+      await waitFor(() => expect(result.current.status).toBe('unauthenticated'));
+      // Lỗi mạng không được xoá token còn tốt.
+      expect(await docRefreshToken()).toBe('rt-con-tot');
+
+      matMang = false;
+      await act(async () => {
+        onlineManager.setOnline(true);
+      });
+      await waitFor(() => expect(result.current.status).toBe('authenticated'));
+      expect(result.current.user?.publicId).toBe('u-1');
+    } finally {
+      onlineManager.setOnline(true);
+    }
+  });
+
+  it('taiLaiNguoiDung nạp lại /api/auth/me (ví dụ sau khi lưu hồ sơ học thuật)', async () => {
+    await luuRefreshToken('rt-con-tot');
+    let me = { ...ME, hasStudentProfile: false };
+    server.use(
+      http.post(`${BASE}/api/auth/refresh`, () =>
+        HttpResponse.json(envelope({ accessToken: 'at-1', tokenType: 'Bearer' })),
+      ),
+      http.get(`${BASE}/api/auth/me`, () => HttpResponse.json(envelope(me))),
+    );
+
+    const { result } = await renderHook(() => useAuth(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.user?.hasStudentProfile).toBe(false));
+
+    me = { ...ME, hasStudentProfile: true };
+    await act(() => result.current.taiLaiNguoiDung());
+    expect(result.current.user?.hasStudentProfile).toBe(true);
   });
 
   it('khởi động app: máy chưa lưu token nào thì KHÔNG gọi /api/auth/refresh', async () => {

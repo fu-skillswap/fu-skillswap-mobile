@@ -9,7 +9,7 @@
 
 import type { InfiniteData } from '@tanstack/react-query';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 import type { CursorPageResponse } from '@/core/api/pagination';
 import { flattenPages, getNextCursor } from '@/core/api/pagination';
@@ -22,6 +22,27 @@ export const THAM_DO_THONG_BAO_MS = 30_000;
 
 /** Chu kỳ tải lại số chưa đọc cho chuông */
 export const THAM_DO_SO_CHUA_DOC_MS = 60_000;
+
+/**
+ * Chốt chặn ĐỒNG BỘ cho việc tải trang kế — cùng lý do và cùng cách làm như
+ * `useChotChanTrangKe` của `features/mentor/hooks/useMentorQueries.ts` (bản riêng
+ * vì hai feature không import chéo nhau). Chốt nằm TRONG hook (mục 6 của quy ước).
+ */
+function useChotChanTrangKe(query: {
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => Promise<unknown>;
+}) {
+  const dangTaiTrangKe = useRef(false);
+
+  return () => {
+    if (dangTaiTrangKe.current || !query.hasNextPage || query.isFetchingNextPage) return;
+    dangTaiTrangKe.current = true;
+    void query.fetchNextPage().finally(() => {
+      dangTaiTrangKe.current = false;
+    });
+  };
+}
 
 type TrangThongBao = InfiniteData<CursorPageResponse<NotificationResponse>, string | null>;
 
@@ -36,8 +57,9 @@ export function useNotifications(thamDoMs: number | false = THAM_DO_THONG_BAO_MS
 
   const thongBao = useMemo(() => flattenPages(query.data?.pages), [query.data]);
   const coChuaDoc = useMemo(() => thongBao.some((n) => !n.read), [thongBao]);
+  const taiTrangKe = useChotChanTrangKe(query);
 
-  return { ...query, thongBao, coChuaDoc };
+  return { ...query, thongBao, coChuaDoc, taiTrangKe };
 }
 
 /** Số thông báo chưa đọc — nguồn của chấm báo trên chuông */

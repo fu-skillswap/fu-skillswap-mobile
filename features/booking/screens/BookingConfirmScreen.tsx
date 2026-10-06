@@ -23,12 +23,13 @@
 import { useRouter } from 'expo-router';
 import { CircleCheck, ShieldCheck } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
 import { phanCachNghin } from '@/core/format/soLuong';
 import { dinhDangKhoangGio, dinhDangNgayCoOffset, dinhDangGio, nhanNgayNgan } from '@/core/time/offsetDateTime';
 import { Avatar } from '@/core/ui/Avatar';
+import { useBuTruBanPhim } from '@/core/ui/banPhim';
 import { BottomBar } from '@/core/ui/BottomBar';
 import { KOKO_HAPPY } from '@/core/ui/brand';
 import { BrandImage } from '@/core/ui/BrandImage';
@@ -67,6 +68,7 @@ export function BookingConfirmScreen({
   const duThamSo = slotId.length > 0 && serviceId.length > 0 && startAt.length > 0;
   const baoGia = useBookingQuote(duThamSo ? { slotId, serviceId, startAt } : null);
   const taoBooking = useCreateBooking();
+  const buTruBanPhim = useBuTruBanPhim();
 
   const [tieuDe, setTieuDe] = useState('');
   const [moTa, setMoTa] = useState('');
@@ -147,7 +149,15 @@ export function BookingConfirmScreen({
           onAction={quayLaiChonGio}
         />
       ) : (
-        <>
+        // Hai ô mục tiêu nằm giữa màn, nút "Gửi yêu cầu" dính đáy: không có lớp này
+        // thì trên iOS bàn phím che cả hai. Màn nằm trong `Screen`, không có thanh
+        // tiêu đề native — xem `core/ui/banPhim.ts`.
+        <KeyboardAvoidingView
+          testID="vung-tranh-ban-phim-dat-lich"
+          className="flex-1"
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={buTruBanPhim}
+        >
           <ScrollView
             className="flex-1"
             contentContainerClassName="gap-4 px-gutter pb-6"
@@ -211,7 +221,7 @@ export function BookingConfirmScreen({
               />
             }
           />
-        </>
+        </KeyboardAvoidingView>
       )}
     </Screen>
   );

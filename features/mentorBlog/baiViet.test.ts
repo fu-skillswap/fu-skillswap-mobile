@@ -1,4 +1,12 @@
-import { baiDangHoatDong, banNhapRong, demBaiViet, kiemBaiViet, taoYeuCauBaiViet } from '@/features/mentorBlog/baiViet';
+import {
+  baiDangHoatDong,
+  banNhapRong,
+  banNhapTuBai,
+  demBaiViet,
+  kiemBaiViet,
+  lyDoKhongSuaDuoc,
+  taoYeuCauBaiViet,
+} from '@/features/mentorBlog/baiViet';
 import type { MentorBlogPostDetailResponse } from '@/features/mentorBlog/types';
 
 function bai(id: string, ghiDe: Partial<MentorBlogPostDetailResponse> = {}): MentorBlogPostDetailResponse {
@@ -77,8 +85,34 @@ describe('taoYeuCauBaiViet', () => {
       excerpt: null,
       contentMarkdown: null,
       visibility: 'PUBLIC',
+      categoryIds: [],
+      tagIds: [],
       entitledServiceIds: [],
     });
+  });
+
+  it('gửi lại id danh mục và thẻ của bài gốc', () => {
+    const yc = taoYeuCauBaiViet(
+      banNhapTuBai(bai('b', { categories: [{ id: 'cat1', name: 'A' }], tags: [{ id: 'tag1' }, { id: 'tag2' }] })),
+    );
+    expect(yc.categoryIds).toEqual(['cat1']);
+    expect(yc.tagIds).toEqual(['tag1', 'tag2']);
+  });
+});
+
+describe('lyDoKhongSuaDuoc', () => {
+  it('bản nháp không ảnh thì sửa được', () => {
+    expect(lyDoKhongSuaDuoc(bai('b'))).toBeNull();
+  });
+
+  it('bài đã đăng hoặc lưu trữ thì không sửa', () => {
+    expect(lyDoKhongSuaDuoc(bai('b', { status: 'PUBLISHED' }))).toMatch(/đã đăng/);
+    expect(lyDoKhongSuaDuoc(bai('b', { status: 'ARCHIVED' }))).toMatch(/lưu trữ/);
+  });
+
+  it('bản nháp có ảnh bìa hoặc ảnh OG thì không sửa (lưu sẽ xoá ảnh)', () => {
+    expect(lyDoKhongSuaDuoc(bai('b', { coverImageUrl: 'https://x/a.png' }))).toMatch(/ảnh bìa/);
+    expect(lyDoKhongSuaDuoc(bai('b', { ogImageUrl: 'https://x/og.png' }))).toMatch(/ảnh bìa/);
   });
 
   it('đổi khỏi "Mentee đã đặt dịch vụ" thì không gửi dịch vụ đã chọn trước', () => {

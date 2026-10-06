@@ -339,6 +339,15 @@ export interface CancelBookingRequest {
 /** Giới hạn `@Size(max = 1000)` của `CancelBookingRequest.cancelReason` */
 export const LY_DO_HUY_TOI_DA = 1000;
 
+/**
+ * Payload `POST /api/me/bookings/{id}/confirm` (`ConfirmBookingRequest.java`).
+ * Backend nhận thân rỗng (`@RequestBody(required = false)`); ghi chú tối đa 2000
+ * ký tự và được lưu thành `menteeNote`.
+ */
+export interface ConfirmBookingRequest {
+  confirmationNote?: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Luồng đặt lịch: lịch rảnh → candidate → báo giá → tạo booking
 // ---------------------------------------------------------------------------
@@ -504,3 +513,11 @@ export interface RejectBookingRequest {
 export const LINK_PHONG_HOC_TOI_DA = 1000;
 export const DIA_DIEM_TOI_DA = 500;
 export const LY_DO_TU_CHOI_TOI_DA = 2000;
+
+/**
+ * `dto/request/CompleteBookingRequest.java` — mentor xác nhận hoàn tất. Thân
+ * request tuỳ chọn; `completionNote` ≤ 2000 ký tự, chỉ dùng cho lịch sử nội bộ.
+ */
+export interface CompleteBookingRequest {
+  completionNote?: string | null;
+}

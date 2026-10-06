@@ -38,11 +38,13 @@ import {
 } from 'react-native';
 
 import { toUserMessage } from '@/core/api/errors';
+import { trangThaiTai } from '@/core/api/queryState';
 import { phanCachNghin } from '@/core/format/soLuong';
 import { cacNgayTrongTuan, congNgay, dauTuan, homNayVN, isoNgay } from '@/core/time/lichTuan';
 import type { NgayLich } from '@/core/time/lichTuan';
 import { Button } from '@/core/ui/Button';
 import { Chip } from '@/core/ui/Chip';
+import { EmptyState } from '@/core/ui/EmptyState';
 import { ErrorView } from '@/core/ui/ErrorView';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Screen } from '@/core/ui/Screen';
@@ -62,6 +64,7 @@ import {
   useSetServiceActive,
 } from '@/features/mentorMode/hooks/useMentorStudio';
 import { gioVN, instantTuGioVN, nhomSlotMentorTheoNgay } from '@/features/mentorMode/lichDay';
+import { laLoiDichVuConYeuCauCho, moTaLoiNgungSlot, moTaLoiTaoSlot } from '@/features/mentorMode/loiLichDay';
 import type { MentorManagedSlotResponse, MentorServiceManagementResponse } from '@/features/mentorMode/types';
 
 type Phan = 'lich' | 'dich-vu';
@@ -144,7 +147,19 @@ function PhanLichDay({ bayGioMs }: { bayGioMs?: number }) {
   const theoNgay = useMemo(() => nhomSlotMentorTheoNgay(slots.data ?? []), [slots.data]);
   const trongNgay = theoNgay.get(ngay) ?? [];
   const [moThem, setMoThem] = useState(false);
-  const [slotChon, setSlotChon] = useState<MentorManagedSlotResponse | null>(null);
+  const [slotChon, setSlotChonTho] = useState<MentorManagedSlotResponse | null>(null);
+  // Mở/đóng hộp slot thì xoá lỗi của lần trước: lỗi ngừng slot A không được
+  // dính sang hộp của slot B.
+  const setSlotChon = (slot: MentorManagedSlotResponse | null) => {
+    ngung.reset();
+    setSlotChonTho(slot);
+  };
+  const trangThaiSlotTai = trangThaiTai({
+    isPaused: slots.isPaused,
+    isPending: slots.isPending,
+    isError: slots.isError,
+    coDuLieu: slots.data !== undefined,
+  });
 
   const doiTuan = (buoc: number) => {
     const moi = Math.min(SO_TUAN_TOI_DA, Math.max(0, tuan + buoc));
@@ -184,9 +199,21 @@ function PhanLichDay({ bayGioMs }: { bayGioMs?: number }) {
           </Text>
         </View>
 
-        {slots.isPending && slots.fetchStatus !== 'idle' ? (
+        {trangThaiSlotTai === 'dang-tai' ? (
           <ActivityIndicator testID="dang-tai-slot" color={colors.accent} />
-        ) : slots.isError ? (
+        ) : trangThaiSlotTai === 'mat-ket-noi' ? (
+          // Mất mạng khi tuần này chưa có cache: truy vấn bị HOÃN, `isPending`
+          // bật mãi — trước đây vòng quay không bao giờ dừng.
+          <View testID="slot-mat-ket-noi" className="gap-2 rounded-md border border-line bg-surface p-4">
+            <Text className="text-body text-ink" style={{ fontFamily: fonts.bold }}>
+              Không có kết nối
+            </Text>
+            <Text className="text-caption text-ink-muted" style={{ fontFamily: fonts.regular }}>
+              Lịch dạy sẽ tải khi có mạng trở lại.
+            </Text>
+            <Button label="Thử lại" variant="secondary" size="sm" onPress={() => void slots.refetch()} />
+          </View>
+        ) : slots.isError && !slots.data ? (
           <ErrorView error={slots.error} onAction={() => void slots.refetch()} />
         ) : trongNgay.length === 0 ? (
           <View className="rounded-md border border-dashed border-line bg-surface p-4" style={{ borderWidth: 1.5 }}>
@@ -261,8 +288,8 @@ function PhanLichDay({ bayGioMs }: { bayGioMs?: number }) {
               </Text>
             )}
             {ngung.isError ? (
-              <Text className="text-caption-lg text-danger" style={{ fontFamily: fonts.medium }}>
-                {toUserMessage(ngung.error).title}
+              <Text testID="loi-ngung-slot" className="text-caption-lg text-danger" style={{ fontFamily: fonts.medium }}>
+                {moTaLoiNgungSlot(ngung.error)}
               </Text>
             ) : null}
             <Button label="Đóng" variant="secondary" onPress={() => setSlotChon(null)} />
@@ -426,6 +453,15 @@ function HopThemSlot({ mo, ngay, onDong }: { mo: boolean; ngay: NgayLich & { ten
   const [ketThuc, setKetThuc] = useState('10:00');
   const [chon, setChon] = useState<string[]>([]);
   const dangMo = (dichVu.data ?? []).filter((d) => d.isActive);
+
+  // Mỗi lần mở hộp là một lần thêm mới: lỗi "trùng giờ" của lần trước không
+  // được hiện sẵn khi mentor chưa bấm gì.
+  const datLaiTao = tao.reset;
+  useEffect(() => {
+    if (mo) {
+      datLaiTao();
+    }
+  }, [mo, datLaiTao]);
   const loi = loiTaoSlot({ batDau, ketThuc, soDichVu: chon.length, ngay });
 
   const gui = () => {
@@ -497,7 +533,7 @@ function HopThemSlot({ mo, ngay, onDong }: { mo: boolean; ngay: NgayLich & { ten
             className={`text-caption ${tao.isError ? 'text-danger' : 'text-ink-muted'}`}
             style={{ fontFamily: fonts.medium }}
           >
-            {tao.isError ? toUserMessage(tao.error).description : (loi ?? 'Giờ Việt Nam (GMT+7).')}
+            {tao.isError ? moTaLoiTaoSlot(tao.error) : (loi ?? 'Giờ Việt Nam (GMT+7).')}
           </Text>
           <Button
             label="Lưu giờ rảnh"
@@ -521,21 +557,57 @@ function PhanDichVu() {
   const router = useRouter();
   const dichVu = useMyServices();
   const doiTrangThai = useSetServiceActive();
+  /** Dịch vụ đang chờ mentor đồng ý từ chối các yêu cầu còn treo trước khi tắt */
+  const [canXacNhanTat, setCanXacNhanTat] = useState<MentorServiceManagementResponse | null>(null);
+  const trangThai = trangThaiTai({
+    isPaused: dichVu.isPaused,
+    isPending: dichVu.isPending,
+    isError: dichVu.isError,
+    coDuLieu: dichVu.data !== undefined,
+  });
 
-  if (dichVu.isPending && dichVu.fetchStatus !== 'idle') {
+  if (trangThai === 'dang-tai') {
     return (
       <View className="flex-1 items-center justify-center">
         <ActivityIndicator testID="dang-tai-dich-vu" color={colors.accent} />
       </View>
     );
   }
-  if (dichVu.isError || !dichVu.data) {
+  if (trangThai === 'mat-ket-noi') {
+    // Trước đây nhánh này rơi vào `ErrorView` với `error = null`.
+    return (
+      <EmptyState
+        title="Không có kết nối"
+        description="Dịch vụ sẽ tải khi có mạng trở lại."
+        actionLabel="Thử lại"
+        onAction={() => void dichVu.refetch()}
+      />
+    );
+  }
+  if (!dichVu.data) {
     return <ErrorView error={dichVu.error} onAction={() => void dichVu.refetch()} />;
   }
 
+  const doi = (dv: MentorServiceManagementResponse, isActive: boolean, rejectPendingBookings?: boolean) =>
+    doiTrangThai.mutate(
+      { serviceId: dv.serviceId, isActive, expectedVersion: dv.version, ...(rejectPendingBookings ? { rejectPendingBookings } : {}) },
+      {
+        onSuccess: () => setCanXacNhanTat(null),
+        onError: (loi) => {
+          if (!isActive && !rejectPendingBookings && laLoiDichVuConYeuCauCho(loi)) {
+            setCanXacNhanTat(dv);
+          }
+        },
+      },
+    );
+  const dongXacNhan = () => {
+    doiTrangThai.reset();
+    setCanXacNhanTat(null);
+  };
+
   return (
     <ScrollView className="flex-1" contentContainerClassName="gap-3.5 px-gutter pb-28">
-      {doiTrangThai.isError ? (
+      {doiTrangThai.isError && !canXacNhanTat ? (
         <Text testID="loi-doi-trang-thai" className="text-caption-lg text-danger" style={{ fontFamily: fonts.medium }}>
           {toUserMessage(doiTrangThai.error).title}
         </Text>
@@ -545,13 +617,7 @@ function PhanDichVu() {
           key={dv.serviceId}
           dv={dv}
           dangDoi={doiTrangThai.isPending && doiTrangThai.variables?.serviceId === dv.serviceId}
-          onDoi={(isActive) =>
-            doiTrangThai.mutate({
-              serviceId: dv.serviceId,
-              isActive,
-              expectedVersion: dv.version,
-            })
-          }
+          onDoi={(isActive) => doi(dv, isActive)}
           onPress={() => router.push(`/mentor-service/${dv.serviceId}`)}
         />
       ))}
@@ -567,6 +633,32 @@ function PhanDichVu() {
           Tạo dịch vụ mới
         </Text>
       </Pressable>
+
+      <Modal visible={canXacNhanTat !== null} transparent animationType="slide" onRequestClose={dongXacNhan}>
+        <View className="flex-1 justify-end bg-black/40">
+          <View testID="hop-thoai-tat-dich-vu" className="gap-3 rounded-t-lg bg-surface p-4">
+            <Text className="text-base text-ink" style={{ fontFamily: fonts.bold }}>
+              Dịch vụ còn yêu cầu đang chờ
+            </Text>
+            <Text className="text-caption-lg text-ink-body" style={{ fontFamily: fonts.regular }}>
+              {`“${canXacNhanTat?.title ?? ''}” còn yêu cầu đặt lịch chưa phản hồi. Tắt dịch vụ sẽ tự động từ chối các yêu cầu đó và mentee được báo lại.`}
+            </Text>
+            {doiTrangThai.isError && !laLoiDichVuConYeuCauCho(doiTrangThai.error) ? (
+              <Text className="text-caption-lg text-danger" style={{ fontFamily: fonts.medium }}>
+                {toUserMessage(doiTrangThai.error).title}
+              </Text>
+            ) : null}
+            <Button
+              label="Tắt và từ chối các yêu cầu"
+              variant="danger"
+              busy={doiTrangThai.isPending}
+              onPress={() => (canXacNhanTat ? doi(canXacNhanTat, false, true) : undefined)}
+              testID="nut-tat-va-tu-choi"
+            />
+            <Button label="Giữ dịch vụ" variant="secondary" onPress={dongXacNhan} />
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }

@@ -371,6 +371,56 @@ describe('ProfileScreen', () => {
     expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 
+  it('đang đăng xuất thì hàng quay và bị khoá: chạm thêm KHÔNG gọi signOut lần nữa', async () => {
+    server.use(hoSoOk());
+    let xong!: () => void;
+    mockSignOut.mockReturnValue(
+      new Promise<void>((resolve) => {
+        xong = resolve;
+      }),
+    );
+
+    await renderScreen();
+    await doiHoSoXong();
+
+    await fireEvent.press(screen.getByTestId('nut-dang-xuat'));
+    await fireEvent.press(screen.getByTestId('nut-dang-xuat'));
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('nut-dang-xuat-dang-chay')).toBeTruthy();
+
+    await act(async () => {
+      xong();
+    });
+    expect(screen.queryByTestId('nut-dang-xuat-dang-chay')).toBeNull();
+  });
+
+  it('hồ sơ ĐANG TẢI thì hiện vòng quay, KHÔNG vẽ các hàng trống', async () => {
+    let mo!: () => void;
+    const cho = new Promise<void>((resolve) => {
+      mo = resolve;
+    });
+    server.use(
+      http.get(`${BASE}/api/me/student-profile`, async () => {
+        await cho;
+        return HttpResponse.json(envelope(HO_SO));
+      }),
+    );
+
+    await renderScreen();
+
+    try {
+      expect(screen.getByTestId('dang-tai-ho-so')).toBeTruthy();
+      expect(screen.queryByText('Mã sinh viên')).toBeNull();
+    } finally {
+      await act(async () => {
+        mo();
+      });
+    }
+    await waitFor(() => expect(screen.getByText('HE180001')).toBeTruthy());
+    await doiHoSoXong();
+  });
+
   it('signOut ném lỗi thì màn hình KHÔNG sập', async () => {
     // Phiên cục bộ đã được AuthProvider dọn ở nhánh finally trước khi lỗi ném
     // ra, nên nuốt lỗi ở đây là đúng — nhưng phải chắc là nó được nuốt thật.

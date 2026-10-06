@@ -83,6 +83,30 @@ describe('apiClient', () => {
     await expect(apiClient('/api/bookings/b1/feedback')).resolves.toBeNull();
   });
 
+  it('envelope VẮNG khoá data (backend @JsonInclude NON_NULL) thì trả null, không trả cả envelope', async () => {
+    server.use(
+      http.post(`${BASE}/api/me/bookings/b1/confirm`, () =>
+        HttpResponse.json({
+          timestamp: '2026-09-20T00:00:00Z',
+          status: 200,
+          code: 'SUCCESS_0200',
+          message: 'Thành công',
+        }),
+      ),
+    );
+
+    await expect(apiClient('/api/me/bookings/b1/confirm', { method: 'POST' })).resolves.toBeNull();
+  });
+
+  it('JSON trần không bọc envelope (AI service /v1/chat) thì trả nguyên văn', async () => {
+    const phanHoi = { content: 'Chào bạn', requestId: 'req-1', sourcesUsed: ['a'] };
+    server.use(http.post('https://ai.test/v1/chat', () => HttpResponse.json(phanHoi)));
+
+    await expect(
+      apiClient('/v1/chat', { method: 'POST', baseURL: 'https://ai.test', data: {} }),
+    ).resolves.toEqual(phanHoi);
+  });
+
   it('đính kèm Authorization khi đã có access token', async () => {
     let seen: string | null = null;
     server.use(
@@ -243,6 +267,39 @@ describe('apiClient', () => {
 
     await expect(apiClient('/api/auth/me')).rejects.toBeInstanceOf(ApiClientError);
     expect(onUnauthenticated).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['mất mạng', () => HttpResponse.error()],
+    ['lỗi 503', () => HttpResponse.json(envelope(null, { status: 503, code: 'SYS_5030' }), { status: 503 })],
+  ])('refresh gặp %s thì KHÔNG đăng xuất, request gốc bị từ chối', async (_ten, traLoiRefresh) => {
+    const onUnauthenticated = jest.fn();
+    server.use(
+      http.get(`${BASE}/api/auth/me`, () =>
+        HttpResponse.json(envelope(null, { status: 401, code: 'AUTH_1001' }), { status: 401 }),
+      ),
+      http.post(`${BASE}/api/auth/refresh`, traLoiRefresh),
+    );
+    setAccessToken('token-cu');
+    setUnauthenticatedHandler(onUnauthenticated);
+
+    await expect(apiClient('/api/auth/me')).rejects.toBeInstanceOf(ApiClientError);
+    expect(onUnauthenticated).not.toHaveBeenCalled();
+  });
+
+  it('lỗi dạng FastAPI `{ detail }` (AI service) thì lấy `detail` làm thông điệp', async () => {
+    server.use(
+      http.post('https://ai.test/v1/chat', () =>
+        HttpResponse.json({ detail: 'Bạn đã hỏi khá nhiều trong một giờ qua, thử lại sau nhé.' }, { status: 429 }),
+      ),
+    );
+
+    const loi = await apiClient('/v1/chat', { method: 'POST', baseURL: 'https://ai.test', data: {} }).catch(
+      (e: unknown) => e,
+    );
+    expect(loi).toBeInstanceOf(ApiClientError);
+    expect((loi as ApiClientError).status).toBe(429);
+    expect((loi as ApiClientError).message).toBe('Bạn đã hỏi khá nhiều trong một giờ qua, thử lại sau nhé.');
   });
 
   it('không tự refresh cho chính các endpoint auth', async () => {

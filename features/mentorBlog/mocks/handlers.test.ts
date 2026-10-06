@@ -38,6 +38,8 @@ describe('handler mock blog của mentor', () => {
       excerpt: null,
       contentMarkdown: 'Nội dung',
       visibility: 'PUBLIC',
+      categoryIds: [],
+      tagIds: [],
       entitledServiceIds: [],
     });
     expect(nhap.status).toBe('DRAFT');
@@ -58,9 +60,43 @@ describe('handler mock blog của mentor', () => {
       excerpt: null,
       contentMarkdown: null,
       visibility: 'PUBLIC',
+      categoryIds: [],
+      tagIds: [],
       entitledServiceIds: [],
     });
 
     await expect(mentorBlogRepo.publish(nhap.id, { expectedVersion: nhap.version })).rejects.toBeInstanceOf(ApiClientError);
+  });
+
+  it('PUT ghi đè như backend: thiếu id danh mục/thẻ/ảnh là XOÁ, gửi lại id thì giữ', async () => {
+    const goc = await mentorBlogRepo.get('bp2');
+    expect(goc.categories.map((c) => c.id)).toEqual(['cat1']);
+    expect(goc.tags.map((t) => t.id)).toEqual(['tag1']);
+
+    const giu = await mentorBlogRepo.update('bp2', {
+      expectedVersion: goc.version,
+      title: goc.title,
+      excerpt: goc.excerpt,
+      contentMarkdown: goc.contentMarkdown,
+      visibility: goc.visibility,
+      categoryIds: ['cat1'],
+      tagIds: ['tag1'],
+      entitledServiceIds: goc.entitledServiceIds,
+    });
+    expect(giu.categories.map((c) => c.id)).toEqual(['cat1']);
+    expect(giu.tags.map((t) => t.id)).toEqual(['tag1']);
+
+    const xoa = await mentorBlogRepo.update('bp2', {
+      expectedVersion: giu.version,
+      title: goc.title,
+      excerpt: goc.excerpt,
+      contentMarkdown: goc.contentMarkdown,
+      visibility: goc.visibility,
+      categoryIds: [],
+      tagIds: [],
+      entitledServiceIds: goc.entitledServiceIds,
+    });
+    expect(xoa.categories).toEqual([]);
+    expect(xoa.tags).toEqual([]);
   });
 });

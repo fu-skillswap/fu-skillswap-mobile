@@ -77,11 +77,15 @@ function dichVu(
   };
 }
 
-let MOCK_DICH_VU: MentorServiceManagementResponse[] = [
-  dichVu('msv1', 'Review CV 1:1', 45, 150_000),
-  dichVu('msv2', 'Mock interview PM', 60, 250_000),
-  dichVu('msv3', 'Định hướng nghề Product', 30, 0, { isActive: false }),
-];
+function taoDichVu(): MentorServiceManagementResponse[] {
+  return [
+    dichVu('msv1', 'Review CV 1:1', 45, 150_000),
+    dichVu('msv2', 'Mock interview PM', 60, 250_000),
+    dichVu('msv3', 'Định hướng nghề Product', 30, 0, { isActive: false }),
+  ];
+}
+
+let MOCK_DICH_VU: MentorServiceManagementResponse[] = taoDichVu();
 
 function dichVuGanSlot(): SlotServiceBasic[] {
   return MOCK_DICH_VU.filter((d) => d.isActive).map((d) => ({
@@ -150,6 +154,31 @@ function sinhSlot(): MentorManagedSlotResponse[] {
 
 let MOCK_SLOT: MentorManagedSlotResponse[] = sinhSlot();
 
+/**
+ * Slot sinh từ lịch lặp hàng tuần. DTO slot KHÔNG có trường nào nói điều này
+ * (`MentorManagedAvailabilitySlotResponse`), nên mock giữ riêng: ngừng các slot
+ * này mà thiếu `expectedTemplateVersion` thì backend trả 409
+ * `AVAILABILITY_TEMPLATE_VERSION_CONFLICT` (`AVAIL_4302`).
+ */
+function sinhSlotTuLichLap(): Set<string> {
+  return new Set([`ms-${isoNgay(congNgay(dauTuan(homNayVN()), 8))}-sang`]);
+}
+let SLOT_TU_LICH_LAP = sinhSlotTuLichLap();
+
+/** Dịch vụ còn yêu cầu PENDING trong tương lai — tắt nó cần `rejectPendingBookings` */
+let DICH_VU_CO_YEU_CAU_CHO = new Set(['msv2']);
+
+/** Đưa kho studio về ban đầu — chỉ dùng trong test */
+export function __resetStudioMockForTests(): void {
+  MOCK_SLOT = sinhSlot();
+  MOCK_DICH_VU = taoDichVu();
+  SLOT_TU_LICH_LAP = sinhSlotTuLichLap();
+  DICH_VU_CO_YEU_CAU_CHO = new Set(['msv2']);
+}
+
+/** `MentorAvailabilityService.MAXIMUM_PARENT_SLOT_DURATION_MINUTES` */
+const SLOT_DAI_TOI_DA_MS = 720 * 60_000;
+
 const MOCK_LICH_GOOGLE: GoogleCalendarStatusResponse = {
   connected: false,
   syncEnabled: false,
@@ -187,9 +216,13 @@ export const studioMockHandlers = [
     if (bd <= Date.now()) {
       return loi(400, 'SYS_0001', 'Không thể tạo slot trong quá khứ');
     }
+    if (kt - bd > SLOT_DAI_TOI_DA_MS) {
+      // `validateParentSlotDuration`: BAD_REQUEST mang MÃ THÔ làm message.
+      return loi(400, 'SYS_0002', 'AVAILABILITY_RANGE_TOO_LARGE');
+    }
     const trung = MOCK_SLOT.some((s) => s.isActive && Date.parse(s.startAt) < kt && Date.parse(s.endAt) > bd);
     if (trung) {
-      return loi(409, 'BOOK_4093', 'Khung giờ bị trùng với một slot đang mở');
+      return loi(409, 'SYS_0007', 'Khung giờ này đã bị trùng lặp với lịch rảnh khác của bạn');
     }
     const moi: MentorManagedSlotResponse = {
       ...slotMau(`ms-moi-${MOCK_SLOT.length + 1}`, { nam: 2000, thang: 1, ngay: 1 }, [0, 0, 0, 0]),
@@ -207,9 +240,12 @@ export const studioMockHandlers = [
     if (!slot) {
       return loi(404, 'SYS_0003', 'Không tìm thấy slot');
     }
-    const body = (await request.json()) as { expectedVersion?: number };
+    const body = (await request.json()) as { expectedVersion?: number; expectedTemplateVersion?: number | null };
+    if (SLOT_TU_LICH_LAP.has(slot.slotId) && body.expectedTemplateVersion == null) {
+      return loi(409, 'AVAIL_4302', 'Availability template đã được cập nhật');
+    }
     if (body.expectedVersion !== slot.version) {
-      return loi(409, 'SYS_0004', 'Slot vừa thay đổi, vui lòng tải lại');
+      return loi(409, 'SYS_0007', 'AVAILABILITY_SLOT_VERSION_CONFLICT');
     }
     if (slot.deactivation?.mode !== 'ALLOWED') {
       return loi(409, 'BOOK_4094', 'Slot đã có lịch được chốt, không thể ngừng');
@@ -275,9 +311,22 @@ export const studioMockHandlers = [
     if (!dv) {
       return loi(404, 'SYS_0003', 'Không tìm thấy dịch vụ');
     }
-    const body = (await request.json()) as { isActive?: boolean; expectedVersion?: number };
+    const body = (await request.json()) as { isActive?: boolean; expectedVersion?: number; rejectPendingBookings?: boolean };
     if (body.expectedVersion !== dv.version) {
       return loi(409, 'SYS_0004', 'Dịch vụ vừa được sửa ở nơi khác, vui lòng tải lại');
+    }
+    if (body.isActive !== true) {
+      // `MentorServiceRetirementPortImpl.retireFutureOffers()`.
+      if (DICH_VU_CO_YEU_CAU_CHO.has(dv.serviceId) && body.rejectPendingBookings !== true) {
+        return loi(409, 'SYS_0007', 'SERVICE_HAS_PENDING_BOOKINGS');
+      }
+      DICH_VU_CO_YEU_CAU_CHO.delete(dv.serviceId);
+      // Gỡ dịch vụ khỏi slot tương lai và tăng version của slot đó.
+      MOCK_SLOT = MOCK_SLOT.map((s) =>
+        Date.parse(s.startAt) > Date.now() && s.services.some((x) => x.serviceId === dv.serviceId)
+          ? { ...s, services: s.services.filter((x) => x.serviceId !== dv.serviceId), version: (s.version ?? 0) + 1 }
+          : s,
+      );
     }
     const daDoi = { ...dv, isActive: body.isActive === true, version: dv.version + 1 };
     MOCK_DICH_VU = MOCK_DICH_VU.map((d) => (d.serviceId === dv.serviceId ? daDoi : d));

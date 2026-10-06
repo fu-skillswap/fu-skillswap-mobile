@@ -33,6 +33,33 @@ export const THAM_DO_HOP_THU_MS = 20_000;
 /** Số tin mỗi lần tải — backend mặc định 30, tối đa 50 */
 const SO_TIN_MOI_LAN = 30;
 
+/**
+ * Chốt chặn ĐỒNG BỘ cho việc tải trang kế — cùng lý do và cùng cách làm như
+ * `useChotChanTrangKe` của `features/mentor/hooks/useMentorQueries.ts` (bản riêng
+ * vì hai feature không import chéo nhau): FlatList bắn `onEndReached` nhiều lần
+ * trong cùng một frame, và guard dựa vào `isFetchingNextPage` đọc cùng một giá
+ * trị `false` của lần render cũ ở cả hai lần gọi — cùng một trang bị xin hai
+ * lượt. Ref đổi ngay lập tức nên lần gọi thứ hai bị chặn.
+ *
+ * Chốt nằm TRONG hook (mục 6 của quy ước): màn hình nối thẳng `taiTrangKe` vào
+ * `onEndReached`, không tự dựng lại.
+ */
+function useChotChanTrangKe(query: {
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => Promise<unknown>;
+}) {
+  const dangTaiTrangKe = useRef(false);
+
+  return () => {
+    if (dangTaiTrangKe.current || !query.hasNextPage || query.isFetchingNextPage) return;
+    dangTaiTrangKe.current = true;
+    void query.fetchNextPage().finally(() => {
+      dangTaiTrangKe.current = false;
+    });
+  };
+}
+
 /** Hộp thư, cuộn tới đâu tải tới đó */
 export function useConversations(thamDoMs: number | false = THAM_DO_HOP_THU_MS) {
   const query = useInfiniteQuery({
@@ -48,8 +75,9 @@ export function useConversations(thamDoMs: number | false = THAM_DO_HOP_THU_MS) 
     () => hoiThoai.reduce((tong, h) => tong + h.unreadCount, 0),
     [hoiThoai],
   );
+  const taiTrangKe = useChotChanTrangKe(query);
 
-  return { ...query, hoiThoai, tongChuaDoc };
+  return { ...query, hoiThoai, tongChuaDoc, taiTrangKe };
 }
 
 /** Thông tin một hội thoại (tên người kia, quyền gửi, lý do bị khoá…) */
@@ -84,8 +112,9 @@ export function useMessages(conversationId: string, thamDoMs: number | false = T
   });
 
   const tinNhan = useMemo(() => sapTinNhan(query.data?.pages.flat() ?? []), [query.data]);
+  const taiTrangKe = useChotChanTrangKe(query);
 
-  return { ...query, tinNhan };
+  return { ...query, tinNhan, taiTrangKe };
 }
 
 /**

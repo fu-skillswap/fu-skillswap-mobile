@@ -86,6 +86,7 @@ jest.mock('@/core/auth/AuthProvider', () => ({
     user: mockNguoiDungHienTai,
     signInWithGoogle: jest.fn(),
     signOut: jest.fn(),
+    taiLaiNguoiDung: jest.fn(),
   }),
 }));
 
@@ -140,6 +141,7 @@ function baseComment(commentId: string, overrides: Record<string, unknown> = {})
     createdAt: '2026-09-22T00:00:00Z',
     updatedAt: '2026-09-22T00:00:00Z',
     imageUrls: [],
+    replyCount: 0,
     ...overrides,
   };
 }
@@ -169,6 +171,14 @@ const POST = {
 const postOk = () => http.get(`${BASE}/api/forum/posts/p1`, () => HttpResponse.json(envelope(POST)));
 const commentsOk = (items: unknown[] = []) =>
   http.get(`${BASE}/api/forum/posts/p1/comments`, () =>
+    HttpResponse.json(envelope(cursorPage(items))),
+  );
+/**
+ * Reply của một bình luận gốc — backend trả chúng ở endpoint RIÊNG, danh sách
+ * bình luận của bài chỉ có gốc kèm `replyCount`.
+ */
+const repliesOk = (rootId: string, items: unknown[]) =>
+  http.get(`${BASE}/api/forum/comments/${rootId}/replies`, () =>
     HttpResponse.json(envelope(cursorPage(items))),
   );
 
@@ -212,25 +222,46 @@ async function renderScreen() {
 }
 
 describe('PostDetailScreen', () => {
-  it('hiện bài viết, dòng Trả lời ai của reply, và badge AI của bot', async () => {
+  it('hiện bài viết, mở "Xem N phản hồi" thì tải reply (dòng Trả lời ai, badge AI) và ẩn lại được', async () => {
+    // Backend KHÔNG trả reply trong danh sách bình luận của bài — chỉ
+    // `replyCount`. Không có nút mở luồng thì reply không bao giờ hiện ra.
+    let soLanLayPhanHoi = 0;
     server.use(
       postOk(),
-      commentsOk([
-        baseComment('c1'),
-        baseComment('r1', {
-          replyToCommentId: 'c1',
-          replyToUserName: 'Nguyen Van A',
-          authorUserId: 'bot-user-id',
-          authorFullName: 'SkillSwap AI',
-        }),
-      ]),
+      commentsOk([baseComment('c1', { replyCount: 1 })]),
+      http.get(`${BASE}/api/forum/comments/c1/replies`, () => {
+        soLanLayPhanHoi += 1;
+        return HttpResponse.json(
+          envelope(
+            cursorPage([
+              baseComment('r1', {
+                replyToCommentId: 'c1',
+                replyToUserName: 'Nguyen Van A',
+                authorUserId: 'bot-user-id',
+                authorFullName: 'SkillSwap AI',
+              }),
+            ]),
+          ),
+        );
+      }),
     );
 
     await renderScreen();
 
     await waitFor(() => expect(screen.getByText('Học Spring Boot từ đâu?')).toBeTruthy());
-    expect(screen.getByText('AI')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Xem 1 phản hồi')).toBeTruthy());
+    // Chưa mở thì chưa gọi — không bắn một request cho mỗi bình luận gốc.
+    expect(soLanLayPhanHoi).toBe(0);
+    expect(screen.queryByText('AI')).toBeNull();
+
+    await fireEvent.press(screen.getByText('Xem 1 phản hồi'));
+
+    await waitFor(() => expect(screen.getByText('AI')).toBeTruthy());
     expect(screen.getByText(/Trả lời Nguyen Van A/)).toBeTruthy();
+
+    await fireEvent.press(screen.getByText('Ẩn phản hồi'));
+    expect(screen.queryByText('AI')).toBeNull();
+    expect(screen.getByText('Xem 1 phản hồi')).toBeTruthy();
     await donHangDoiDanhSach();
   });
 
@@ -367,27 +398,52 @@ describe('PostDetailScreen', () => {
     await donHangDoiDanhSach();
   });
 
-  it('reply mồ côi vẫn giữ dòng Trả lời ai dù bị nâng lên làm bình luận gốc', async () => {
-    // Phân trang theo cursor: bình luận gốc có thể nằm ở trang trước, nên
-    // `buildCommentTree` nâng reply mồ côi lên làm gốc để nó không biến mất.
-    // Nhưng nó vẫn LÀ một reply. Nếu màn hình chỉ truyền `isReply` cho phần tử
-    // nằm trong `replies`, reply mồ côi mất sạch ngữ cảnh và người đọc thấy một
-    // câu cụt lủn không hiểu đang trả lời ai.
+  it('bình luận gốc chưa có reply thì KHÔNG bày nút xem phản hồi', async () => {
+    // Nút "Xem 0 phản hồi" mở ra một luồng rỗng — đúng kiểu nút chết repo này cấm.
+    server.use(postOk(), commentsOk([baseComment('c1', { replyCount: 0 })]));
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText('noi dung c1')).toBeTruthy());
+
+    expect(screen.queryByTestId('nut-phan-hoi-c1')).toBeNull();
+    await donHangDoiDanhSach();
+  });
+
+  it('gửi reply xong thì luồng của gốc tự mở và hiện câu vừa gửi', async () => {
+    // Reply không nằm trong danh sách bình luận của bài. Không tự mở luồng thì
+    // người dùng gửi xong không thấy câu mình viết ở đâu và gửi lại.
+    let daGui = false;
     server.use(
       postOk(),
-      commentsOk([
-        baseComment('r9', {
-          replyToCommentId: 'khong-co-trong-trang-nay',
-          replyToUserName: 'Tran Thi B',
-          content: 'Dung roi ban oi',
-        }),
-      ]),
+      http.get(`${BASE}/api/forum/posts/p1/comments`, () =>
+        HttpResponse.json(envelope(cursorPage([baseComment('c1', { replyCount: daGui ? 1 : 0 })]))),
+      ),
+      http.get(`${BASE}/api/forum/comments/c1/replies`, () =>
+        HttpResponse.json(
+          envelope(
+            cursorPage(
+              daGui ? [baseComment('r1', { replyToCommentId: 'c1', content: 'Cam on ban' })] : [],
+            ),
+          ),
+        ),
+      ),
+      http.post(`${BASE}/api/forum/posts/p1/comments`, () => {
+        daGui = true;
+        return HttpResponse.json(
+          envelope(baseComment('r1', { replyToCommentId: 'c1', content: 'Cam on ban' })),
+        );
+      }),
     );
 
     await renderScreen();
+    await waitFor(() => expect(screen.getByText('noi dung c1')).toBeTruthy());
 
-    await waitFor(() => expect(screen.getByText('Dung roi ban oi')).toBeTruthy());
-    expect(screen.getByText(/Trả lời Tran Thi B/)).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Trả lời' }));
+    await fireEvent.changeText(screen.getByLabelText('Nội dung bình luận'), 'Cam on ban');
+    await fireEvent.press(screen.getByTestId('nut-gui-binh-luan'));
+
+    await waitFor(() => expect(screen.getByText('Cam on ban')).toBeTruthy());
+    expect(screen.getByText('Ẩn phản hồi')).toBeTruthy();
     await donHangDoiDanhSach();
   });
 
@@ -472,8 +528,8 @@ describe('PostDetailScreen', () => {
     let body = null as Record<string, unknown> | null;
     server.use(
       postOk(),
-      commentsOk([
-        baseComment('c1'),
+      commentsOk([baseComment('c1', { replyCount: 1 })]),
+      repliesOk('c1', [
         baseComment('r1', {
           replyToCommentId: 'c1',
           replyToUserName: 'Nguyen Van A',
@@ -487,6 +543,8 @@ describe('PostDetailScreen', () => {
     );
 
     await renderScreen();
+    await waitFor(() => expect(screen.getByText('Xem 1 phản hồi')).toBeTruthy());
+    await fireEvent.press(screen.getByText('Xem 1 phản hồi'));
     await waitFor(() => expect(screen.getByText('Tran Thi B')).toBeTruthy());
 
     // Bấm "Trả lời" trên REPLY (phần tử thứ hai), không phải trên bình luận gốc.
@@ -664,13 +722,15 @@ describe('PostDetailScreen', () => {
     // ở nhánh đó thì reply có ô lượt thích nhìn y hệt mà bấm không ăn.
     server.use(
       postOk(),
-      commentsOk([
-        baseComment('c1'),
+      commentsOk([baseComment('c1', { replyCount: 1 })]),
+      repliesOk('c1', [
         baseComment('r1', { replyToCommentId: 'c1', replyToUserName: 'Nguyen Van A' }),
       ]),
     );
 
     await renderScreen();
+    await waitFor(() => expect(screen.getByText('Xem 1 phản hồi')).toBeTruthy());
+    await fireEvent.press(screen.getByText('Xem 1 phản hồi'));
     await waitFor(() => expect(screen.getByText('noi dung r1')).toBeTruthy());
 
     expect(screen.getAllByRole('button', { name: 'Thích bình luận' })).toHaveLength(2);
