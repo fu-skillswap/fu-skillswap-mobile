@@ -286,14 +286,33 @@ cho ông biết vì sao.
 
 ## 6. Còn lại gì để lên Google Play
 
-Chưa có gì trong danh sách này.
-
 **Kỹ thuật**
-- [ ] `eas init` (chưa có `extra.eas.projectId`)
-- [ ] Keystore phát hành + bản lưu cất an toàn
-- [ ] Android OAuth client (package + SHA-1)
+- [x] `eas init` — `extra.eas.projectId` đã có trong `app.json`
+- [x] Keystore do EAS giữ, SHA-1 `7642a8785c33a19b1ca9f7a055fc990ebdec226e`
+- [x] Android OAuth client đã đăng ký `com.fptu.exe.skillswap` + SHA-1 trên
+- [x] Icon và splash dùng logo SkillSwap thật (trước đây còn là ảnh mặc định của
+      Expo — nộp lên Play với logo Expo là bị từ chối)
+- [x] `preview`/`production` trong `eas.json` đã có đủ `EXPO_PUBLIC_*`. **Đây là
+      việc riêng của hai profile này:** bản `development*` đóng gói JS bằng Metro
+      chạy trên máy mình nên đọc được `.env`, còn `preview`/`production` đóng gói
+      trên máy EAS, mà `.env` thì `.gitignore` — biến nào không ghi trong
+      `eas.json` là biến đó KHÔNG tồn tại trong bản build. Thiếu
+      `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` thì `getEnv()` ném ngay ở lần gọi API
+      đầu tiên; thiếu `EXPO_PUBLIC_AI_URL` thì Koko tự ẩn, không ai báo lỗi gì.
+- [ ] `EXPO_PUBLIC_FORUM_BOT_USER_ID` — cần userId thật của tài khoản bot
+      "SkillSwap AI" từ backend; để trống thì bình luận của bot không có badge
 - [ ] Một bản `production` build ra AAB thành công
 - [ ] Đã chạy thử trên máy thật, đăng nhập được đầu–cuối
+- [ ] **SHA-1 thứ hai của Play App Signing.** Play tự ký lại app bằng khoá của
+      Google, nên bản tải từ Play có SHA-1 KHÁC bản EAS build ra, và Google
+      Sign-In sẽ trả `DEVELOPER_ERROR` dù mọi thứ khác đúng. Sau lần tải AAB đầu
+      tiên, vào Play Console → Test and release → Setup → App signing, chép
+      "App signing key certificate" SHA-1 rồi thêm vào CÙNG OAuth client Android
+      ở Google Cloud. Không làm bước này thì mọi người cài từ Play đều không
+      đăng nhập được, trong khi máy của mình vẫn chạy ngon.
+- [ ] Service account JSON của Play để `eas submit` chạy được
+      (`submit.production.android.serviceAccountKeyPath`). Bản AAB **đầu tiên**
+      vẫn phải tải tay lên Play Console — API chỉ nhận bản sau khi app đã tồn tại.
 
 **Hồ sơ Play Console**
 - [ ] Tài khoản Google Play Developer (phí một lần 25 USD)
@@ -323,6 +342,13 @@ Thứ tự việc cần làm:
 1. `npx expo-doctor` — phải ra `21/21 checks passed`. Lệch phiên bản package là
    nguyên nhân hàng đầu làm build hỏng một cách khó hiểu; `npx expo install --fix`
    chỉnh lại.
+
+   > [!WARNING]
+   > **`react-native-screens` là ngoại lệ, đừng để `--fix` hạ nó xuống.** SDK 57
+   > đòi `~4.26.0`, nhưng `4.26.2` làm app chết ngay lúc mở; repo cố ý ghim
+   > `4.28.0`. `package.json` đã có `expo.install.exclude` để `expo install --fix`
+   > bỏ qua nó và expo-doctor không kêu nữa. Nếu thấy ai gỡ dòng đó ra rồi chạy
+   > `--fix`, bản build sau sẽ mở lên là crash mà log không nói vì sao.
 2. `npx expo prebuild --platform android --no-install` — nếu lỗi ở đây thì vấn đề
    ở config plugin / `app.json`, chưa tới Gradle. Xong thì **xoá thư mục `android/`**
    (`rm -rf android`): để nó lại thì mọi thay đổi `app.json` sau này âm thầm không

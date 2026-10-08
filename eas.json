@@ -28,7 +28,9 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.skillswap.asia"
+        "EXPO_PUBLIC_API_URL": "https://api.skillswap.asia",
+        "EXPO_PUBLIC_AI_URL": "https://ai.skillswap.asia",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1009522721292-e7fb6m9h3h62svo27d2s1f7jh5rdeoff.apps.googleusercontent.com"
       }
     },
     "production": {
@@ -37,7 +39,9 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.skillswap.asia"
+        "EXPO_PUBLIC_API_URL": "https://api.skillswap.asia",
+        "EXPO_PUBLIC_AI_URL": "https://ai.skillswap.asia",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1009522721292-e7fb6m9h3h62svo27d2s1f7jh5rdeoff.apps.googleusercontent.com"
       }
     }
   },
