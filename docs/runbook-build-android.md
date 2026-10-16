@@ -301,8 +301,13 @@ cho ông biết vì sao.
       đầu tiên; thiếu `EXPO_PUBLIC_AI_URL` thì Koko tự ẩn, không ai báo lỗi gì.
 - [ ] `EXPO_PUBLIC_FORUM_BOT_USER_ID` — cần userId thật của tài khoản bot
       "SkillSwap AI" từ backend; để trống thì bình luận của bot không có badge
-- [ ] Một bản `production` build ra AAB thành công
-- [ ] Đã chạy thử trên máy thật, đăng nhập được đầu–cuối
+- [x] Một bản `production` build ra AAB thành công — build
+      `38f9b9e1-3488-46dc-a157-79e923e80461`, commit `dbdcab2`, 1.0.0 / versionCode 2
+- [x] Đã cài và mở được trên giả lập (bản `preview` APK, 2026-10-08): app không
+      crash, màn Welcome đúng, Google account picker hiện "to continue to
+      SkillSwap" → package + SHA-1 + OAuth client khớp
+- [ ] Đăng nhập được đầu–cuối trên thiết bị — chặn phía BE đã gỡ 2026-10-13
+      (commit BE `535c9138`), nhưng CHƯA chạy lại trên máy thật/giả lập sau đó
 - [ ] **SHA-1 thứ hai của Play App Signing.** Play tự ký lại app bằng khoá của
       Google, nên bản tải từ Play có SHA-1 KHÁC bản EAS build ra, và Google
       Sign-In sẽ trả `DEVELOPER_ERROR` dù mọi thứ khác đúng. Sau lần tải AAB đầu
@@ -315,9 +320,12 @@ cho ông biết vì sao.
       vẫn phải tải tay lên Play Console — API chỉ nhận bản sau khi app đã tồn tại.
 
 **Hồ sơ Play Console**
-- [ ] Tài khoản Google Play Developer (phí một lần 25 USD)
-- [ ] **Privacy policy URL** — bắt buộc, phải là URL sống. App đăng nhập Google và
-      thu thập email/tên nên không được bỏ qua.
+- [x] Tài khoản Google Play Developer (phí một lần 25 USD) — tạo xong 2026-10-09
+- [x] **Privacy policy URL** — `https://skillswap.asia/vi/chinh-sach-bao-mat`
+      (FE PR #107, sống từ 2026-10-15, render phía server, 12 mục). Ô **"Delete
+      account URL"** của Play dán `https://skillswap.asia/vi/chinh-sach-bao-mat#xoa-tai-khoan`
+      — mục 7 nêu cách xoá qua email `skillswapvn.contact@gmail.com`. Dùng
+      đúng URL có `/vi/`: bản không có locale vẫn chạy nhưng là redirect.
 - [ ] **Data safety form** — khai app thu gì, gửi đi đâu, có mã hoá khi truyền
       không. Khai sai là lý do bị từ chối phổ biến nhất.
 - [ ] **Content rating** (bộ câu hỏi IARC). Có diễn đàn người dùng tự đăng nội
@@ -325,7 +333,9 @@ cho ông biết vì sao.
       duyệt. Backend đã có kiểm duyệt từ ngữ (`FORUM_4201`) và luồng báo cáo —
       nêu đúng hai thứ đó.
 - [ ] Store listing: tên, mô tả ngắn + dài, ít nhất 2 ảnh chụp màn hình điện
-      thoại, icon 512×512, feature graphic 1024×500
+      thoại, icon 512×512 (đã sinh sẵn: `D:\Skillswap\play-store-icon-512.png`,
+      hạ từ `assets/images/icon.png`, nền trắng đặc — Play không nhận ảnh có
+      kênh alpha), feature graphic 1024×500
 - [ ] Nhãn target audience (app cho sinh viên FPT → không phải app cho trẻ em)
 
 **Đánh giá thẳng:** với 4/5 tab còn trống, tôi không nghĩ nên nộp bản public ngay.
